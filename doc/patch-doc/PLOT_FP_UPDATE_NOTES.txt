@@ -1,0 +1,2 @@
+plot_fp.yaml erweitert: Slots und effektive Oeffnungsquerschnitte jetzt explizit ueber Zeit und ueber Kolbenweg x.
+Hinweis: Im Free-Piston-Code wird by_distance relativ zu TDC ausgewertet; der Kolbenweg-Plot benutzt dennoch die Modellkoordinate free_piston_x_m, wie angefordert.

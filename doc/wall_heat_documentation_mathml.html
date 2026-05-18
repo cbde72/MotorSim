@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>thermo0d / MotorSim – Wandwärme-Dokumentation</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121933;
+      --panel-2: #172142;
+      --text: #e9eefc;
+      --muted: #b8c2e6;
+      --accent: #7fb3ff;
+      --ok: #7ee081;
+      --warn: #ffd166;
+      --bad: #ff7b7b;
+      --border: #2b3768;
+      --code: #0d1430;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #08101f 0%, #0d1430 100%);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+    h1, h2, h3, h4 { line-height: 1.2; }
+    h1 { font-size: 2.1rem; margin: 0 0 0.5rem; }
+    h2 {
+      margin-top: 2.3rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid var(--border);
+      font-size: 1.45rem;
+    }
+    h3 { margin-top: 1.6rem; font-size: 1.12rem; }
+    p, li { color: var(--muted); }
+    .hero {
+      background: rgba(18, 25, 51, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .pill {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .panel {
+      background: rgba(18, 25, 51, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 18px 8px;
+      margin-top: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      font-size: 0.95rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      vertical-align: top;
+    }
+    th {
+      background: #18224a;
+      text-align: left;
+      color: var(--text);
+    }
+    td { background: rgba(255,255,255,0.01); }
+    code, pre {
+      font-family: Consolas, "Courier New", monospace;
+      background: var(--code);
+      color: #dce6ff;
+    }
+    pre {
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: auto;
+    }
+    .status-ok { color: var(--ok); font-weight: 600; }
+    .status-warn { color: var(--warn); font-weight: 600; }
+    .status-bad { color: var(--bad); font-weight: 600; }
+    .math {
+      overflow-x: auto;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin: 12px 0 16px;
+    }
+    math { font-size: 1.05rem; }
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .small { font-size: 0.92rem; color: #9eb0e3; }
+    .footnotes li { margin-bottom: 0.45rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Wandwärme-Dokumentation</h1>
+      <p><strong>Projekt:</strong> thermo0d / MotorSim</p>
+      <p>Diese HTML-Dokumentation beschreibt die vorgesehenen Wandwärmemodelle, die mathematischen Ansätze, die projektinterne Variante <code>promo</code> auf Basis der alten Quellen sowie den aktuellen Implementierungsstand im laufenden Umbau.</p>
+      <div class="meta">
+        <div class="pill"><strong>Schwerpunkt</strong><br><span class="small">Woschni-Varianten, Hohenberg, Projekt-Integration</span></div>
+        <div class="pill"><strong>Formeldarstellung</strong><br><span class="small">MathML</span></div>
+        <div class="pill"><strong>Ziel</strong><br><span class="small">Physik, Konfiguration, Export und GUI konsistent dokumentieren</span></div>
+      </div>
+    </section>
+
+    <section class="panel toc">
+      <h2>Inhalt</h2>
+      <ol>
+        <li><a href="#grundlagen">Grundlagen</a></li>
+        <li><a href="#modelle">Modelle und Formeln</a></li>
+        <li><a href="#promo">Projektvariante WoschniPromo</a></li>
+        <li><a href="#status">Implementierungsstand</a></li>
+        <li><a href="#konfig">Konfigurationsmodell</a></li>
+        <li><a href="#performance">Performance-Richtlinien</a></li>
+        <li><a href="#offen">Offene Punkte</a></li>
+        <li><a href="#quellen">Quellen</a></li>
+      </ol>
+    </section>
+
+    <h2 id="grundlagen">1. Grundlagen</h2>
+    <div class="panel">
+      <p>Im Projekt wird die Wandwärme als lokaler Energieterm im Zylinder benötigt. Die Wandwärme beeinflusst die innere Energie, die Gastemperatur, indirekt die Druckentwicklung und alle davon abgeleiteten Größen. Deshalb muss dieselbe Berechnung in Solver, CSV-Export und Plotpfad verwendet werden.</p>
+      <p>Für GT-SUITE werden mehrere in-Zylinder-Wärmeübergangsmodelle beschrieben: <code>WoschniGT</code>, <code>WoschniClassic</code>, <code>WoschniSwirl</code>, <code>WoschniHuber</code>, <code>Hohenberg</code> sowie ein separates <code>flow</code>-Modell. Die Woschni-Varianten unterscheiden sich vor allem durch die Konstanten und die Definition der mittleren Zylindergasgeschwindigkeit. Das GT-Manual nennt außerdem typische Vollast-Wandtemperaturen von 550–600 K für Kopf und Kolben sowie etwa 400 K für die Zylinderwand.¹</p>
+      <div class="math">
+        <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+          <mrow>
+            <mi>Q</mi><mo></mo><mi>w</mi><mo>=</mo><mi>h</mi><mo>&#x2062;</mo><mi>A</mi><mo>&#x2062;</mo><mo stretchy="false">(</mo><msub><mi>T</mi><mi>w</mi></msub><mo>&#x2212;</mo><msub><mi>T</mi><mi>g</mi></msub><mo stretchy="false">)</mo>
+          </mrow>
+        </math>
+      </div>
+      <p>Dabei ist <code>h</code> der Wärmeübergangskoeffizient, <code>A</code> die wirksame Wandfläche, <code>T<sub>w</sub></code> die Wandtemperatur und <code>T<sub>g</sub></code> die Gastemperatur.</p>
+    </div>
+
+    <h2 id="modelle">2. Modelle und Formeln</h2>
+    <div class="panel">
+      <h3>2.1 Gemeinsame Woschni-Grundform</h3>
+      <p>Für die Woschni-Familie verwendet GT-SUITE die folgende gemeinsame Struktur:</p>
+      <div class="math">
+        <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+          <mrow>
+            <mi>h</mi><mo>=</mo><msub><mi>K</mi><mn>1</mn></msub><mo>&#x2062;</mo><msup><mi>B</mi><mrow><mo>&#x2212;</mo><mn>0.2</mn></mrow></msup><mo>&#x2062;</mo><msup><mi>p</mi><mn>0.8</mn></msup><mo>&#x2062;</mo><msup><mi>T</mi><mrow><mo>&#x2212;</mo><msub><mi>K</mi><mn>2</mn></msub></mrow></msup><mo>&#x2062;</mo><msup><mi>w</mi><mn>0.8</mn></msup>
+          </mrow>
+        </math>
+      </div>
+      <p>Mit:</p>
+      <ul>
+        <li><code>B</code> = Bohrung</li>
+        <li><code>p</code> = Zylinderdruck</li>
+        <li><code>T</code> = Zylindertemperatur</li>
+        <li><code>w</code> = mittlere Zylindergasgeschwindigkeit</li>
+      </ul>
+
+      <table>
+        <thead>
+          <tr><th>Modell</th><th>K₁</th><th>K₂</th><th>Bemerkung</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>WoschniGT</td><td>3.01426</td><td>0.50</td><td>GT-nahe Variante ohne Swirl, geöffnete Ventile expliziter behandelt</td></tr>
+          <tr><td>WoschniClassic</td><td>3.26</td><td>0.53</td><td>Klassische Woschni-Korrelation</td></tr>
+          <tr><td>WoschniSwirl</td><td>3.26</td><td>0.53</td><td>Classic mit Swirl-Term</td></tr>
+          <tr><td>WoschniHuber</td><td>3.26</td><td>0.53</td><td>Swirl-Basis mit zusätzlicher Huber-Geschwindigkeit</td></tr>
+        </tbody>
+      </table>
+
+      <h3>2.2 Mittlere Gasgeschwindigkeit für GT, Classic und Swirl</h3>
+      <div class="math">
+        <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+          <mrow>
+            <mi>w</mi><mo>=</mo><msub><mi>C</mi><mn>1</mn></msub><mo>&#x2062;</mo><mover><msub><mi>S</mi><mi>p</mi></msub><mo>&#x00AF;</mo></mover><mo>+</mo><msub><mi>C</mi><mn>2</mn></msub><mo>&#x2062;</mo><mfrac><mrow><msub><mi>V</mi><mi>d</mi></msub><msub><mi>T</mi><mi>r</mi></msub></mrow><mrow><msub><mi>p</mi><mi>r</mi></msub><msub><mi>V</mi><mi>r</mi></msub></mrow></mfrac><mo>&#x2062;</mo><mo stretchy="false">(</mo><mi>p</mi><mo>&#x2212;</mo><msub><mi>p</mi><mi>m</mi></msub><mo stretchy="false">)</mo>
+          </mrow>
+        </math>
+      </div>
+
+      <h3>2.3 WoschniGT</h3>
+      <div class="math">
+        <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+          <mrow>
+            <msub><mi>C</mi><mn>1</mn></msub><mo>=</mo><mn>2.28</mn><mo>+</mo><mn>3.9</mn><mo>&#x2062;</mo><mi>min</mi><mo stretchy="false">(</mo><mfrac><msub><mover><mi>m</mi><mo>.</mo></mover><mi>in</mi></msub><mrow><msub><mi>m</mi><mi>cyl</mi></msub><mo>&#x2062;</mo><mi>f</mi></mrow></mfrac><mo>,</mo><mn>1</mn><mo stretchy="false">)</mo>
+          </mrow>
+        </math>
+      </div>
+      <p><code>C₂</code> ist in Gaswechsel und Verdichtung 0 und in Verbrennung/Expansion <code>3.24·10⁻³</code>.</p>
+
+      <h3>2.4 WoschniClassic</h3>
+      <table>
+        <thead><tr><th>Phase</th><th>C₁</th><th>C₂</th></tr></thead>
+        <tbody>
+          <tr><td>Gaswechsel</td><td>6.18</td><td>0</td></tr>
+          <tr><td>Verdichtung</td><td>2.28</td><td>0</td></tr>
+          <tr><td>Verbrennung / Expansion</td><td>2.28</td><td>3.24·10⁻³</td></tr>
+        </tbody>
+      </table>
+
+      <h3>2.5 WoschniSwirl</h3>
+      <table>
+        <thead><tr><th>Phase</th><th>C₁</th><th>C₂</th></tr></thead>
+        <tbody>
+          <tr><td>Gaswechsel</td><td>6.18 + 0.417·Sw</td><td>0</td></tr>
+          <tr><td>Verdichtung</td><td>2.28 + 0.308·Sw</td><td>0</td></tr>
+          <tr><td>Verbrennung / Expansion</td><td>2.28 + 0.308·Sw</td><td>3.24·10⁻³</td></tr>
+        </tbody>
+      </table>
+      <p><code>Sw</code> ist die Swirl-Zahl der zentralen Brennraumregion.</p>
+
+      <h3>2.6 WoschniHuber</h3>
+      <div class="math">
+        <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+          <mrow>
+            <mi>w</mi><mo>=</mo><mi>max</mi><mo stretchy="false">(</mo><msub><mi>w</mi><mi>w</mi></msub><mo>,</mo><msub><mi>w</mi><mi>h</mi></msub><mo stretchy="false">)</mo>
+          </mrow>
+        </math>
+      </div>
+      <div class="math">
+        <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+          <mrow>
+            <msub><mi>w</mi><mi>h</mi></msub><mo>=</mo><msub><mi>C</mi><mn>1</mn></msub><mo>&#x2062;</mo><mover><msub><mi>S</mi><mi>p</mi></msub><mo>&#x00AF;</mo></mover><mo>&#x2062;</mo><mo stretchy="false">(</mo><mn>1</mn><mo>+</mo><mn>2</mn><mo>&#x2062;</mo><msup><mrow><mo stretchy="false">(</mo><mfrac><msub><mi>V</mi><mi>TDC</mi></msub><mi>V</mi></mfrac><mo stretchy="false">)</mo></mrow><mn>2</mn></msup><mo>&#x2062;</mo><msup><mrow><mi>max</mi><mo stretchy="false">(</mo><mi>IMEP</mi><mo>,</mo><mn>1</mn><mo stretchy="false">)</mo></mrow><mrow><mo>&#x2212;</mo><mn>0.2</mn></mrow></msup><mo stretchy="false">)</mo>
+          </mrow>
+        </math>
+      </div>
+
+      <h3>2.7 Hohenberg</h3>
+      <div class="math">
+        <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+          <mrow>
+            <msub><mi>h</mi><mi>c</mi></msub><mo>=</mo><mn>130</mn><mo>&#x2062;</mo><msup><mi>V</mi><mrow><mo>&#x2212;</mo><mn>0.06</mn></mrow></msup><mo>&#x2062;</mo><msup><mrow><mo stretchy="false">(</mo><mfrac><mi>p</mi><mn>100000</mn></mfrac><mo stretchy="false">)</mo></mrow><mn>0.8</mn></msup><mo>&#x2062;</mo><msup><mi>T</mi><mrow><mo>&#x2212;</mo><mn>0.4</mn></mrow></msup><mo>&#x2062;</mo><msup><mrow><mo stretchy="false">(</mo><mover><msub><mi>S</mi><mi>p</mi></msub><mo>&#x00AF;</mo></mover><mo>+</mo><mn>1.4</mn><mo stretchy="false">)</mo></mrow><mn>0.8</mn></msup>
+          </mrow>
+        </math>
+      </div>
+      <p>Das GT-Manual beschreibt Hohenberg als Alternative, die sich besonders für manche DI-Diesel genauer verhalten kann und bei sehr niedrigen Drehzahlen eine höhere Untergrenze von <code>h</code> liefert als eine rein laminar begrenzte Korrelation.</p>
+    </div>
+
+    <h2 id="promo">3. Projektvariante WoschniPromo</h2>
+    <div class="panel">
+      <p>Im Projekt wurde zusätzlich die Variante <code>promo</code> als quellennahe Legacy-Erweiterung vorgesehen. Sie orientiert sich an den alten Fortran-Quellen, in denen eine klassische, swirl-nahe Woschni-Form mit Temperatur-Exponent <code>-0.53</code>, Druck-Exponent <code>0.8</code> und Bohrungsfaktor <code>0.013·D<sup>-0.2</sup></code> verwendet wurde. Charakteristisch ist, dass der zusätzliche Druckdifferenzterm in der alten Zylinderrechnung praktisch deaktiviert war. Deshalb ist <code>dp_mode: off</code> die empfohlene robuste Standardeinstellung.</p>
+      <div class="math">
+        <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+          <mrow>
+            <mi>h</mi><mo>=</mo><mi>M</mi><mo>&#x2062;</mo><mn>0.013</mn><mo>&#x2062;</mo><msup><mi>D</mi><mrow><mo>&#x2212;</mo><mn>0.2</mn></mrow></msup><mo>&#x2062;</mo><msup><mi>T</mi><mrow><mo>&#x2212;</mo><mn>0.53</mn></mrow></msup><mo>&#x2062;</mo><msup><mrow><mi>p</mi><mo>&#x2062;</mo><mo stretchy="false">(</mo><msub><mi>w</mi><mn>1</mn></msub><mo>+</mo><msub><mi>w</mi><mn>2</mn></msub><mo>&#x2062;</mo><mi>&#x0394;</mi><mi>p</mi><mo stretchy="false">)</mo></mrow><mn>0.8</mn></msup>
+          </mrow>
+        </math>
+      </div>
+      <p>Mit Phasenumschaltung für <code>w₁</code> ähnlich der alten Quellen:</p>
+      <table>
+        <thead><tr><th>Phase</th><th>w₁ / Sₚ-Basis</th></tr></thead>
+        <tbody>
+          <tr><td>Gaswechsel</td><td>(6.18 + 0.417·c<sub>ucm</sub>) · <span style="text-decoration:overline;">S<sub>p</sub></span></td></tr>
+          <tr><td>Verdichtung / Expansion</td><td>(2.28 + 0.308·c<sub>ucm</sub>) · <span style="text-decoration:overline;">S<sub>p</sub></span></td></tr>
+        </tbody>
+      </table>
+      <p>Diese Variante ist im Projekt vor allem nützlich, um alte Ergebnisse möglichst nahe nachzubilden, ohne die modernen GT-Varianten umzubenennen.</p>
+    </div>
+
+    <h2 id="status">4. Implementierungsstand</h2>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr><th>Bereich</th><th>Status</th><th>Bemerkung</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Architektur für Wandwärmevarianten</td><td><span class="status-ok">definiert</span></td><td>Build-Time-Auswahl, Runtime über flache Spezifikation vorgesehen</td></tr>
+          <tr><td>Gemeinsame Auswertung für Solver / CSV / Plot</td><td><span class="status-ok">konzeptionell festgelegt</span></td><td>Keine doppelte Physik in RHS, Export und Plotpfad</td></tr>
+          <tr><td>Varianten <code>legacy</code>, <code>promo</code>, <code>classic</code>, <code>swirl</code>, <code>gt</code>, <code>huber</code></td><td><span class="status-ok">modelliert</span></td><td>Formell beschrieben und als Zielzustand integriert</td></tr>
+          <tr><td>YAML-Konfiguration</td><td><span class="status-warn">instabil</span></td><td>Mehrfach Schema-Mismatches bei automatisiert erzeugten Testdateien; reale lokale Pydantic-Struktur muss exakt getroffen werden</td></tr>
+          <tr><td>GUI-Editoren</td><td><span class="status-warn">angepasst, aber abzugleichen</span></td><td>Felder und Auswahl wurden ergänzt; tatsächliche lokale Schemaform bleibt maßgeblich</td></tr>
+          <tr><td>RHS-/Numba-Signaturen</td><td><span class="status-warn">sensibel</span></td><td>Bei Refactoring trat bereits ein echter Signaturbruch in der Ventilpfad-Weitergabe auf</td></tr>
+          <tr><td>Hohenberg</td><td><span class="status-bad">noch nicht voll eingebunden</span></td><td>Formel dokumentiert, aber nicht als stabiler Projektstandard bestätigt</td></tr>
+          <tr><td>Wandtemperatur-Solver / FE-Wandmodell</td><td><span class="status-bad">nicht Teil des aktuellen Patches</span></td><td>Dokumentiert, aber außerhalb des bisherigen Projektumbaus</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Bewertung</h3>
+      <p>Der fachliche Zielzustand ist klar: eine zentrale, performante Wandwärmeauswertung, die in Solver, CSV und Plot identisch verwendet wird. Der aktuelle Engpass liegt weniger in den Gleichungen als in der lokalen Projektintegration: Schemaform der YAMLs, tatsächliche Felder in den Editoren und Signaturkonsistenz zwischen <code>rhs.py</code>, <code>source_terms.py</code>, Export und GUI.</p>
+    </div>
+
+    <h2 id="konfig">5. Konfigurationsmodell</h2>
+    <div class="panel">
+      <p>Das Zielkonfigurationsmodell für die Varianten ist inhaltlich:</p>
+      <pre>wall_heat:
+  model: woschni
+  variant: promo | classic | swirl | gt | huber | legacy
+  wall_temperature_K: ...
+  wall_area_m2: ...
+  multiplier: 1.0
+  dp_mode: off | instant | motored
+  reference_state_mode: none | pre_combustion_latch | cycle_start_latch
+  phase_mode: promo | classic | gt
+  cucm: 0.0
+  swirl_number: 0.0
+  imep_bar: 0.0</pre>
+      <p>Wichtig: Die tatsächlich gültige YAML-Struktur muss immer gegen den realen lokalen Projektstand validiert werden. Im laufenden Umbau gab es wiederholt Abweichungen zwischen angenommener und lokaler Schemaform. Deshalb ist bei Testdateien zuerst die echte Modellklasse entscheidend, nicht die zuletzt angenommene Beispielstruktur.</p>
+    </div>
+
+    <h2 id="performance">6. Performance-Richtlinien</h2>
+    <div class="panel">
+      <ul>
+        <li>Keine Python-Polymorphie im Hot Path.</li>
+        <li>Variantenwahl vor Simulationsstart, nicht pro RHS-Schritt.</li>
+        <li>Runtime über flache Arrays, Integer-IDs und Numba-Helfer.</li>
+        <li>Wandwärme nur einmal pro Pfad berechnen und an Export/Plot weiterreichen.</li>
+        <li>Keine zweite, leicht abweichende Physik in <code>rows.py</code> oder <code>plots.py</code>.</li>
+      </ul>
+      <pre>// Zielidee
+wall_heat_spec = build_wall_heat_model(config)
+qdot_wall, htc = evaluate_wall_heat_from_state(spec, state)
+// derselbe Helper für RHS, CSV und Plot</pre>
+    </div>
+
+    <h2 id="offen">7. Offene Punkte</h2>
+    <div class="panel">
+      <ol>
+        <li>Lokale YAML-Schemaform endgültig festziehen und daraus Testdateien neu erzeugen.</li>
+        <li>GUI-Felder gegen diese reale Schemaform spiegeln.</li>
+        <li>Hohenberg optional als weitere Runtime-Variante ergänzen.</li>
+        <li>Wandtemperaturmodell von reiner Imposition zu berechnetem Modell ausbauen, falls gewünscht.</li>
+        <li>Die CSV-/Plotsignale für <code>htc</code>, <code>qdot_wall</code>, ggf. <code>woschni_velocity</code> endgültig vereinheitlichen.</li>
+      </ol>
+    </div>
+
+    <h2 id="quellen">8. Quellen</h2>
+    <div class="panel footnotes">
+      <ol>
+        <li>Gamma Technologies, <em>Engine Performance Application Manual</em>, Version 2025, Abschnitt 2.6.1–2.6.2, insbesondere Seiten 23–28 sowie die Formelseiten 25–27.</li>
+        <li>Im Manual werden die Varianten WoschniGT, WoschniClassic, WoschniSwirl, WoschniHuber und Hohenberg beschrieben. Die Tabellen und Formeln auf Seiten 25–27 bilden die Grundlage für die hier dokumentierten Modellvarianten.</li>
+        <li>Der Implementierungsstand in Abschnitt 4 beschreibt den Stand des laufenden Projektumbaus in diesem Chat-Kontext und ist nicht Teil des hochgeladenen Manuals.</li>
+      </ol>
+    </div>
+  </div>
+</body>
+</html>

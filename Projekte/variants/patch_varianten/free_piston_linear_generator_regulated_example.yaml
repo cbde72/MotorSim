@@ -1,0 +1,534 @@
+# Hinweis:
+# Diese Konfiguration setzt das neue Lastmodell
+#   free_piston.load.model: linear_generator_regulated
+# voraus.
+# Sie ist als direkt kommentierte Arbeitsbasis für free_piston_GenSet_V09d gedacht.
+# Schwerpunkt der Parametrierung:
+# - realer Freikolben-Hub aus free_piston.mechanics.x_min_m / x_max_m
+# - Schutz vor Totpunktüberschreitung mit weicher Zielmarge + harter Sicherheitsmarge
+# - vorsichtige elektrische Leistungsabnahme, damit die Kompression und der Vibe-Start
+#   nicht schon im ersten Schritt zu stark abgewürgt werden
+
+versioning:
+  # Paketstand des Archivs, aus dem diese Konfiguration abgeleitet wurde.
+  package_version: 7.1.93
+  # Erwartete Config-Schema-Version.
+  config_schema_version: 5
+  # Beim Laden erkannte Schema-Version der Datei.
+  loaded_config_schema_version: 5
+  # false = keine automatische Migration in diese Datei zurückgeschrieben.
+  migration_applied: false
+
+test_description: >-
+  Free-piston GenSet V09d mit linearem Generator-Lastmodell.
+  Die Last wird in der Hubmitte zur Leistungsentnahme genutzt und nahe OT/UT
+  über den verbleibenden Anhalteweg aktiv erhöht.
+
+modeling:
+  # Aktiviert den Free-Piston-Zweig des Modells.
+  architecture: free_piston
+
+free_piston:
+  initial_conditions:
+    # Startposition des Freikolbens [m] relativ zu OT/TDC.
+    # 0.0 = OT/TDC, x_max_m = UT/BDC.
+    # 0.086 m bedeutet: Start nahe UT und Bewegung anfangs in Richtung OT.
+    x0_m: 0.086
+
+    # Startgeschwindigkeit [m/s].
+    # Negativ = Bewegung Richtung OT/TDC, positiv = Richtung UT/BDC.
+    v0_m_per_s: -6.175151311120057
+
+    cylinder:
+      # Anfangsdruck im Zylinder [Pa].
+      pressure_Pa: 132188.21686828526
+      # Anfangstemperatur im Zylinder [K].
+      temperature_K: 474.1499796697688
+
+    combustion_state:
+      # Bereits verbrannter Massenanteil zum Start [0..1].
+      burned_fraction_0to1: 0.0
+      # Bereits freigesetzte Verbrennungsenergie zum Start [J].
+      released_energy_J: 0.0
+      # false = Zündung ist beim Simulationsstart noch nicht scharf.
+      ignition_armed: false
+      # false = Einspritzung ist beim Simulationsstart noch nicht scharf.
+      injection_armed: false
+
+  mechanics:
+    # Bewegte Gesamtmasse von Kolben + Stange + Läufer + gekoppelte translatorische Masse [kg].
+    moving_mass_kg: 3.0
+    # Wirksamer Kolbendurchmesser [m]. Daraus wird die Kolbenfläche gebildet.
+    piston_diameter_m: 0.0605
+    # Geometrisches Verdichtungsverhältnis des Freikolbensystems.
+    compression_ratio: 50
+    # Mechanischer OT/TDC-Anschlag [m].
+    x_min_m: 0.0
+    # Mechanischer UT/BDC-Anschlag [m].
+    # Daraus ergibt sich der reale Freikolbenhub: 0.10807 m = 108.07 mm.
+    x_max_m: 0.10807
+
+  friction:
+    # Reibmodell des Freikolbens.
+    model: coulomb_viscous
+    # Coulomb-Reibkraft [N]. Immer entgegen der Bewegungsrichtung.
+    fc_N: 100.0
+    # Zusätzliche lineare viskose Reibung [N·s/m].
+    cv_Ns_per_m: 0.0
+
+  load:
+    # Neues lineares Generator-Lastmodell mit Leistungs- und Schutzanteil.
+    model: linear_generator_regulated
+
+    # Grunddämpfung [N·s/m].
+    # Kleine Grundlast für stetige Energienahme, aber bewusst moderat,
+    # damit die Kompression vor dem Vibe-Start nicht zu stark gedämpft wird.
+    damping_Ns_per_m: 20.0
+
+    # Obergrenze der effektiven Generator-Dämpfung [N·s/m].
+    # Dient als zusätzliche Begrenzung der Bremskraft bei hohen Geschwindigkeiten.
+    max_damping_Ns_per_m: 12000.0
+
+    # Zielwert der elektrischen Generatorleistung [W].
+    # Startwert bewusst konservativ gewählt, weil die Vibe-Freisetzung
+    # über die gelatchte Zylindermasse variiert und der Betrieb erst stabil
+    # gegen die Totpunkte abgefangen werden soll.
+    power_target_W: 2500.0
+
+    # Elektrischer Wirkungsgrad des linearen Generators [0..1].
+    # Aus dem elektrischen Sollwert wird intern eine mechanische Bremsleistung berechnet.
+    efficiency_0to1: 0.92
+
+    # Untere Geschwindigkeitsgrenze [m/s] für die Leistungsregelung.
+    # Verhindert unrealistisch große Sollkräfte bei sehr kleiner Kolbengeschwindigkeit.
+    min_velocity_m_per_s: 0.35
+
+    # Breite der Schutz-/Regelzone vor beiden Totpunkten [m].
+    # Hier: 8 mm. Das liegt bewusst innerhalb der letzten 20 mm vor OT,
+    # also noch hinter dem Vibe-Start bei hign_mm = 20 mm.
+    # Gleichzeitig liegt es am UT klar innerhalb der letzten 8 mm und stört daher
+    # die Öffnung der Transfer-/Auslassschlitze deutlich weniger.
+    control_zone_m: 0.008
+
+    # Gewünschte weiche Restmarge zu OT/UT [m].
+    # Der Regler versucht, den Kolben vor dem Anschlag schon innerhalb dieser Reserve abzufangen.
+    target_margin_m: 0.0020
+
+    # Harte Sicherheitsmarge [m].
+    # Wird dieser Abstand unterschritten, fährt das Modell auf maximale Schutzbremsung.
+    hard_margin_m: 0.0008
+
+    # Verstärkung des stop-distance-basierten Schutzanteils [-].
+    # > 1.0 bedeutet etwas aggressiver als die rein energetisch gerade notwendige Bremsung.
+    stop_kp: 1.20
+
+    # Absolute Obergrenze der Generatorbremskraft [N].
+    # Startwert so gewählt, dass ausreichend Schutzwirkung vorhanden ist,
+    # ohne die Mittellagen-Dynamik sofort vollständig zu ersticken.
+    max_force_N: 6500.0
+
+preprocessing:
+  gas_properties:
+    # Spezifische Wärmekapazität bei konstantem Druck [J/(kg·K)].
+    cp_J_per_kgK: 1005.0
+    # Spezifische Wärmekapazität bei konstantem Volumen [J/(kg·K)].
+    cv_J_per_kgK: 718.0
+    # Spezifische Gaskonstante [J/(kg·K)].
+    R_J_per_kgK: 287.0
+
+  features:
+    # true = Ladungswechsel / Massestrommodell aktiv.
+    mass_flow: true
+    # true = Wandwärmemodell aktiv.
+    wall_heat: true
+    # true = Verbrennungsmodell aktiv.
+    combustion: true
+    # false = kein Verdampfungsmodell aktiv.
+    evaporation: false
+    # true = p·V-Arbeit wird bilanziert.
+    pv_work: true
+
+  engine:
+    # Zweitakt-Betrieb.
+    cycle_type: 2t
+    # Referenzdrehzahl [rpm].
+    # Im Free-Piston-Zweig oft nur Hilfs-/Bezugsgröße für diverse Hilfsfunktionen.
+    speed_rpm: 25.0
+
+  volumes:
+    - name: cylinder
+      # Hauptarbeitsraum des Freikolbenmotors.
+      type: cylinder
+      # Anfangsdruck des Zylinders [Pa].
+      initial_pressure_Pa: 132188.21686828526
+      # Anfangstemperatur des Zylinders [K].
+      initial_temperature_K: 474.1499796697688
+
+      kinematics:
+        # Für den Freikolbenpfad wird dieser Block häufig als Referenz-/Hilfsgeometrie
+        # für zylinderbezogene Submodelle verwendet. Die eigentliche translatorische
+        # Freikolbenkinematik steckt oben in free_piston.mechanics.
+        type: crank_slider
+        # Referenz-Bohrung [m].
+        bore_m: 1.0745
+        # Referenz-Hub [m].
+        stroke_m: 1.08
+        # Referenz-Pleuellänge [m].
+        conrod_m: 1.12
+        # Referenz-Verdichtungsverhältnis für die Zylinder-Hilfsgeometrie.
+        compression_ratio: 50.0
+        # Phasenverschiebung [°] der Referenzkinematik.
+        phase_deg: 0.0
+
+      wall_heat:
+        # Woschni-Wandwärme aktiv.
+        model: woschni
+        # Verwendete Woschni-Variante.
+        variant: promo
+        # Angenommene Wandtemperatur [K].
+        wall_temperature_K: 450.0
+        # Wirksame Wärmeübertragerfläche [m²].
+        wall_area_m2: 0.03
+        # Druckgradientenmodus des Woschni-Modells.
+        dp_mode: 'off'
+        # Globaler Multiplikator auf den Wärmeübergang.
+        multiplier: 15
+
+      combustion:
+        # Vibe-Verbrennungsmodell aktiv.
+        model: vibe
+
+        # Startart der Vibe-Freisetzung.
+        # hign_position = Start über Abstand zu OT/TDC.
+        start_mode: hign_position
+        # Startabstand der Verbrennung von OT/TDC [mm].
+        # 20 mm vor OT entspricht bei 108.07 mm Hub rund 18.5 % des Gesamtwegs.
+        hign_mm: 20.0
+
+        # Dauerdefinition der Vibe-Freisetzung.
+        duration_mode: time
+        # Verbrennungsdauer [ms].
+        duration_ms: 3.0
+
+        # Vibe-Formparameter a [-].
+        a: 6.9
+        # Vibe-Formparameter m [-].
+        m: 2.0
+
+        # none = keine zusätzliche Energiekopplung an einen anderen Teilpfad.
+        energy_coupling: none
+        # Referenzhub [m] für hubbezogene Skalierungen im Verbrennungsmodell.
+        stroke_reference_m: 0.010807
+        # Exponent für die Hubskalierung.
+        stroke_exponent: 0.01
+
+        # Brennstoffdosierung aus gelatchter Zylindermasse beim Slot-Schluss.
+        fueling_mode: lambda_from_cylinder_mass_at_slot_close
+        # Lambda-Zielwert [-].
+        lambda_target: 1.0
+        # Unterer Heizwert des Kraftstoffs [J/kg].
+        lhv_J_per_kg: 43000000.0
+        # Stöchiometrisches Luft/Kraftstoff-Verhältnis [kg Luft / kg Kraftstoff].
+        afr_stoich_kg_air_per_kg_fuel: 14.5
+        # Gesamtwirkungsgrad der Verbrennung [0..1].
+        combustion_efficiency_0to1: 0.98
+
+        # Schwelle der Gesamt-Slotfläche [m²], ab der das System "Slot offen" erkennt.
+        slot_open_threshold_m2: 1.0e-07
+        # Schwelle der Gesamt-Slotfläche [m²], unter der das System "Slot geschlossen" erkennt.
+        slot_closed_threshold_m2: 1.0e-09
+        # Mindest-Kompressionsgeschwindigkeit [m/s], damit der Kompressionshub sicher erkannt wird.
+        compression_velocity_threshold_m_per_s: 0.02
+
+      evaporation:
+        # Kein Verdampfungsmodell.
+        model: none
+
+    - name: bounce
+      # Gegenseitiger Gasfeder-/Bounce-Raum.
+      type: bounce_chamber
+      # Gasfeder-Modell für den Bounce-Raum.
+      model: gas_spring
+      # Anfangsdruck im Bounce-Raum [Pa].
+      initial_pressure_Pa: 441325.0
+      # Anfangstemperatur im Bounce-Raum [K].
+      # Achtung: Der hier vorhandene Wert stammt aus dem aktuellen Archivstand und ist
+      # physikalisch nicht plausibel. Für die reine Weiterarbeit am bestehenden Fall
+      # bleibt er absichtlich unverändert.
+      initial_temperature_K: 19887526.76591058
+      # Durchmesser des Bounce-Raums [m].
+      chamber_diameter_m: 0.07
+      # Länge des Bounce-Raums [m].
+      chamber_length_m: 0.10807
+      # Verdichtungsverhältnis des Bounce-Raums [-].
+      compression_ratio: 16
+      # Polytropenexponent der Bounce-Gasfeder [-].
+      polytropic_exponent: 1.3
+
+    - name: receiver
+      # Spül-/Ladeplenum vor dem Transferschlitz.
+      type: plenum
+      # Anfangsdruck im Receiver [Pa].
+      initial_pressure_Pa: 121399.29888871335
+      # Anfangstemperatur im Receiver [K].
+      initial_temperature_K: 340.82375641191624
+      # Festes Plenumvolumen [m³].
+      fixed_volume_m3: 0.00048
+      wall_heat:
+        # Keine Wandwärme im Receiver.
+        model: none
+      combustion:
+        # Keine Verbrennung im Receiver.
+        model: none
+      evaporation:
+        # Keine Verdampfung im Receiver.
+        model: none
+
+    - name: exhaust_plenum
+      # Auslassplenum hinter dem Auslassschlitz.
+      type: plenum
+      # Anfangsdruck im Auslassplenum [Pa].
+      initial_pressure_Pa: 118975.02600717332
+      # Anfangstemperatur im Auslassplenum [K].
+      initial_temperature_K: 662.884456108642
+      # Festes Plenumvolumen [m³].
+      fixed_volume_m3: 0.00260279
+      wall_heat:
+        # Keine Wandwärme im Auslassplenum.
+        model: none
+      combustion:
+        # Keine Verbrennung im Auslassplenum.
+        model: none
+      evaporation:
+        # Keine Verdampfung im Auslassplenum.
+        model: none
+
+    - name: ambient_in
+      # Umgebungsrandbedingung am Einlass.
+      type: environment
+      # Umgebungsdruck am Einlass [Pa].
+      pressure_Pa: 121325.0
+      # Umgebungstemperatur am Einlass [K].
+      temperature_K: 300.0
+
+    - name: ambient_out
+      # Umgebungsrandbedingung am Auslass.
+      type: environment
+      # Umgebungsdruck am Auslass [Pa].
+      pressure_Pa: 101325.0
+      # Umgebungstemperatur am Auslass [K].
+      temperature_K: 300.0
+
+  connections:
+    - name: bounce_in_cv
+      # Rückschlagventil zwischen Umgebung und Receiver.
+      type: check_valve
+      # Upstream-Volumen.
+      from_volume: ambient_in
+      # Downstream-Volumen.
+      to_volume: receiver
+      # Ventildurchmesser [mm].
+      diameter_mm: 55
+      # Abflussbeiwert des Rückschlagventils [-].
+      discharge_coefficient: 0.82
+      # Öffnungsdruckdifferenz [Pa].
+      cracking_pressure_Pa: 0.0
+
+    - name: transfer_slot
+      # Transferschlitz vom Receiver in den Zylinder.
+      type: slot
+      # Upstream-Volumen.
+      from_volume: receiver
+      # Downstream-Volumen.
+      to_volume: cylinder
+      # Rechteckgeometrie wird direkt aus width/height berechnet.
+      source_of_data: rectangle
+      # Öffnung des Schlitzes wird über Kolbenposition definiert.
+      opening_mode: by_distance
+      # Abstand des Schlitzdachs zu OT/TDC [mm].
+      distance_from_tdc_mm: 92.07
+      # Winkelbasierte Öffnung ist hier nicht verwendet.
+      opening_angle_deg: null
+      # Nur relevant für bestimmte Kurbelgehäuse-/Referenzmodelle; hier 0.0.
+      piston_height_if_crankcase_m: 0.0
+      # Eintrittswinkel des Schlitzes [°].
+      entrance_angle_deg: 0.0
+      # Schlitzbreite je Öffnung [mm].
+      width_mm: 26.0
+      # Schlitzhöhe je Öffnung [mm].
+      height_mm: 16.0
+      # Abrundungsradius beim Öffnungsbeginn [m].
+      open_fillet_radius_m: 0.0
+      # Abrundungsradius im Vollöffnungsbereich [m].
+      full_fillet_radius_m: 0.0
+      # Anzahl identischer Schlitzöffnungen.
+      number_of_identical_holes: 6
+      discharge_coefficients:
+        # Konstanter Abflussbeiwert in beide Richtungen.
+        mode: constant
+        # Vorwärtsrichtung Receiver -> Cylinder.
+        forward_cd: 0.9
+        # Rückwärtsrichtung Cylinder -> Receiver.
+        reverse_cd: 0.9
+
+    - name: exhaust_slot
+      # Auslassschlitz vom Zylinder ins Auslassplenum.
+      type: slot
+      # Upstream-Volumen.
+      from_volume: cylinder
+      # Downstream-Volumen.
+      to_volume: exhaust_plenum
+      # Rechteckgeometrie wird direkt aus width/height berechnet.
+      source_of_data: rectangle
+      # Öffnung des Schlitzes wird über Kolbenposition definiert.
+      opening_mode: by_distance
+      # Abstand des Schlitzdachs zu OT/TDC [mm].
+      distance_from_tdc_mm: 90.6
+      # Winkelbasierte Öffnung ist hier nicht verwendet.
+      opening_angle_deg: null
+      # Nur relevant für bestimmte Kurbelgehäuse-/Referenzmodelle; hier 0.0.
+      piston_height_if_crankcase_m: 0.0
+      # Eintrittswinkel des Schlitzes [°].
+      entrance_angle_deg: 0.0
+      # Schlitzbreite je Öffnung [mm].
+      width_mm: 24
+      # Schlitzhöhe je Öffnung [mm].
+      height_mm: 18
+      # Abrundungsradius beim Öffnungsbeginn [m].
+      open_fillet_radius_m: 0.0
+      # Abrundungsradius im Vollöffnungsbereich [m].
+      full_fillet_radius_m: 0.0
+      # Anzahl identischer Schlitzöffnungen.
+      number_of_identical_holes: 6
+      discharge_coefficients:
+        # Konstanter Abflussbeiwert in beide Richtungen.
+        mode: constant
+        # Vorwärtsrichtung Cylinder -> Exhaust-Plenum.
+        forward_cd: 0.95
+        # Rückwärtsrichtung Exhaust-Plenum -> Cylinder.
+        reverse_cd: 0.8
+
+    - name: exhaust_bleed
+      # Orifice vom Auslassplenum zur Umgebung.
+      type: orifice
+      # Upstream-Volumen.
+      from_volume: exhaust_plenum
+      # Downstream-Volumen.
+      to_volume: ambient_out
+      # Orifice-Durchmesser [mm].
+      diameter_mm: 12.0
+      # Abflussbeiwert in Vorwärtsrichtung.
+      forward_cd: 0.98
+      # Abflussbeiwert in Rückwärtsrichtung.
+      reverse_cd: 0.55
+
+simulation:
+  # Integrationszeitschritt [s] für feste Integrationsverfahren bzw. nominale Schrittweite.
+  dt_s: 1.0e-05
+  # Anzahl formaler Zyklen. Im Free-Piston-Zeitlauf oft nur ergänzende Angabe.
+  total_cycles: 1
+  # Anzahl der am Ende gespeicherten Zyklen/Fenster.
+  save_last_cycles: 1
+  # Simulationsdauer [s].
+  simulationtime: 0.2
+  solver:
+    # Integrator-Typ.
+    kind: rk4
+    # Relative Toleranz.
+    rtol: 1.0e-05
+    # Absolute Toleranz.
+    atol: 1.0e-07
+
+postprocessing:
+  # true = CSV-Export aktiv.
+  csv_enabled: true
+  # Pfad der CSV-Datei relativ zum Output-Ordner.
+  csv_path: results/free_piston_Genset_V09d.csv
+  # CSV-Trennzeichen.
+  csv_separator: ";"
+  # true = Excel-Export aktiv.
+  excel_enabled: true
+  # Pfad der Excel-Datei relativ zum Output-Ordner.
+  excel_path: results/free_piston_Genset_V09d.xlsx
+
+  sampling:
+    # Zeitbasiertes Sampling.
+    mode: time
+    # Abtastschritt [s] für die gespeicherten Ausgabesignale.
+    step_s: 0.0001
+
+  final_cycle_uniform_angle_export:
+    # false = kein uniformer Winkel-Export für den letzten Zyklus.
+    enabled: false
+    # Winkelschritt [°] für den Uniform-Export.
+    step_deg: 1.0
+
+  free_piston_last_ut_ot_ut_export:
+    # true = Export des letzten UT -> OT -> UT-Hubs aktiv.
+    enabled: true
+    # Winkeläquivalenter Ausgabeschritt [°] für diesen Export.
+    step_deg: 0.1
+    # Linke Achsgrenze [°] dieses normierten Exportfensters.
+    axis_min_deg: -9.0
+    # Rechte Achsgrenze [°] dieses normierten Exportfensters.
+    axis_max_deg: 9.0
+
+  check_report:
+    # false = kein numerischer Check-Report als CSV.
+    enabled: false
+    # false = kein HTML-Check-Report.
+    html_enabled: false
+
+  plots:
+    # true = Plot-Erzeugung aktiv.
+    enabled: true
+    # export_rows = Plots aus den Exportzeilen statt aus last_cycle_uniform erzeugen.
+    source: export_rows
+    layouts:
+      # true = Standardlayouts dürfen automatisch ergänzt werden.
+      auto_create_defaults: true
+      entries:
+        - enabled: true
+          # Layoutdatei für Energiediagramme.
+          path: plot_Energy.yaml
+          # Präfix für die Ausgabedateien dieses Layouts.
+          prefix: plot_fp
+        - enabled: false
+          path: plot_fp4.yaml
+          prefix: plot_fp4
+        - enabled: false
+          path: plot-fp_pressure.yaml
+          prefix: plot_fp_pressure
+        - enabled: false
+          path: plot-fp_mdot.yaml
+          prefix: plot_fp_mdot
+        - enabled: false
+          path: plot-fp_mass.yaml
+          prefix: plot_fp_mass
+        - enabled: false
+          path: plot-fp_pressure2.yaml
+          prefix: plot_fp_pressure2
+        - enabled: false
+          path: plot-fp_temperature.yaml
+          prefix: plot_fp_Temp
+
+    # Ausgabeordner für die Plots relativ zum Run-Ordner.
+    output_dir: results/plots
+
+  console:
+    run_summary:
+      # true = kurze Laufzusammenfassung in der Konsole.
+      enabled: true
+    cycle_summary:
+      # false = keine Zykluszusammenfassung pro Zyklus in der Konsole.
+      enabled: false
+    check_report:
+      # false = kein Check-Report-Status in der Konsole.
+      enabled: false
+    geometry:
+      # false = keine Geometrieausgabe in der Konsole.
+      enabled: false
+
+  # false = die Startbedingungen werden nach dem Lauf nicht automatisch
+  # zurück in diese YAML-Datei geschrieben.
+  auto_update_initial_conditions: false

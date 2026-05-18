@@ -1,0 +1,2 @@
+Applied engineering CSV unit conversion for all exact *_Pa, *_m3, *_m2, *_m columns to bar, cm³, mm², mm.
+Added geometry README.md output and console geometry units.

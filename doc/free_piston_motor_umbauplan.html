@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Freikolbenmotor / FPLG – Zusammenfassung, Formeln und abgesicherte Umbau-Reihenfolge</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1f2937;
+      --muted: #4b5563;
+      --line: #d1d5db;
+      --soft: #f3f4f6;
+      --accent: #0f766e;
+      --accent-soft: #ecfeff;
+      --warn: #92400e;
+      --warn-soft: #fffbeb;
+    }
+    html, body { background: var(--bg); color: var(--text); font: 16px/1.55 "Segoe UI", Arial, sans-serif; }
+    body { margin: 0; }
+    .page { max-width: 1100px; margin: 0 auto; padding: 32px 28px 64px; }
+    h1, h2, h3 { line-height: 1.25; }
+    h1 { font-size: 2rem; margin: 0 0 0.8rem; }
+    h2 { font-size: 1.35rem; margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: 0.3rem; }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; }
+    p, li { max-width: 95ch; }
+    .lead { font-size: 1.05rem; color: var(--muted); }
+    .box { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 1rem 0; }
+    .ok { background: var(--accent-soft); border-color: #99f6e4; }
+    .warn { background: var(--warn-soft); border-color: #fcd34d; }
+    code, pre { font-family: Consolas, "Courier New", monospace; }
+    pre { background: #0b1020; color: #f8fafc; padding: 14px; border-radius: 10px; overflow: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: var(--soft); }
+    .small { color: var(--muted); font-size: 0.93rem; }
+    math { overflow-x: auto; }
+    .refs li { margin-bottom: 0.5rem; }
+    .phase { border-left: 4px solid var(--accent); padding-left: 12px; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1>Freikolbenmotor / Freikolben-Lineargenerator – technische Zusammenfassung, Formeln und abgesicherte Umbau-Reihenfolge</h1>
+    <p class="lead">
+      Dieses Dokument fasst den bisher besprochenen technischen Zielpfad für die Erweiterung von MotorSim / Thermo0D in Richtung
+      Freikolbenmotor bzw. Freikolben-Lineargenerator (FPLG) zusammen. Fokus ist eine robuste, softwaretechnisch saubere und schrittweise
+      Erweiterung, bei der der vorhandene Solver unverändert bleibt und die neue Physik als eigener Modellpfad aufgebaut wird.
+    </p>
+
+    <section>
+      <h2>1. Kernaussage</h2>
+      <div class="box ok">
+        <p>
+          Der entscheidende Systemwechsel besteht darin, die bisher kurbelwinkelgeführte Kinematik durch eine translatorische Bewegungsgleichung
+          zu ersetzen. Beim Freikolbenmotor ist die Kolbenbewegung nicht vorgegeben, sondern ergibt sich aus dem Zusammenspiel von Gasdruck,
+          Rückstellkräften, Reibung und Lastmaschine.
+        </p>
+      </div>
+      <p>
+        Genau daraus folgen die beiden wichtigsten Architekturentscheidungen:
+      </p>
+      <ol>
+        <li><strong>Kein Umbau des Solvers.</strong> Der Solver bleibt unverändert und integriert weiterhin ein Zustandsvektorsystem in der Zeit.</li>
+        <li><strong>Ein neuer Modellzweig neben dem klassischen Motorpfad.</strong> Freikolbenlogik wird nicht in den klassischen 4T/2T-Pfad hineingemischt, sondern als eigenständige Architekturvariante aufgebaut.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>2. Warum Freikolbenmotoren softwareseitig anders behandelt werden müssen</h2>
+      <p>
+        In der Literatur werden gerade <em>Piston Motion Control</em>, Lastkopplung und das Zusammenspiel zwischen Verbrennung, bewegter Masse und
+        Linear-Elektromaschine als zentrale Herausforderungen beschrieben. Das liegt daran, dass die Kolbenbewegung nicht durch Kurbeltrieb und
+        Schwungrad kinematisch festgelegt ist, sondern aktiv oder indirekt stabilisiert werden muss.
+      </p>
+      <div class="box warn">
+        <p>
+          Für die Software bedeutet das: Winkelgetriggerte Ereignisse, zyklusbezogene 720°-/360°-Logik und kurbelkinematische Volumenberechnung
+          sind nur eingeschränkt wiederverwendbar. Der saubere Weg ist daher ein eigenständiger Freikolben-Pfad mit neuen Zuständen,
+          neuer Geometrie und neuer Ereignislogik.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Minimalmodell eines Freikolbensystems</h2>
+      <p>Die erste lauffähige Version sollte nur die für das Bewegungsverhalten unbedingt notwendigen Bestandteile enthalten:</p>
+      <ul>
+        <li>bewegte Masse</li>
+        <li>Zylinderdruckkraft</li>
+        <li>Rückstellkraft, z.&nbsp;B. Gasfeder</li>
+        <li>Reibung</li>
+        <li>Lastkraft, zunächst einfach als viskose oder lineare elektromagnetische Ersatzlast</li>
+      </ul>
+
+      <h3>3.1 Mechanische Bewegungsgleichung</h3>
+      <p>Die translatorische Hauptgleichung lautet:</p>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <mi>m</mi><mfrac><mrow><msup><mi>d</mi><mn>2</mn></msup><mi>x</mi></mrow><mrow><mi>d</mi><msup><mi>t</mi><mn>2</mn></msup></mrow></mfrac>
+          <mo>=</mo>
+          <msub><mi>F</mi><mtext>gas</mtext></msub>
+          <mo>-</mo><msub><mi>F</mi><mtext>bounce</mtext></msub>
+          <mo>-</mo><msub><mi>F</mi><mtext>friction</mtext></msub>
+          <mo>-</mo><msub><mi>F</mi><mtext>load</mtext></msub>
+        </mrow>
+      </math>
+
+      <p>Als Zustände werden mindestens Kolbenweg und Kolbengeschwindigkeit geführt:</p>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <mfrac><mrow><mi>d</mi><mi>x</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mi>v</mi>
+        </mrow>
+      </math>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <mfrac><mrow><mi>d</mi><mi>v</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+          <mo>=</mo>
+          <mfrac><mrow><msub><mi>F</mi><mtext>net</mtext></msub></mrow><mi>m</mi></mfrac>
+        </mrow>
+      </math>
+
+      <h3>3.2 Zylinderkraft</h3>
+      <p>Die Gasdruckkraft auf den Kolben ergibt sich aus Druck mal wirksamer Fläche:</p>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mi>F</mi><mtext>gas</mtext></msub><mo>=</mo><msub><mi>p</mi><mtext>cyl</mtext></msub><mo>&#x2062;</mo><msub><mi>A</mi><mtext>piston</mtext></msub>
+        </mrow>
+      </math>
+
+      <h3>3.3 Zylindervolumen aus Kolbenweg</h3>
+      <p>Für eine einfache translatorische Geometrie bietet sich an:</p>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mi>V</mi><mtext>cyl</mtext></msub>
+          <mo>=</mo>
+          <msub><mi>V</mi><mtext>c</mtext></msub>
+          <mo>+</mo>
+          <msub><mi>A</mi><mtext>piston</mtext></msub>
+          <mo>(</mo><msub><mi>x</mi><mtext>max</mtext></msub><mo>-</mo><mi>x</mi><mo>)</mo>
+        </mrow>
+      </math>
+
+      <p>Die zeitliche Volumenänderung folgt dann aus:</p>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <mfrac><mrow><mi>d</mi><mi>V</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+          <mo>=</mo>
+          <mfrac><mrow><mi>d</mi><mi>V</mi></mrow><mrow><mi>d</mi><mi>x</mi></mrow></mfrac>
+          <mo>&#x2062;</mo>
+          <mfrac><mrow><mi>d</mi><mi>x</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+          <mo>=</mo>
+          <mo>-</mo><msub><mi>A</mi><mtext>piston</mtext></msub><mo>&#x2062;</mo><mi>v</mi>
+        </mrow>
+      </math>
+
+      <h3>3.4 Einfache Last- und Reibungsmodelle</h3>
+      <p>Für einen ersten stabilen Modellpfad reichen einfache, robuste Ersatzansätze:</p>
+      <p>Viskose Last:</p>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow><msub><mi>F</mi><mtext>load</mtext></msub><mo>=</mo><msub><mi>c</mi><mtext>load</mtext></msub><mo>&#x2062;</mo><mi>v</mi></mrow>
+      </math>
+      <p>Coulomb-plus-viskose Reibung:</p>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mi>F</mi><mtext>friction</mtext></msub>
+          <mo>=</mo>
+          <msub><mi>F</mi><mtext>c</mtext></msub><mo>&#x2062;</mo><mi>sign</mi><mo>(</mo><mi>v</mi><mo>)</mo>
+          <mo>+</mo>
+          <msub><mi>c</mi><mtext>v</mtext></msub><mo>&#x2062;</mo><mi>v</mi>
+        </mrow>
+      </math>
+
+      <h3>3.5 Einfache Gasfeder</h3>
+      <p>Für eine erste Rückstelleinheit ist eine polytrope Gasfeder sinnvoll:</p>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mi>p</mi><mtext>bounce</mtext></msub>
+          <mo>=</mo>
+          <msub><mi>p</mi><mn>0</mn></msub>
+          <msup>
+            <mrow>
+              <mo>(</mo><mfrac><msub><mi>V</mi><mn>0</mn></msub><msub><mi>V</mi><mtext>bounce</mtext></msub></mfrac><mo>)</mo>
+            </mrow>
+            <mi>n</mi>
+          </msup>
+        </mrow>
+      </math>
+      <p>mit der resultierenden Kraft</p>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mi>F</mi><mtext>bounce</mtext></msub>
+          <mo>=</mo>
+          <msub><mi>p</mi><mtext>bounce</mtext></msub><mo>&#x2062;</mo><msub><mi>A</mi><mtext>piston</mtext></msub>
+        </mrow>
+      </math>
+    </section>
+
+    <section>
+      <h2>4. Startbedingungen</h2>
+      <p>
+        Startbedingungen sind beim Freikolbenmotor wesentlich kritischer als beim Kurbeltrieb, weil keine feste Bahn vorliegt. Die Anfangswerte entscheiden direkt,
+        ob das System anschwingt, driftet, stehenbleibt oder an einen Anschlag läuft.
+      </p>
+      <h3>4.1 Notwendige Anfangswerte</h3>
+      <ul>
+        <li>Kolbenweg <code>x0_m</code></li>
+        <li>Kolbengeschwindigkeit <code>v0_m_per_s</code></li>
+        <li>Zylinderdruck und Zylindertemperatur</li>
+        <li>Bounce-Raum-Druck und Bounce-Raum-Temperatur</li>
+        <li>Anfangsstatus von Verbrennung / Einspritzung / freigesetzter Energie</li>
+      </ul>
+      <p>Empfehlung für einen ersten passiven Testfall:</p>
+      <ul>
+        <li><code>x0_m</code> leicht aus der Mittellage versetzt</li>
+        <li><code>v0_m_per_s</code> klein, aber ungleich null</li>
+        <li>Zylinderdruck nahe Umgebungsdruck</li>
+        <li>Bounce-Raum etwas höherer Druck</li>
+      </ul>
+      <div class="box">
+        <p><strong>Wichtig:</strong> Druck- und Temperatur-Startwerte dürfen nicht nur nominal gesetzt werden; daraus müssen konsistente Anfangsmassen und Anfangsenergien im Zustandsvektor aufgebaut werden.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>5. Software-Architektur für MotorSim / Thermo0D</h2>
+      <h3>5.1 Zielbild</h3>
+      <table>
+        <thead>
+          <tr><th>Schicht</th><th>Klassischer Pfad</th><th>Freikolben-Pfad</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Solver</td><td>bleibt unverändert</td><td>bleibt unverändert</td></tr>
+          <tr><td>Config</td><td>bestehend</td><td>neue Architekturvariante + neue Sektion <code>free_piston</code></td></tr>
+          <tr><td>RHS / Physik</td><td>kurbelwinkelgeführt</td><td>translatorisch, zeitgeführt</td></tr>
+          <tr><td>Geometrie</td><td><code>V(θ)</code></td><td><code>V(x)</code></td></tr>
+          <tr><td>Ereignisse</td><td>winkelgeführt</td><td>positions- / geschwindigkeitsgeführt</td></tr>
+          <tr><td>Postprocessing</td><td>bestehend</td><td>gleiche Export-Pipeline, aber neue Signale und neue Zyklusdefinition</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.2 Empfohlene neue Struktur</h3>
+      <pre>src/thermo0d/model/free_piston/
+    __init__.py
+    builder.py
+    state_layout.py
+    geometry.py
+    forces.py
+    events.py
+    rhs.py
+    signals.py
+    cycle_metrics.py
+
+src/thermo0d/postprocessing/
+    free_piston_cycles.py</pre>
+    </section>
+
+    <section>
+      <h2>6. Abgesicherte Reihenfolge des Umbaus</h2>
+      <p>
+        Die Reihenfolge ist bewusst so gewählt, dass in jeder Stufe ein stabil testbarer Zwischenstand entsteht und nicht gleichzeitig
+        Mechanik, Verbrennung, Gaswechsel, Generator und Regelung vermischt werden.
+      </p>
+
+      <div class="phase">
+        <h3>Phase A – Architekturumschalter und neue Zustände</h3>
+        <ul>
+          <li>neue Config-Semantik, z.&nbsp;B. <code>modeling.architecture = free_piston</code></li>
+          <li>neue Config-Sektion <code>free_piston</code></li>
+          <li>zusätzliche Zustände <code>x</code> und <code>v</code></li>
+          <li>eigener Builder-Zweig</li>
+        </ul>
+        <p><strong>Ziel:</strong> Das System kann den neuen Modellpfad aufbauen, ohne dass bereits vollständige Physik vorhanden sein muss.</p>
+      </div>
+
+      <div class="phase">
+        <h3>Phase B – Mechanischer Kern ohne Verbrennung</h3>
+        <ul>
+          <li>Volumen aus Kolbenweg</li>
+          <li>Kraftzerlegung: Gas, Bounce, Reibung, Last</li>
+          <li>translatorisches RHS</li>
+          <li>passive Testfälle ohne Verbrennung</li>
+        </ul>
+        <p><strong>Ziel:</strong> Erst stabile und physikalisch nachvollziehbare Oszillation nachweisen.</p>
+      </div>
+
+      <div class="phase">
+        <h3>Phase C – Output und Diagnose</h3>
+        <ul>
+          <li>neue Signale: <code>x_m</code>, <code>v_m_per_s</code>, <code>a_m_per_s2</code>, <code>F_*</code>, <code>V_cyl</code></li>
+          <li>CSV/XLSX/Plots über bestehende Pipeline</li>
+          <li>neue Oszillationsmetriken statt 360°/720°-Zykluslogik</li>
+        </ul>
+        <p><strong>Ziel:</strong> Sichtbarkeit und Debugbarkeit herstellen, bevor Verbrennung hinzukommt.</p>
+      </div>
+
+      <div class="phase">
+        <h3>Phase D – Ereignislogik</h3>
+        <ul>
+          <li>Totpunkt-Erkennung aus Vorzeichenwechsel von <code>v</code></li>
+          <li>Positions- oder Ereignis-triggerte Einspritzung / Zündung</li>
+          <li>keine harte Winkelkopplung mehr</li>
+        </ul>
+        <p><strong>Ziel:</strong> Triggerlogik an den Freikolben anpassen, nicht den Freikolben an die alte Winkelwelt anpassen.</p>
+      </div>
+
+      <div class="phase">
+        <h3>Phase E – Einfache Verbrennung</h3>
+        <ul>
+          <li>zunächst Single-Zone</li>
+          <li>Vibe/Wiebe als erste Freisetzungsfunktion</li>
+          <li>Trigger über Position oder Totpunktnähe</li>
+        </ul>
+        <p><strong>Ziel:</strong> Ersten selbstangeregten motorischen Betrieb ermöglichen, ohne sofort 2-Zonen, Restgas und Verdampfung mit einzubauen.</p>
+      </div>
+
+      <div class="phase">
+        <h3>Phase F – Positionsabhängiger Gaswechsel</h3>
+        <ul>
+          <li>Ports/Slots über <code>x</code> statt über <code>θ</code></li>
+          <li>einfacher Spül- und Auslasspfad</li>
+          <li>später erst komplexere Ventil- und Restgasmodelle</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <h3>Phase G – Lastmodell und Regelung</h3>
+        <ul>
+          <li>von viskoser Last zu einfachem Generator-Ersatzmodell</li>
+          <li>Zielhub / Ziel-Totpunkt / Ziel-Kompressionsendpunkt</li>
+          <li>später Energie- und Leistungsregelung</li>
+        </ul>
+      </div>
+
+      <div class="box ok">
+        <p><strong>Begründung der Reihenfolge:</strong> Erst wenn Mechanik, Geometrie, Startbedingungen und Diagnostik stabil sind, lohnt sich der nächste Freiheitsgrad. So bleibt jeder Schritt testbar und rückverfolgbar.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>7. Erste empfohlene Config-Semantik</h2>
+      <pre>modeling:
+  architecture: free_piston
+
+free_piston:
+  initial_conditions:
+    x0_m: -0.008
+    v0_m_per_s: 0.4
+    cylinder:
+      pressure_Pa: 101325.0
+      temperature_K: 300.0
+    bounce:
+      pressure_Pa: 140000.0
+      temperature_K: 300.0
+    combustion_state:
+      burned_fraction_0to1: 0.0
+      released_energy_J: 0.0
+      ignition_armed: false
+      injection_armed: false
+
+  mechanics:
+    moving_mass_kg: 2.0
+    piston_area_m2: 0.00436
+    clearance_volume_m3: 2.5e-05
+    x_min_m: -0.04
+    x_max_m: 0.04
+
+  friction:
+    model: coulomb_viscous
+    fc_N: 20.0
+    cv_Ns_per_m: 10.0
+
+  load:
+    model: viscous
+    damping_Ns_per_m: 120.0
+
+  bounce:
+    model: gas_spring
+    chamber_volume0_m3: 3.0e-04
+    p0_Pa: 150000.0
+    polytropic_exponent: 1.30</pre>
+    </section>
+
+    <section>
+      <h2>8. Was bewusst noch nicht zuerst eingebaut werden sollte</h2>
+      <ul>
+        <li>2-Zonen-Verbrennung</li>
+        <li>detaillierte Verdampfung</li>
+        <li>komplexe Wandwärmemodelle</li>
+        <li>hochdetaillierte Generator-Feldmodelle</li>
+        <li>komplexe Ventilkinematik</li>
+        <li>fortgeschrittene Regelalgorithmen</li>
+      </ul>
+      <p>
+        Diese Punkte sind später relevant, aber in der frühen Phase erhöhen sie vor allem die Zahl der Freiheitsgrade und verdecken Fehler
+        in Geometrie, Kraftbilanz, Startbedingungen und Eventlogik.
+      </p>
+    </section>
+
+    <section>
+      <h2>9. Teststrategie</h2>
+      <ol>
+        <li><strong>Smoke-Test:</strong> reine translatorische Bewegung mit kleinen Anfangsauslenkungen</li>
+        <li><strong>Passive Oszillation:</strong> Gasfeder + Reibung + Last</li>
+        <li><strong>Diagnosetest:</strong> Outputsignale, Totpunkte, Kräfte, Energiebilanz</li>
+        <li><strong>Verbrennungstest:</strong> einfache Single-Zone-Freisetzung mit Positionstrigger</li>
+        <li><strong>Gaswechseltest:</strong> positionsabhängige Ports</li>
+        <li><strong>Regelungstest:</strong> Hub-/Leistungs-/Totpunktregelung</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>10. Fazit</h2>
+      <div class="box ok">
+        <p>
+          Der fachlich und softwaretechnisch saubere Weg zum Freikolbenmodell ist nicht die schrittweise Verformung des klassischen
+          Kurbeltrieb-Modells, sondern ein eigener translatorischer Modellpfad mit gemeinsamer Solver- und Output-Infrastruktur.
+        </p>
+        <p>
+          Der erste sinnvolle Ausbau ist daher: <strong>Architekturumschalter + Startbedingungen + translatorische Zustände + Geometrie + Kräfte + RHS + neue Outputsignale</strong> – und noch nicht die volle Verbrennungs-, Gaswechsel- und Generator-Komplexität.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>11. Quellen</h2>
+      <ol class="refs">
+        <li>Raheem, A. T. et al. (2022): <em>A review of free piston engine control literature—Taxonomy and techniques</em>. Alexandria Engineering Journal. Kernaussage: Piston Motion Control ist ein zentrales Stabilitäts- und Performance-Thema bei FPELG-Systemen.</li>
+        <li>Wang, X. et al. (2018): <em>A Review of the Design and Control of Free-Piston Linear Generator</em>. Energies 11(8), 2179. Kernaussage: Wegfall von Kurbel und Schwungrad bringt Freiheitsgrade, macht aber LEM-Design und Piston Motion Control zu Schlüsseltechnologien.</li>
+        <li>Guo, C. et al. (2020): <em>Review of recent advances of free-piston internal combustion engine linear generator</em>. Applied Energy. Kernaussage: Modellierung, Versuchstechnik und Regelstrategie sind die dominierenden Entwicklungsachsen.</li>
+        <li>Zhang, C. et al. (2018): <em>A Free-Piston Linear Generator Control Strategy for Improving Output Power</em>. Energies 11(1), 135. Kernaussage: Kolbenbewegung und Lastkopplung beeinflussen Leistung und Betriebsstabilität direkt.</li>
+        <li>Guo, C. et al. (2023): <em>Research on Piston Dynamics and Engine Performances of a Free-Piston Engine Linear Generator</em>. Energies 16(18), 6570. Kernaussage: Kolbendynamik und Systemleistung sind eng gekoppelt; einfache Topologien sind oft für die Regelung günstiger.</li>
+      </ol>
+      <p class="small">
+        Die in diesem Dokument verwendeten Grundgleichungen für Bewegung, Kräfte und Volumenbeziehungen sind Standardformeln der translatorischen Mechanik und der 0D-Thermodynamik. Die Quellen werden hier vor allem für die Systemeinordnung, die Bedeutung von Piston Motion Control sowie die Priorisierung der Entwicklungsschritte herangezogen.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

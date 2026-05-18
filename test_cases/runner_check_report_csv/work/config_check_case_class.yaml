@@ -1,0 +1,180 @@
+# Projektkonfiguration
+# Solveroptionen: euler | rk4 | scipy_rk45 | scipy_bdf | scipy_radau
+# postprocessing.sampling.mode: time | crank_angle
+#   time        -> step_s
+#   crank_angle -> step_deg
+
+# Vollständige Optionsübersicht siehe examples/config_schema_documented.yaml
+# ============================================================================
+# Beispielprojekt: 1-Zylinder-2-Takt
+# ----------------------------------------------------------------------------
+# Diese Datei zeigt dieselbe Struktur wie das 4-Takt-Beispiel, verwendet aber
+# Slots statt Ventilen und eine zeitbasierte Ausgabeabtastung.
+# ============================================================================
+
+preprocessing:
+  # Konstante Stoffwerte des idealisierten Arbeitsgases.
+  gas_properties:
+    cp_J_per_kgK: 1005.0
+    cv_J_per_kgK: 718.0
+    R_J_per_kgK: 287.0
+
+  # Globale Aktivierung der Modellterme.
+  features:
+    mass_flow: true
+    wall_heat: true
+    combustion: true
+    evaporation: true
+    pv_work: true
+
+  # Globale Motordaten.
+  engine:
+    # Zweitaktmotor.
+    cycle_type: 2t
+    # Drehzahl [1/min].
+    speed_rpm: 3000.0
+
+  # Kontrollvolumina.
+  volumes:
+    - name: cylinder
+      type: cylinder
+      initial_pressure_Pa: 2660863.972667
+      initial_temperature_K: 390.0
+      kinematics:
+        type: crank_slider
+        bore_m: 0.054
+        stroke_m: 0.054
+        conrod_m: 0.095
+        compression_ratio: 8.0
+        phase_deg: 0.0
+      wall_heat:
+        model: woschni
+        c1: 3.00
+        c2: 0.8
+        c3: -0.55
+        wall_temperature_K: 410.0
+        wall_area_m2: 0.020
+      combustion:
+        model: vibe
+        start_deg: 350.0
+        duration_deg: 40.0
+        a: 6.908
+        m: 2.0
+        fuel_mass_per_cycle_kg: 0.000012
+        lhv_J_per_kg: 43000000.0
+        angle_reference: compression_tdc
+      evaporation:
+        model: simple
+        start_deg: 335.0
+        duration_deg: 22.0
+        evaporated_mass_per_cycle_kg: 0.000012
+        latent_heat_J_per_kg: 330000.0
+        angle_reference: compression_tdc
+
+    - name: scavenge_plenum
+      type: plenum
+      initial_pressure_Pa: 76260.000000
+      initial_temperature_K: 310.0
+      fixed_volume_m3: 0.0014
+      wall_heat:
+        model: none
+      combustion:
+        model: none
+      evaporation:
+        model: none
+
+    - name: exhaust_plenum
+      type: plenum
+      initial_pressure_Pa: 105233.333333
+      initial_temperature_K: 600.0
+      fixed_volume_m3: 0.0018
+      wall_heat:
+        model: none
+      combustion:
+        model: none
+      evaporation:
+        model: none
+
+  # Verbindungen.
+  connections:
+    # Überströmkanal als Slot.
+    - name: transfer_slot
+      type: slot
+      from_volume: scavenge_plenum
+      to_volume: cylinder
+      # Aktuell nur rechteckige Slot-Geometrie.
+      source_of_data: rectangle
+      # Öffnungsdefinition über Winkel.
+      opening_mode: by_angle
+      # Muss bei by_angle null sein.
+      distance_from_tdc_m: null
+      # Öffnungsbeginn [deg].
+      opening_angle_deg: 120.0
+      # Piston height if port in crankcase [m], aktuell nur als Eingabefeld.
+      piston_height_if_crankcase_m: 0.0
+      # Eintrittswinkel [deg], aktuell noch ohne Flächenkorrektur.
+      entrance_angle_deg: 20.0
+      # Rechteckbreite [m].
+      width_m: 0.010
+      # Rechteckhöhe [m].
+      height_m: 0.012
+      # Fillet-Radius zu Öffnungsbeginn [m].
+      open_fillet_radius_m: 0.001
+      # Fillet-Radius bei voller Öffnung [m].
+      full_fillet_radius_m: 0.001
+      # Anzahl identischer Kanäle.
+      number_of_identical_holes: 2
+      # Abflussbeiwert aus Tabelle.
+      discharge_coefficients:
+        mode: table
+        # CSV-Datei: Spalte 1 Öffnungshöhe, Spalte 2 vorwärts, Spalte 3 rückwärts.
+        table_file: data/slot_cd_table.csv
+
+    # Auslasskanal als Slot.
+    - name: exhaust_slot
+      type: slot
+      from_volume: cylinder
+      to_volume: exhaust_plenum
+      source_of_data: rectangle
+      # Öffnungsdefinition über Kolbenabstand von TDC.
+      opening_mode: by_distance
+      # Öffnungsabstand [m].
+      distance_from_tdc_m: 0.018
+      # Muss bei by_distance null sein.
+      opening_angle_deg: null
+      piston_height_if_crankcase_m: 0.0
+      entrance_angle_deg: 0.0
+      width_m: 0.016
+      height_m: 0.014
+      open_fillet_radius_m: 0.001
+      full_fillet_radius_m: 0.001
+      number_of_identical_holes: 1
+      # Konstante Abflussbeiwerte.
+      discharge_coefficients:
+        mode: constant
+        forward_cd: 0.72
+        reverse_cd: 0.68
+
+simulation:
+  # Feste Integrationsschrittweite [s].
+  dt_s: 0.00001
+  # Anzahl simulierter Zyklen.
+  total_cycles: 4
+  # Anzahl exportierter letzter Zyklen.
+  save_last_cycles: 2
+  solver:
+    # Sehr einfacher, registrierter Solver.
+    kind: euler
+    rtol: 1.0e-6
+    atol: 1.0e-9
+
+postprocessing:
+  # Zielpfad für die CSV-Datei relativ zur YAML-Datei.
+  csv_path: /tmp/motorsim_envpatch/test_cases/runner_check_report_csv/work/run_check_case_class.csv
+  # Trennzeichen der CSV-Datei.
+  csv_separator: ","
+  sampling:
+    # Winkelbasierte Ausgabe: Export in festen Kurbelwinkelschritten.
+    mode: crank_angle
+    # Abtastschritt [deg Kurbelwinkel].
+    step_deg: 5.0

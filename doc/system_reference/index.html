@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thermo0D System-Dokumentation</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="wrap">
+    
+    <div class="sidebar">
+      <section class="card">
+        <div class="badge">Thermo0D · Referenz</div>
+        <h1 style="margin-top:.7rem">System-Dokumentation</h1>
+        <p class="muted">Statische HTML-Referenz für aktuellen Projektstand: Physik, Numerik, Konfiguration, Generatoranbindung und Ausbaupfad.</p>
+      </section>
+      <section class="card">
+        <nav><a href="index.html" style="background:#0e1624">Start</a>
+<a href="physik.html">Physik</a>
+<a href="numerik.html">Numerik</a>
+<a href="konfiguration_klassisch.html">Konfiguration classic</a>
+<a href="konfiguration_free_piston.html">Konfiguration free_piston</a>
+<a href="generator_und_schwungmasse.html">Generator & Schwungmasse</a>
+<a href="verbesserungen_und_next_steps.html">Verbesserungen & Next Steps</a></nav>
+      </section>
+      <section class="card">
+        <div><strong>Pfad</strong></div>
+        <div class="muted"><code>doc/system_reference/index.html</code></div>
+      </section>
+    </div>
+    
+    <main>
+<section class="card">
+  <div class="badge">Übersicht</div>
+  <h2 style="margin-top:.7rem">Was diese Doku abdeckt</h2>
+  <div class="grid">
+    <div class="card"><div class="kpi">2</div><div>Architekturpfade</div><p class="muted">Klassischer crank-slider-Pfad und freier Kolbenpfad werden getrennt beschrieben.</p></div>
+    <div class="card"><div class="kpi">5</div><div>Solvervarianten</div><p class="muted">Euler, RK4, SciPy RK45, BDF und Radau mit fester Ausgaberasterung.</p></div>
+    <div class="card"><div class="kpi">4</div><div>Connection-Typen</div><p class="muted">Valve, Slot, Orifice und Check Valve mit gemeinsamer Massenstromlogik.</p></div>
+  </div>
+</section>
+<section class="card">
+  <h2>Zielbild des Systems</h2>
+  <p>Thermo0D ist ein 0D-Kontrollvolumenmodell mit gemeinsamem Thermo-/Flow-Kern und zwei Architekturen:</p>
+  <ul>
+    <li><strong>classic</strong>: konventioneller Zylinderpfad mit vorgegebener Kurbelkinematik und zeit-/winkelbasierter Zylinderbewegung.</li>
+    <li><strong>free_piston</strong>: mechanisch dynamischer Pfad mit translatorischem Freiheitsgrad <code>x</code> und <code>v</code>, Gasfeder/Bounce und optional generatorischer Last als lineares Dämpfungsmodell.</li>
+  </ul>
+  <div class="callout">Die gemeinsame Physik für Massenstrom, ideale Gasbeziehung, Wandwärme, Vibe-Wärmefreisetzung und Verdampfung wird in beiden Pfaden wiederverwendet. Unterschiede liegen primär in Kinematik, Zustandsvektor und Lastmodell.</div>
+</section>
+<section class="card">
+  <h2>Dokumentenstruktur</h2>
+  <ul>
+    <li><a href="physik.html">Physik</a>: Massen-, Energie- und Bewegungsmodell beider Pfade.</li>
+    <li><a href="numerik.html">Numerik</a>: Zeitraster, Solver, Sampling, Konsistenz und Grenzen.</li>
+    <li><a href="konfiguration_klassisch.html">Konfiguration classic</a>: vollständige Parameter- und Optionsübersicht des konventionellen Pfads.</li>
+    <li><a href="konfiguration_free_piston.html">Konfiguration free_piston</a>: vollständige Parameter- und Optionsübersicht des Freikolbenpfads.</li>
+    <li><a href="generator_und_schwungmasse.html">Generator &amp; Schwungmasse</a>: aktuelle Modellierung und empfohlene Erweiterung.</li>
+    <li><a href="verbesserungen_und_next_steps.html">Verbesserungen &amp; Next Steps</a>: Stoffwerte, verbrannt/unverbrannt/restgas, Regelung und Ausbaupfad.</li>
+  </ul>
+</section>
+<section class="card">
+  <h2>Wichtige Klarstellung zum aktuellen Projektstand</h2>
+  <ul>
+    <li>Im <strong>classic</strong>-Pfad ist die Drehzahl aktuell vorgegeben. Es gibt keinen dynamischen Kurbelwellenzustand mit Winkelgeschwindigkeit als ODE-Zustand.</li>
+    <li>Im <strong>free_piston</strong>-Pfad ist die Lastanbindung aktuell ein <strong>lineares Dämpfungsmodell</strong> (<code>viscous</code>, <code>electromagnetic_linear</code>, <code>generator_controlled</code>), also ein Generatorersatzmodell, kein vollelektromagnetisches Feldmodell.</li>
+    <li>Verbranntes Gas, unverbranntes Frischgas, Restgas und temperaturabhängige Mehrstoff-Stoffwerte sind im aktuellen Stand noch nicht als getrennte Zustandsgrößen ausmodelliert.</li>
+  </ul>
+</section>
+</main>
+  </div>
+</body>
+</html>

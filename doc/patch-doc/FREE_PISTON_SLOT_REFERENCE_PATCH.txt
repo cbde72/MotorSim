@@ -1,0 +1,49 @@
+Free-piston slot reference patch
+================================
+
+Problem fixed
+-------------
+In the free-piston path, slot opening_mode=by_distance was evaluated with the
+raw state coordinate x_m. The shared slot logic, however, expects piston travel
+measured from compression TDC. Because the free-piston cylinder geometry uses
+x_max_m as the TDC-side position, this caused an inconsistent reference between
+cylinder volume and slot opening.
+
+Implemented fix
+---------------
+1. Added helper:
+   src/thermo0d/model/free_piston/geometry.py
+   - cylinder_distance_from_tdc(x_m, x_max_m)
+
+2. Free-piston RHS now passes distance-from-TDC into the shared slot logic:
+   src/thermo0d/model/free_piston/rhs.py
+
+3. Reconstruction / CSV / plots now use the same distance-from-TDC reference:
+   src/thermo0d/output/reconstruction.py
+
+4. Free-piston postprocessing exports the derived signal:
+   free_piston_distance_from_tdc_m
+   src/thermo0d/model/free_piston/postprocessing.py
+
+5. Signal catalog extended with the new diagnostic signal:
+   src/thermo0d/gui/signal_catalog.py
+
+6. Regression tests added:
+   tests/test_free_piston_slot_reference.py
+
+Verification
+------------
+Passing tests:
+- tests/test_free_piston_slot_reference.py
+- tests/test_free_piston_coldflow.py
+- tests/test_gui_signal_catalog.py
+
+Command used:
+PYTHONPATH=src pytest -q tests/test_free_piston_slot_reference.py tests/test_free_piston_coldflow.py tests/test_gui_signal_catalog.py
+
+Result on tuned oscillating config
+----------------------------------
+Using the patched code with free_piston_coldflow_oscillating.yaml:
+- transfer_slot_slot_height_m: max 0.012 m
+- exhaust_slot_slot_height_m: max 0.014 m
+- slots are no longer stuck at zero

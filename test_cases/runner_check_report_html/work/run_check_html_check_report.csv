@@ -1,0 +1,41 @@
+metric;value;unit;status;details
+check_case_class;fired_gas_exchange_4T;-;green;Automatisch erkannte Fallklasse für die Ampelbewertung.
+check_cycle_type;4T;-;green;Aus dem Modell abgeleiteter Zyklustyp für die Bewertung.
+last_cycle_points;720;count;green;Anzahl Stützstellen im letzten Zyklus.
+cylinder_bore_mm;86.0;mm;green;Zylindergeometrie: Bohrung.
+cylinder_stroke_mm;86.0;mm;green;Zylindergeometrie: Hub.
+cylinder_conrod_mm;143.0;mm;green;Zylindergeometrie: Pleuellänge.
+cylinder_bore_area_mm2;5808.804816487526;mm²;green;Zylindergeometrie: Bohrungsfläche.
+cylinder_swept_cm3;499.55721421792725;cm³;green;Zylindergeometrie: Hubvolumen.
+cylinder_clearance_cm3;52.58496991767655;cm³;green;Zylindergeometrie: Restvolumen.
+intake_valve_lift_max_mm;7.9;mm;green;Ventilgeometrie: maximaler effektiver Lift nach Skalierung und Lash.
+intake_valve_A_ref_mm2;5808.804816487526;mm²;green;Ventilgeometrie: Referenzfläche.
+intake_valve_A_eff_forward_max_mm2;2189.9194158157975;mm²;green;Ventilgeometrie: maximale effektive Vorwärtsfläche.
+intake_valve_A_eff_reverse_max_mm2;1844.2955292347897;mm²;green;Ventilgeometrie: maximale effektive Rückwärtsfläche.
+exhaust_valve_lift_max_mm;7.3999999999999995;mm;green;Ventilgeometrie: maximaler effektiver Lift nach Skalierung und Lash.
+exhaust_valve_A_ref_mm2;5808.804816487526;mm²;green;Ventilgeometrie: Referenzfläche.
+exhaust_valve_A_eff_forward_max_mm2;1928.5231990738584;mm²;green;Ventilgeometrie: maximale effektive Vorwärtsfläche.
+exhaust_valve_A_eff_reverse_max_mm2;2044.6992954036093;mm²;green;Ventilgeometrie: maximale effektive Rückwärtsfläche.
+theta_first_deg;1.0;deg;green;Erster lokaler Kurbelwinkel des Prüfzyklus.
+theta_last_deg;720.0;deg;green;Letzter lokaler Kurbelwinkel des Prüfzyklus.
+overall_status;red;-;red;Gesamtampel für fired_gas_exchange_4T.
+pmin_bar;1.041378926690599;bar;green;Minimaler Zylinderdruck im letzten Zyklus (fired_gas_exchange_4T).
+pmax_bar;11.016593291137404;bar;green;Maximaler Zylinderdruck im letzten Zyklus (fired_gas_exchange_4T).
+Tmin_K;414.1998534826155;K;green;Minimale Zylindertemperatur im letzten Zyklus (fired_gas_exchange_4T).
+Tmax_K;2433.2294640789974;K;green;Maximale Zylindertemperatur im letzten Zyklus (fired_gas_exchange_4T).
+mmin_kg;1.2076623055908598e-05;kg;green;Minimale Zylindermasse im letzten Zyklus.
+mmax_kg;0.0006623389058169473;kg;green;Maximale Zylindermasse im letzten Zyklus.
+delta_m_cycle_kg;-1.9953929952657486e-06;kg;green;Massenänderung des Zylinders über den letzten Zyklus.
+mdot_in_cycle_kg;0.0006486380826700077;kg;green;Integrierte Einströmmasse über den letzten Zyklus.
+mdot_out_cycle_kg;0.000666785865498616;kg;green;Integrierte Ausströmmasse über den letzten Zyklus.
+mass_balance_residual_kg;1.6152389833342545e-05;kg;red;Sollte nahe 0 liegen: Δm - (m_in - m_out), bewertet relativ zur durchgesetzten bzw. gespeicherten Masse.
+mass_balance_residual_rel;0.02422425349593148;-;red;Normierte Massenbilanzrestgröße für die Fallklassen-Ampel.
+delta_U_cycle_J;-0.4539649627356255;J;green;Änderung der inneren Energie im letzten Zyklus.
+enthalpy_in_cycle_J;298.64804024495226;J;green;Integrierte Enthalpie in den Zylinder.
+enthalpy_out_cycle_J;347.7659471265594;J;green;Integrierte Enthalpie aus dem Zylinder.
+wall_heat_cycle_J;-870.1105728869161;J;green;Integrierte Wandwärme.
+added_energy_cycle_J;859.2930151641798;J;green;Integrierte zugeführte Energie/Verbrennung.
+evaporation_sink_cycle_J;7.233333333333339;J;green;Integrierte Verdampfungsenthalpie-Senke.
+piston_work_cycle_J;-53.42676867614976;J;green;Integrierte p*dV-Arbeit.
+energy_balance_residual_J;13.288064298791397;J;red;Sollte nahe 0 liegen: ΔU - (H_net + Q_wall + Q_add - Q_evap - W_pv).
+energy_balance_residual_rel;0.005453800961064526;-;red;Normierte Energiebilanzrestgröße für die Fallklassen-Ampel.

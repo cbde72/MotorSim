@@ -1,0 +1,25 @@
+name: Thermo0D pV Diagramm
+figures:
+- title: pV Diagramm
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Zylinder p-V
+    plot_type: line
+    x_signal: cylinder_V_m3
+    x_title: Volumen [m³]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_p
+      title: Druck [bar]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: cylinder_p_Pa
+      label: Zylinderdruck
+      axis_id: ax_p
+      color: '#111111'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      unit_preset: raw

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Free-Piston Diagnoseansicht – TDC/BDC, Hub, Slots, Config→Physik</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #101a2e;
+      --panel2: #16233c;
+      --text: #e5edf8;
+      --muted: #94a3b8;
+      --grid: #233251;
+      --cyan: #38bdf8;
+      --red: #f87171;
+      --orange: #f59e0b;
+      --green: #34d399;
+      --stroke: #cbd5e1;
+      --steel: #7c8aa6;
+      --piston: #8b9bb4;
+      --shadow: rgba(0,0,0,0.25);
+      --warn: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: linear-gradient(180deg, #08101d 0%, #0b1220 100%); color: var(--text); font: 14px/1.4 "Segoe UI", system-ui, sans-serif; }
+    .wrap { max-width: 1600px; margin: 0 auto; padding: 18px; display: grid; grid-template-columns: 390px 1fr; gap: 18px; }
+    .panel { background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%); border: 1px solid #22314b; border-radius: 16px; box-shadow: 0 20px 40px var(--shadow); }
+    .left { padding: 16px; display: grid; gap: 14px; align-content: start; }
+    h1 { font-size: 21px; margin: 0; line-height: 1.2; }
+    h2 { font-size: 15px; margin: 0 0 8px 0; }
+    .sub { color: var(--muted); font-size: 13px; }
+    .controls, .box { display: grid; gap: 10px; padding: 12px; background: rgba(255,255,255,0.02); border: 1px solid #22314b; border-radius: 14px; }
+    .row { display: grid; gap: 6px; }
+    .row.grid2 { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row.grid3 { grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .row.inline { grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+    label { color: var(--muted); font-size: 12px; }
+    input[type="range"] { width: 100%; accent-color: var(--cyan); background: #0f172a; }
+    input[type="number"], select, textarea {
+      width: 100%; background: #0f172a; color: var(--text); border: 1px solid #334155; border-radius: 8px; padding: 8px 10px;
+    }
+    textarea { min-height: 110px; font-family: Consolas, monospace; }
+    button { background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%); color: white; border: 0; border-radius: 10px; padding: 10px 12px; cursor: pointer; font-weight: 600; }
+    .btns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .metric { background: rgba(255,255,255,0.03); border: 1px solid #22314b; border-radius: 12px; padding: 10px; }
+    .metric .k { color: var(--muted); font-size: 11px; }
+    .metric .v { font-size: 18px; font-weight: 700; margin-top: 2px; }
+    .metric small { color: var(--muted); }
+    .right { padding: 14px; display: grid; gap: 12px; }
+    .topgrid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
+    svg, canvas { width: 100%; display: block; border-radius: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border: 1px solid #22314b; }
+    svg { height: min(72vh, 820px); }
+    canvas { height: 240px; }
+    .diaggrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 12px; padding: 0 4px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; margin-right: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid #22314b; padding: 7px 8px; vertical-align: top; }
+    th { color: var(--muted); text-align: left; }
+    code { background: rgba(255,255,255,0.05); border-radius: 6px; padding: 1px 5px; color: #dbeafe; }
+    .ok { color: var(--green); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--red); }
+    .foot { color: var(--muted); font-size: 12px; padding: 4px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <aside class="panel left">
+      <div>
+        <h1>Free-Piston Diagnoseansicht</h1>
+        <div class="sub">Prüfe TDC/BDC-Definition, 80-mm-Hub, Slot-Öffnung/Schließung und die Kette <b>Config → Geometrie → Physik → verarbeitete Größen</b>.</div>
+      </div>
+
+      <div class="controls">
+        <h2>Geometrie aus Config</h2>
+        <div class="row grid2">
+          <div><label>x_min [mm]</label><input id="xMin" type="number" step="0.1" value="-40.0"></div>
+          <div><label>x_max [mm]</label><input id="xMax" type="number" step="0.1" value="40.0"></div>
+        </div>
+        <div class="row grid2">
+          <div><label>Kolbenfläche A [mm²]</label><input id="pistonArea" type="number" step="1" value="4360"></div>
+          <div><label>Restvolumen Vc [cm³]</label><input id="clearance" type="number" step="0.1" value="25.0"></div>
+        </div>
+        <div class="row grid3">
+          <div><label>Transfer Abstand ab TDC [mm]</label><input id="trDist" type="number" step="0.1" value="55.0"></div>
+          <div><label>Transfer Höhe [mm]</label><input id="trH" type="number" step="0.1" value="12.0"></div>
+          <div><label>Transfer Breite × Anzahl</label><input id="trWn" type="text" value="20 × 2"></div>
+        </div>
+        <div class="row grid3">
+          <div><label>Auslass Abstand ab TDC [mm]</label><input id="exDist" type="number" step="0.1" value="45.0"></div>
+          <div><label>Auslass Höhe [mm]</label><input id="exH" type="number" step="0.1" value="14.0"></div>
+          <div><label>Auslass Breite × Anzahl</label><input id="exWn" type="text" value="24 × 2"></div>
+        </div>
+        <div class="btns">
+          <button id="applyBtn">Geometrie anwenden</button>
+          <button id="hub80Btn">Hub = 80 mm</button>
+          <button id="exampleBtn">Beispiel laden</button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <h2>Arbeits-/Prüfpunkt</h2>
+        <div class="row"><label>Freikolben-Koordinate x [mm]</label><input id="xSlider" type="range" min="-40" max="40" step="0.1" value="0"></div>
+        <div class="row inline"><label>Direkteingabe x [mm]</label><input id="xInput" type="number" step="0.1" value="0.0"></div>
+        <div class="row"><label>Animation / Hubfahrt</label><input id="speedSlider" type="range" min="0.2" max="3.0" step="0.1" value="1.0"></div>
+        <div class="btns">
+          <button id="playBtn">Play</button>
+          <button id="tdcBtn">zu TDC</button>
+          <button id="bdcBtn">zu BDC</button>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric"><div class="k">TDC</div><div class="v" id="mTdc">x = +40.0 mm</div><small>minimaler Abstand zum Kopf</small></div>
+        <div class="metric"><div class="k">BDC</div><div class="v" id="mBdc">x = -40.0 mm</div><small>maximaler Abstand zum Kopf</small></div>
+        <div class="metric"><div class="k">Hub</div><div class="v" id="mHub">80.0 mm</div><small>x_max - x_min</small></div>
+        <div class="metric"><div class="k">Abstand von TDC</div><div class="v" id="mDist">40.0 mm</div><small><code>distance = x_max - x</code></small></div>
+        <div class="metric"><div class="k">Transfer offen</div><div class="v" id="mTrOpen">0.0 mm</div><small id="mTrA">A_geom 0.0 mm²</small></div>
+        <div class="metric"><div class="k">Auslass offen</div><div class="v" id="mExOpen">0.0 mm</div><small id="mExA">A_geom 0.0 mm²</small></div>
+      </div>
+
+      <div class="box">
+        <h2>Formeln, wie das Modell rechnen sollte</h2>
+        <div class="sub">
+          <div><code>TDC = x_max</code></div>
+          <div><code>BDC = x_min</code></div>
+          <div><code>Hub = x_max - x_min</code></div>
+          <div><code>distance_from_tdc = x_max - x</code></div>
+          <div><code>open_h = clamp(distance_from_tdc - slot_distance, 0, slot_height)</code></div>
+          <div><code>A_geom = n · width · open_h</code></div>
+          <div><code>V_cyl = Vc + A_piston · distance_from_tdc</code></div>
+          <div><code>dV/dt = -A_piston · v</code></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="panel right">
+      <div class="topgrid">
+        <div>
+          <svg id="svg" viewBox="0 0 980 820" xmlns="http://www.w3.org/2000/svg" aria-label="Free piston diagnosis section view"></svg>
+          <div class="legend">
+            <span><span class="dot" style="background:#38bdf8"></span>Transfer</span>
+            <span><span class="dot" style="background:#f87171"></span>Auslass</span>
+            <span><span class="dot" style="background:#8b9bb4"></span>Kolben</span>
+            <span><span class="dot" style="background:#34d399"></span>offener Bereich</span>
+            <span><span class="dot" style="background:#fbbf24"></span>aktueller Arbeits-/Prüfpunkt</span>
+          </div>
+        </div>
+        <div class="diaggrid">
+          <canvas id="slotCanvas" width="560" height="240"></canvas>
+          <canvas id="volCanvas" width="560" height="240"></canvas>
+          <div class="box">
+            <h2>Öffnen / Schließen</h2>
+            <table>
+              <tr><th>Größe</th><th>Transfer</th><th>Auslass</th></tr>
+              <tr><td>Öffnet bei</td><td id="openTrAt"></td><td id="openExAt"></td></tr>
+              <tr><td>Voll offen ab</td><td id="fullTrAt"></td><td id="fullExAt"></td></tr>
+              <tr><td>Schließt beim Rückhub unter</td><td id="closeTrAt"></td><td id="closeExAt"></td></tr>
+              <tr><td>Aktuell</td><td id="stateTr"></td><td id="stateEx"></td></tr>
+            </table>
+          </div>
+          <div class="box">
+            <h2>Config → Modellabbild</h2>
+            <table>
+              <tr><th>Config</th><th>Interne Bedeutung</th><th>Wird hier geprüft als</th></tr>
+              <tr><td><code>x_min_m</code>, <code>x_max_m</code></td><td>Grenzen der freien Bewegung</td><td><span id="checkHub"></span></td></tr>
+              <tr><td><code>distance_from_tdc_m</code></td><td>Slot-Start relativ zu TDC</td><td><span id="checkDist"></span></td></tr>
+              <tr><td><code>height_m</code></td><td>max. offene Slot-Höhe</td><td><span id="checkHeight"></span></td></tr>
+              <tr><td><code>width_m</code> &amp; <code>number_of_identical_holes</code></td><td>geometrische Öffnungsfläche</td><td><span id="checkArea"></span></td></tr>
+              <tr><td><code>piston_area_m2</code>, <code>clearance_volume_m3</code></td><td>Volumenabbildung</td><td><span id="checkVol"></span></td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="diaggrid">
+        <div class="box">
+          <h2>Interpretation / Prüfkriterien</h2>
+          <div class="sub" id="interpretation"></div>
+        </div>
+        <div class="box">
+          <h2>YAML-Block zum Vergleich</h2>
+          <textarea id="yamlBlock" spellcheck="false"></textarea>
+        </div>
+      </div>
+      <div class="foot">Diese Ansicht ist bewusst eine Diagnoseansicht: Sie soll nicht nur zeigen <i>dass</i> sich etwas bewegt, sondern <i>wie</i> TDC/BDC, Hub, Slot-Öffnung und Geometrie intern interpretiert werden.</div>
+    </main>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const svg = $('svg');
+const slotCanvas = $('slotCanvas');
+const volCanvas = $('volCanvas');
+
+let state = {
+  playing: false,
+  t: 0,
+  lastTs: 0,
+  geom: null,
+  xMm: 0.0,
+};
+
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function f1(v){ return Number(v).toFixed(1); }
+function f2(v){ return Number(v).toFixed(2); }
+function fmtState(open, h){
+  if (open <= 1e-9) return '<span class="bad">geschlossen</span>';
+  if (open >= h - 1e-9) return '<span class="ok">voll offen</span>';
+  return '<span class="warn">teiloffen</span>';
+}
+function parseWidthCount(text){
+  const s = String(text).replace(',', '.').trim();
+  const m = s.match(/([0-9.]+)\s*[x×*]\s*([0-9.]+)/i);
+  if (m) return { widthMm: parseFloat(m[1]), n: parseInt(m[2],10) };
+  const one = parseFloat(s);
+  return { widthMm: isFinite(one)?one:0, n:1 };
+}
+
+function readGeom(){
+  const tr = parseWidthCount($('trWn').value);
+  const ex = parseWidthCount($('exWn').value);
+  const g = {
+    xMinMm: parseFloat($('xMin').value),
+    xMaxMm: parseFloat($('xMax').value),
+    pistonAreaMm2: parseFloat($('pistonArea').value),
+    clearanceCm3: parseFloat($('clearance').value),
+    transfer: { distMm: parseFloat($('trDist').value), heightMm: parseFloat($('trH').value), widthMm: tr.widthMm, n: tr.n, color: '#38bdf8' },
+    exhaust:  { distMm: parseFloat($('exDist').value), heightMm: parseFloat($('exH').value), widthMm: ex.widthMm, n: ex.n, color: '#f87171' },
+  };
+  g.hubMm = g.xMaxMm - g.xMinMm;
+  return g;
+}
+
+function calcSlot(slot, distanceMm){
+  const openMm = clamp(distanceMm - slot.distMm, 0, slot.heightMm);
+  const frac = slot.heightMm > 0 ? openMm / slot.heightMm : 0;
+  const areaMm2 = slot.n * slot.widthMm * openMm;
+  return { openMm, frac, areaMm2 };
+}
+
+function cylinderVolumeCm3(g, distanceMm){
+  return g.clearanceCm3 + (g.pistonAreaMm2 * distanceMm) / 1000.0;
+}
+
+function updateYaml(){
+  const g = state.geom;
+  $('yamlBlock').value = `free_piston:\n  mechanics:\n    x_min_m: ${(g.xMinMm/1000).toFixed(4)}\n    x_max_m: ${(g.xMaxMm/1000).toFixed(4)}\n    piston_area_m2: ${(g.pistonAreaMm2/1e6).toFixed(6)}\n    clearance_volume_m3: ${(g.clearanceCm3/1e6).toExponential(3)}\n\npreprocessing:\n  connections:\n    - name: transfer_slot\n      type: slot\n      opening_mode: by_distance\n      distance_from_tdc_m: ${(g.transfer.distMm/1000).toFixed(3)}\n      width_m: ${(g.transfer.widthMm/1000).toFixed(3)}\n      height_m: ${(g.transfer.heightMm/1000).toFixed(3)}\n      number_of_identical_holes: ${g.transfer.n}\n\n    - name: exhaust_slot\n      type: slot\n      opening_mode: by_distance\n      distance_from_tdc_m: ${(g.exhaust.distMm/1000).toFixed(3)}\n      width_m: ${(g.exhaust.widthMm/1000).toFixed(3)}\n      height_m: ${(g.exhaust.heightMm/1000).toFixed(3)}\n      number_of_identical_holes: ${g.exhaust.n}`;
+}
+
+function updateMetrics(){
+  const g = state.geom;
+  const x = state.xMm;
+  const distance = g.xMaxMm - x;
+  const tr = calcSlot(g.transfer, distance);
+  const ex = calcSlot(g.exhaust, distance);
+  const v = cylinderVolumeCm3(g, distance);
+
+  $('mTdc').textContent = `x = ${f1(g.xMaxMm)} mm`;
+  $('mBdc').textContent = `x = ${f1(g.xMinMm)} mm`;
+  $('mHub').textContent = `${f1(g.hubMm)} mm`;
+  $('mDist').textContent = `${f1(distance)} mm`;
+  $('mTrOpen').textContent = `${f1(tr.openMm)} mm`;
+  $('mTrA').textContent = `A_geom ${f1(tr.areaMm2)} mm²`;
+  $('mExOpen').textContent = `${f1(ex.openMm)} mm`;
+  $('mExA').textContent = `A_geom ${f1(ex.areaMm2)} mm²`;
+
+  $('openTrAt').textContent = `distance > ${f1(g.transfer.distMm)} mm`;
+  $('openExAt').textContent = `distance > ${f1(g.exhaust.distMm)} mm`;
+  $('fullTrAt').textContent = `distance ≥ ${f1(g.transfer.distMm + g.transfer.heightMm)} mm`;
+  $('fullExAt').textContent = `distance ≥ ${f1(g.exhaust.distMm + g.exhaust.heightMm)} mm`;
+  $('closeTrAt').textContent = `distance ≤ ${f1(g.transfer.distMm)} mm`;
+  $('closeExAt').textContent = `distance ≤ ${f1(g.exhaust.distMm)} mm`;
+  $('stateTr').innerHTML = fmtState(tr.openMm, g.transfer.heightMm);
+  $('stateEx').innerHTML = fmtState(ex.openMm, g.exhaust.heightMm);
+
+  $('checkHub').innerHTML = (Math.abs(g.hubMm - 80) < 1e-6) ? '<span class="ok">Hub = 80 mm</span>' : `<span class="warn">Hub = ${f1(g.hubMm)} mm</span>`;
+  $('checkDist').innerHTML = `<span class="ok">distance = x_max - x</span>`;
+  $('checkHeight').innerHTML = `<span class="ok">clamp(..., 0, height)</span>`;
+  $('checkArea').innerHTML = `<span class="ok">A = n·b·h_open</span>`;
+  $('checkVol').innerHTML = `<span class="ok">V = Vc + A·distance</span>`;
+
+  $('interpretation').innerHTML = [
+    `<div><b>Aktueller Arbeits-/Prüfpunkt:</b> x = ${f1(x)} mm, distance_from_tdc = ${f1(distance)} mm, V_cyl = ${f2(v)} cm³.</div>`,
+    `<div><b>TDC-Definition:</b> TDC liegt bei <code>x = x_max</code>. Dann ist <code>distance_from_tdc = 0</code> und das Zylindervolumen minimal.</div>`,
+    `<div><b>BDC-Definition:</b> BDC liegt bei <code>x = x_min</code>. Dann ist <code>distance_from_tdc = Hub</code> und das Zylindervolumen maximal.</div>`,
+    `<div><b>Slot-Definition:</b> Ein Slot öffnet nicht bei einem absoluten x, sondern wenn der <code>Abstand von TDC</code> seinen konfigurierten Öffnungsabstand überschreitet.</div>`,
+    `<div><b>Transfer aktuell:</b> ${tr.openMm <= 0 ? 'geschlossen' : tr.openMm >= g.transfer.heightMm ? 'voll offen' : 'teiloffen'}.</div>`,
+    `<div><b>Auslass aktuell:</b> ${ex.openMm <= 0 ? 'geschlossen' : ex.openMm >= g.exhaust.heightMm ? 'voll offen' : 'teiloffen'}.</div>`
+  ].join('');
+}
+
+function drawSection(){
+  const g = state.geom;
+  const x = state.xMm;
+  const distance = g.xMaxMm - x;
+  const tr = calcSlot(g.transfer, distance);
+  const ex = calcSlot(g.exhaust, distance);
+
+  const W = 980, H = 820;
+  const cx = 490, topY = 90, boreW = 180, cylH = 580;
+  const pxPerMm = cylH / g.hubMm;
+  const left = cx - boreW/2, right = cx + boreW/2;
+  const pistonY = topY + distance * pxPerMm;
+  const pistonH = 48;
+
+  const trTop = topY + g.transfer.distMm * pxPerMm;
+  const trH = g.transfer.heightMm * pxPerMm;
+  const exTop = topY + g.exhaust.distMm * pxPerMm;
+  const exH = g.exhaust.heightMm * pxPerMm;
+
+  const trOpenY = trTop + (g.transfer.heightMm - tr.openMm) * pxPerMm;
+  const trOpenH = tr.openMm * pxPerMm;
+  const exOpenY = exTop + (g.exhaust.heightMm - ex.openMm) * pxPerMm;
+  const exOpenH = ex.openMm * pxPerMm;
+
+  let grid = '';
+  for (let mm = 0; mm <= g.hubMm + 0.001; mm += 5) {
+    const y = topY + mm * pxPerMm;
+    const isMajor = (Math.round(mm) % 10 === 0);
+    grid += `<line x1="140" y1="${y}" x2="840" y2="${y}" stroke="${isMajor ? '#233251' : '#1b2943'}" stroke-width="1" />`;
+    grid += `<text x="120" y="${y+4}" fill="#94a3b8" font-size="${isMajor ? '12' : '10'}" text-anchor="end">${f0(mm)}</text>`;
+  }
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="cylFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#132238"/><stop offset="100%" stop-color="#0b1424"/></linearGradient>
+      <linearGradient id="steelGrad" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#a8b6ce"/><stop offset="100%" stop-color="#65748f"/></linearGradient>
+      <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="rgba(0,0,0,0.35)"/></filter>
+      <marker id="arrowEnd" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#34d399"/></marker>
+    </defs>
+    <g filter="url(#softShadow)">
+      <rect x="${left-24}" y="${topY-20}" width="${boreW+48}" height="${cylH+80}" rx="24" fill="#0f172a" stroke="#2b3b57" stroke-width="2"/>
+      <rect x="${left}" y="${topY}" width="${boreW}" height="${cylH}" rx="18" fill="url(#cylFill)" stroke="#b6c2d2" stroke-width="3"/>
+      <rect x="${left+12}" y="${topY+12}" width="${boreW-24}" height="${cylH-24}" rx="12" fill="none" stroke="#3a4b66" stroke-width="1.3" />
+    </g>
+    ${grid}
+    <text x="150" y="58" fill="#e5edf8" font-size="22" font-weight="700">TDC / BDC / 80-mm-Hub / Slot-Definition</text>
+    <text x="150" y="80" fill="#94a3b8" font-size="13">Vertikale Achse = Abstand von TDC [mm], nicht rohe x-Koordinate</text>
+
+    <rect x="${left-10}" y="${topY-28}" width="${boreW+20}" height="28" rx="10" fill="url(#steelGrad)" stroke="#dbe6f7" stroke-width="2"/>
+    <text x="${right+85}" y="${topY+5}" fill="#dbeafe" font-size="13">TDC = x_max = ${f1(g.xMaxMm)} mm</text>
+    <line x1="${right+12}" y1="${topY}" x2="${right+78}" y2="${topY}" stroke="#dbeafe" stroke-width="2" />
+
+    <line x1="${left-78}" y1="${topY + g.hubMm*pxPerMm}" x2="${right+78}" y2="${topY + g.hubMm*pxPerMm}" stroke="#fbbf24" stroke-width="2" stroke-dasharray="8 6"/>
+    <text x="${right+85}" y="${topY + g.hubMm*pxPerMm + 5}" fill="#fbbf24" font-size="13">BDC = x_min = ${f1(g.xMinMm)} mm</text>
+    <line x1="${right+12}" y1="${topY + g.hubMm*pxPerMm}" x2="${right+78}" y2="${topY + g.hubMm*pxPerMm}" stroke="#fbbf24" stroke-width="2" />
+
+    <rect x="${left-78}" y="${trTop}" width="78" height="${trH}" rx="6" fill="#0f172a" stroke="${g.transfer.color}" stroke-width="2"/>
+    <rect x="${left-78}" y="${trOpenY}" width="78" height="${trOpenH}" rx="6" fill="#34d399" opacity="0.88"/>
+    <rect x="${left-120}" y="${trTop+5}" width="26" height="${Math.max(0,trH-10)}" rx="5" fill="#0f172a" stroke="${g.transfer.color}" stroke-width="2"/>
+    <rect x="${left-120}" y="${trOpenY+5}" width="26" height="${Math.max(0,trOpenH-10)}" rx="5" fill="#34d399" opacity="0.88"/>
+    <text x="${left-132}" y="${trTop-10}" fill="${g.transfer.color}" font-size="14" text-anchor="start">Transfer</text>
+    <text x="${left-132}" y="${trTop+trH+18}" fill="#94a3b8" font-size="12" text-anchor="start">ab ${f1(g.transfer.distMm)} mm, Höhe ${f1(g.transfer.heightMm)} mm</text>
+
+    <rect x="${right}" y="${exTop}" width="78" height="${exH}" rx="6" fill="#0f172a" stroke="${g.exhaust.color}" stroke-width="2"/>
+    <rect x="${right}" y="${exOpenY}" width="78" height="${exOpenH}" rx="6" fill="#34d399" opacity="0.88"/>
+    <rect x="${right+94}" y="${exTop+5}" width="26" height="${Math.max(0,exH-10)}" rx="5" fill="#0f172a" stroke="${g.exhaust.color}" stroke-width="2"/>
+    <rect x="${right+94}" y="${exOpenY+5}" width="26" height="${Math.max(0,exOpenH-10)}" rx="5" fill="#34d399" opacity="0.88"/>
+    <text x="${right+132}" y="${exTop-10}" fill="${g.exhaust.color}" font-size="14" text-anchor="end">Auslass</text>
+    <text x="${right+132}" y="${exTop+exH+18}" fill="#94a3b8" font-size="12" text-anchor="end">ab ${f1(g.exhaust.distMm)} mm, Höhe ${f1(g.exhaust.heightMm)} mm</text>
+
+    <g filter="url(#softShadow)">
+      <rect x="${left+10}" y="${pistonY}" width="${boreW-20}" height="48" rx="10" fill="#8b9bb4" stroke="#d7e1ef" stroke-width="2"/>
+      <rect x="${left+18}" y="${pistonY+8}" width="${boreW-36}" height="10" rx="4" fill="#b7c4d8" opacity="0.9"/>
+      <rect x="${left+18}" y="${pistonY+24}" width="${boreW-36}" height="8" rx="4" fill="#6d7f9b" opacity="0.95"/>
+    </g>
+    <line x1="${left-10}" y1="${pistonY}" x2="${right+10}" y2="${pistonY}" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="7 6"/>
+    <text x="${right+85}" y="${pistonY+5}" fill="#fbbf24" font-size="13">aktueller Prüfpunkt: x = ${f1(x)} mm</text>
+    <line x1="${right+12}" y1="${pistonY}" x2="${right+78}" y2="${pistonY}" stroke="#fbbf24" stroke-width="2" />
+
+    <line x1="${cx}" y1="${topY}" x2="${cx}" y2="${pistonY}" stroke="#34d399" stroke-width="3" marker-end="url(#arrowEnd)"/>
+    <text x="${cx+16}" y="${(topY+pistonY)/2}" fill="#34d399" font-size="16" font-weight="700">distance_from_tdc = ${f1(distance)} mm</text>
+
+    <rect x="130" y="715" width="720" height="86" rx="14" fill="rgba(255,255,255,0.03)" stroke="#22314b" stroke-width="1.5"/>
+    <text x="160" y="745" fill="#e5edf8" font-size="18" font-weight="700">Modellabbild</text>
+    <text x="160" y="773" fill="#cbd5e1" font-size="14">TDC = x_max, BDC = x_min, Hub = x_max - x_min = ${f1(g.hubMm)} mm</text>
+    <text x="160" y="795" fill="#94a3b8" font-size="13">Slot-Logik: open_h = clamp((x_max - x) - distance_from_tdc_slot, 0, height)</text>
+  `;
+}
+
+function drawSlotChart(){
+  const ctx = slotCanvas.getContext('2d');
+  const g = state.geom;
+  const W = slotCanvas.width, H = slotCanvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = '#22314b'; ctx.strokeRect(0,0,W,H);
+  const l=52, r=16, t=18, b=36, pw=W-l-r, ph=H-t-b;
+  const maxY = Math.max(g.transfer.heightMm, g.exhaust.heightMm, 1);
+  for(let i=0;i<=5;i++){
+    const y=t+ph*i/5;
+    ctx.strokeStyle='#22314b'; ctx.beginPath(); ctx.moveTo(l,y); ctx.lineTo(W-r,y); ctx.stroke();
+    const val = maxY*(1-i/5); ctx.fillStyle='#94a3b8'; ctx.font='11px Segoe UI'; ctx.fillText(f1(val), 8, y+4);
+  }
+  for(let i=0;i<=8;i++){
+    const x=l+pw*i/8; ctx.strokeStyle='#1b2943'; ctx.beginPath(); ctx.moveTo(x,t); ctx.lineTo(x,H-b); ctx.stroke();
+  }
+  const mapX = (dist)=> l + pw*(dist/g.hubMm);
+  const mapY = (v)=> t + ph*(1-v/maxY);
+  ctx.lineWidth=2.5;
+  ctx.strokeStyle='#38bdf8'; ctx.beginPath();
+  for(let i=0;i<=240;i++){
+    const dist=g.hubMm*i/240; const open=calcSlot(g.transfer,dist).openMm; const x=mapX(dist), y=mapY(open);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.strokeStyle='#f87171'; ctx.beginPath();
+  for(let i=0;i<=240;i++){
+    const dist=g.hubMm*i/240; const open=calcSlot(g.exhaust,dist).openMm; const x=mapX(dist), y=mapY(open);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  const distNow = g.xMaxMm - state.xMm;
+  const xNow = mapX(distNow);
+  ctx.strokeStyle='#fbbf24'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(xNow,t); ctx.lineTo(xNow,H-b); ctx.stroke();
+  ctx.fillStyle='#e5edf8'; ctx.font='14px Segoe UI'; ctx.fillText('Slotöffnung über Abstand von TDC', 14, 16);
+  ctx.fillStyle='#94a3b8'; ctx.font='12px Segoe UI'; ctx.fillText('0 = TDC, 80 = BDC', W-120, H-10);
+}
+
+function drawVolumeChart(){
+  const ctx = volCanvas.getContext('2d');
+  const g = state.geom;
+  const W = volCanvas.width, H = volCanvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = '#22314b'; ctx.strokeRect(0,0,W,H);
+  const l=52, r=16, t=18, b=36, pw=W-l-r, ph=H-t-b;
+  const minV = cylinderVolumeCm3(g,0), maxV = cylinderVolumeCm3(g,g.hubMm);
+  for(let i=0;i<=5;i++){
+    const y=t+ph*i/5;
+    ctx.strokeStyle='#22314b'; ctx.beginPath(); ctx.moveTo(l,y); ctx.lineTo(W-r,y); ctx.stroke();
+    const val = maxV-(maxV-minV)*i/5; ctx.fillStyle='#94a3b8'; ctx.font='11px Segoe UI'; ctx.fillText(f1(val), 6, y+4);
+  }
+  const mapX = (dist)=> l + pw*(dist/g.hubMm);
+  const mapY = (v)=> t + ph*(1-(v-minV)/(maxV-minV || 1));
+  ctx.lineWidth=2.5;
+  ctx.strokeStyle='#34d399'; ctx.beginPath();
+  for(let i=0;i<=240;i++){
+    const dist=g.hubMm*i/240; const vol=cylinderVolumeCm3(g,dist); const x=mapX(dist), y=mapY(vol);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  const distNow = g.xMaxMm - state.xMm;
+  const volNow = cylinderVolumeCm3(g,distNow);
+  const xNow = mapX(distNow), yNow = mapY(volNow);
+  ctx.strokeStyle='#fbbf24'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(xNow,t); ctx.lineTo(xNow,H-b); ctx.stroke();
+  ctx.fillStyle='#fbbf24'; ctx.beginPath(); ctx.arc(xNow,yNow,4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#e5edf8'; ctx.font='14px Segoe UI'; ctx.fillText('Zylindervolumen über Abstand von TDC', 14, 16);
+  ctx.fillStyle='#94a3b8'; ctx.font='12px Segoe UI'; ctx.fillText('V = Vc + A·distance', W-130, H-10);
+}
+
+function render(){
+  updateMetrics();
+  drawSection();
+  drawSlotChart();
+  drawVolumeChart();
+  updateYaml();
+}
+
+function applyGeom(){
+  state.geom = readGeom();
+  $('xSlider').min = state.geom.xMinMm;
+  $('xSlider').max = state.geom.xMaxMm;
+  state.xMm = clamp(state.xMm, state.geom.xMinMm, state.geom.xMaxMm);
+  $('xSlider').value = state.xMm;
+  $('xInput').value = f1(state.xMm);
+  render();
+}
+
+$('applyBtn').addEventListener('click', applyGeom);
+$('hub80Btn').addEventListener('click', ()=>{ $('xMin').value='-40.0'; $('xMax').value='40.0'; applyGeom(); });
+$('exampleBtn').addEventListener('click', ()=>{
+  $('xMin').value='-40.0'; $('xMax').value='40.0'; $('pistonArea').value='4360'; $('clearance').value='25.0';
+  $('trDist').value='55.0'; $('trH').value='12.0'; $('trWn').value='20 × 2';
+  $('exDist').value='45.0'; $('exH').value='14.0'; $('exWn').value='24 × 2';
+  state.xMm = 0.0; $('xSlider').value='0'; $('xInput').value='0.0'; applyGeom();
+});
+$('xSlider').addEventListener('input', ()=>{ state.xMm = parseFloat($('xSlider').value); $('xInput').value = f1(state.xMm); render(); });
+$('xInput').addEventListener('input', ()=>{ state.xMm = clamp(parseFloat($('xInput').value)||0, state.geom.xMinMm, state.geom.xMaxMm); $('xSlider').value = state.xMm; render(); });
+$('tdcBtn').addEventListener('click', ()=>{ state.xMm = state.geom.xMaxMm; $('xSlider').value = state.xMm; $('xInput').value = f1(state.xMm); render(); });
+$('bdcBtn').addEventListener('click', ()=>{ state.xMm = state.geom.xMinMm; $('xSlider').value = state.xMm; $('xInput').value = f1(state.xMm); render(); });
+$('playBtn').addEventListener('click', ()=>{ state.playing = !state.playing; $('playBtn').textContent = state.playing ? 'Pause' : 'Play'; if(state.playing) requestAnimationFrame(loop); });
+
+function loop(ts){
+  if(!state.playing) return;
+  if(!state.lastTs) state.lastTs = ts;
+  const dt = ts - state.lastTs;
+  state.lastTs = ts;
+  state.t += dt;
+  const speed = parseFloat($('speedSlider').value);
+  const center = 0.5*(state.geom.xMinMm + state.geom.xMaxMm);
+  const amp = 0.5*state.geom.hubMm;
+  state.xMm = center + amp*Math.sin(state.t * 0.0014 * speed);
+  $('xSlider').value = state.xMm;
+  $('xInput').value = f1(state.xMm);
+  render();
+  requestAnimationFrame(loop);
+}
+
+state.geom = readGeom();
+state.xMm = 0.0;
+applyGeom();
+</script>
+</body>
+</html>

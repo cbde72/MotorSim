@@ -1,0 +1,560 @@
+name: Standard Thermo0D Plotpaket
+figures:
+- title: Standard Thermo0D Plotpaket
+  rows: 5
+  cols: 2
+  subplots:
+  - title: Massenströme / Hubvolumen
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    events: &id001
+    - x: 0.0
+      label: OT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      event_type: reference
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - x: 140.0
+      label: EVO
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      event_type: valve
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - x: 180.0
+      label: UT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      event_type: reference
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - x: 300.0
+      label: EVC
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      event_type: valve
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - x: 350.0
+      label: IVO
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      event_type: valve
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - x: 350.0
+      label: SOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      event_type: combustion
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - x: 360.0
+      label: OT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      event_type: reference
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - x: 405.0
+      label: EOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      event_type: combustion
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - x: 510.0
+      label: IVC
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      event_type: valve
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - x: 540.0
+      label: UT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      event_type: reference
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    y_axes:
+    - id: ax_mdot
+      title: Massenstrom [kg/s]
+      side: left
+      color: '#111111'
+    - id: ax_vol
+      title: Hubvolumen [cm³]
+      side: right
+      color: '#666666'
+    series:
+    - signal_key: cylinder_mdot_in_kg_per_s
+      label: Einströmender Massenstrom
+      axis_id: ax_mdot
+      color: '#87cefa'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_mdot_out_kg_per_s
+      label: Ausströmender Massenstrom
+      axis_id: ax_mdot
+      color: '#8b0000'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_V_m3
+      label: Hubvolumen
+      axis_id: ax_vol
+      color: '#808080'
+      line_style: --
+      scale_factor: 1000000.0
+      unit_preset: raw
+  - title: Temperatur / Ventilhub
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    events: *id001
+    y_axes:
+    - id: ax_main
+      title: Temperatur [K]
+      side: left
+      color: '#111111'
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      color: '#1f77b4'
+    series:
+    - signal_key: cylinder_T_K
+      label: Temperatur
+      axis_id: ax_main
+      color: '#111111'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      color: '#0000ff'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      color: '#ff0000'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+  - title: Innere Energie / Ventilhub
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    events: *id001
+    y_axes:
+    - id: ax_main
+      title: Innere Energie [J]
+      side: left
+      color: '#111111'
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      color: '#1f77b4'
+    series:
+    - signal_key: cylinder_U_J
+      label: Innere Energie
+      axis_id: ax_main
+      color: '#111111'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      color: '#0000ff'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      color: '#ff0000'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+  - title: Zylindermasse / Ventilhub
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    events: *id001
+    y_axes:
+    - id: ax_main
+      title: Zylindermasse [mg]
+      side: left
+      color: '#111111'
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      color: '#1f77b4'
+    series:
+    - signal_key: cylinder_m_kg
+      label: Zylindermasse
+      axis_id: ax_main
+      color: '#111111'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      color: '#0000ff'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      color: '#ff0000'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+  - title: Zugeführte Energie kumuliert / Ventilhub
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    events: *id001
+    y_axes:
+    - id: ax_main
+      title: Zugeführte Energie [J]
+      side: left
+      color: '#111111'
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      color: '#1f77b4'
+    series:
+    - signal_key: cylinder_added_energy_cycle_J
+      label: Zugeführte Energie (kumuliert)
+      axis_id: ax_main
+      color: '#111111'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      color: '#0000ff'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      color: '#ff0000'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+  - title: Wandwärme kumuliert / Ventilhub
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    events: *id001
+    y_axes:
+    - id: ax_main
+      title: Wandwärme [J]
+      side: left
+      color: '#111111'
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      color: '#1f77b4'
+    series:
+    - signal_key: cylinder_wall_heat_cycle_J
+      label: Wandwärme (kumuliert)
+      axis_id: ax_main
+      color: '#111111'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      color: '#0000ff'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      color: '#ff0000'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+  - title: Enthalpie ein/aus kumuliert / Ventilhub
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    events: *id001
+    y_axes:
+    - id: ax_main
+      title: Enthalpie [J]
+      side: left
+      color: '#111111'
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      color: '#1f77b4'
+    series:
+    - signal_key: cylinder_enthalpy_in_cycle_J
+      label: Enthalpie ein (kumuliert)
+      axis_id: ax_main
+      color: '#87cefa'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_enthalpy_out_cycle_J
+      label: Enthalpie aus (kumuliert)
+      axis_id: ax_main
+      color: '#8b0000'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      color: '#0000ff'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      color: '#ff0000'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+  - title: Kolbenarbeit kumuliert / Ventilhub
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    events: *id001
+    y_axes:
+    - id: ax_main
+      title: Kolbenarbeit [J]
+      side: left
+      color: '#111111'
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      color: '#1f77b4'
+    series:
+    - signal_key: cylinder_piston_work_cycle_J
+      label: Kolbenarbeit (kumuliert)
+      axis_id: ax_main
+      color: '#111111'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      color: '#0000ff'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      color: '#ff0000'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+  - title: Energiebilanz kumuliert
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    events: *id001
+    y_axes:
+    - id: ax_energy
+      title: Energie [J]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: cylinder_delta_U_cycle_J
+      label: ΔU seit Zyklusstart
+      axis_id: ax_energy
+      color: '#111111'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_added_energy_cycle_J
+      label: Q_add kumuliert
+      axis_id: ax_energy
+      color: '#ff8c00'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_wall_heat_cycle_J
+      label: Q_wall kumuliert
+      axis_id: ax_energy
+      color: '#7a7a7a'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_enthalpy_net_cycle_J
+      label: H_net kumuliert
+      axis_id: ax_energy
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_piston_work_cycle_J
+      label: W_pV kumuliert
+      axis_id: ax_energy
+      color: '#12b76a'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_energy_balance_residual_J
+      label: Bilanzfehler
+      axis_id: ax_energy
+      color: '#b42318'
+      line_style: --
+      scale_factor: 1.0
+      unit_preset: raw

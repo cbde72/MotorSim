@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thermo0D Numerik</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="wrap">
+    
+    <div class="sidebar">
+      <section class="card">
+        <div class="badge">Thermo0D · Referenz</div>
+        <h1 style="margin-top:.7rem">System-Dokumentation</h1>
+        <p class="muted">Statische HTML-Referenz für aktuellen Projektstand: Physik, Numerik, Konfiguration, Generatoranbindung und Ausbaupfad.</p>
+      </section>
+      <section class="card">
+        <nav><a href="index.html">Start</a>
+<a href="physik.html">Physik</a>
+<a href="numerik.html" style="background:#0e1624">Numerik</a>
+<a href="konfiguration_klassisch.html">Konfiguration classic</a>
+<a href="konfiguration_free_piston.html">Konfiguration free_piston</a>
+<a href="generator_und_schwungmasse.html">Generator & Schwungmasse</a>
+<a href="verbesserungen_und_next_steps.html">Verbesserungen & Next Steps</a></nav>
+      </section>
+      <section class="card">
+        <div><strong>Pfad</strong></div>
+        <div class="muted"><code>doc/system_reference/index.html</code></div>
+      </section>
+    </div>
+    
+    <main>
+<section class="card"><h2>Zeitintegration</h2><p>Die Rechenkerne laufen auf einem festen Ausgaberaster. Daraus ergibt sich eine klare Trennung:</p><ul><li><strong>RHS</strong>: berechnet Ableitungen für den aktuellen Zustand.</li><li><strong>Executor</strong>: erzeugt Zeitgitter und wählt den Solver.</li><li><strong>Sampler/Postprocessing</strong>: schreibt exakt auf dem gewünschten Zeit- oder Winkelraster.</li></ul><pre>t_eval = TimeGridBuilder.build(dt_s, t_end_s)</pre></section>
+<section class="card"><h2>Verfügbare Solver</h2><ul><li><code>euler</code> – einfacher fixer Schritt, robust für Debug, aber ungenau.</li><li><code>rk4</code> – fixer Schritt, guter Default für glatte 0D-Systeme.</li><li><code>scipy_rk45</code> – explizit, adaptiv intern, Ausgabe trotzdem auf <code>t_eval</code>.</li><li><code>scipy_bdf</code> – steif, nutzt optional Jacobian/Jacobian-Sparsity.</li><li><code>scipy_radau</code> – steif, implizit, robust für harte Quellterme.</li></ul><div class="callout">Die Ausgabe bleibt trotz adaptivem SciPy-Solver auf dem projektierten Raster. Das ist für CSV/Excel/Plots wichtig, weil Sampling und Solver entkoppelt bleiben.</div></section>
+<section class="card"><h2>Sampling und Endzeit</h2><ul><li><strong>classic</strong>: Endzeit standardmäßig <code>total_cycles · cycle_period</code>.</li><li><strong>free_piston</strong>: wenn <code>simulationtime</code> gesetzt ist, überschreibt sie die aus <code>total_cycles</code> abgeleitete Endzeit.</li><li><strong>sampling.mode = time</strong>: Export auf <code>step_s</code>.</li><li><strong>sampling.mode = crank_angle</strong>: Export auf <code>step_deg</code>.</li></ul></section>
+<section class="card"><h2>Stabilitäts- und Genauigkeitshinweise</h2><ul><li>Harte Check-Valve-/Slot-Umschaltungen und sehr hohe Verdichtungsverhältnisse erzeugen steife Abschnitte. Dafür sind <code>scipy_bdf</code> oder <code>scipy_radau</code> oft die robusteren Verfahren.</li><li>Der klassische Pfad profitiert meist von konstantem <code>rk4</code>, wenn Öffnungsfunktionen glatt und Toleranzdebatten vermieden werden sollen.</li><li>Im Freikolbenpfad kann der Kombinationseffekt aus hoher Bounce-Härte, kleiner Masse und starker Generatorlast die ODE sehr steif machen.</li></ul></section>
+<section class="card"><h2>Numerische Grenzen des aktuellen Stands</h2><ul><li>Keine Mehrkomponenten-Massenbilanzen für verbrannt/unverbrannt/restgas.</li><li>Keine thermodynamischen Stoffwerte als Funktion von Gemischzusammensetzung und Temperatur.</li><li>Im classic-Pfad keine dynamische Drehzahlgleichung und keine Schwungmassen-ODE.</li><li>Im free_piston-Pfad Generator als Ersatzlast, nicht als vollständiges elektromechanisches Co-Simulationsmodell.</li></ul></section>
+</main>
+  </div>
+</body>
+</html>

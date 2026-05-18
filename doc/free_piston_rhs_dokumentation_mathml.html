@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<title>Free-Piston Simulation – technische Dokumentation</title>
+<style>
+body{font-family:Segoe UI,Arial,sans-serif;line-height:1.45;margin:32px;color:#111}
+h1,h2,h3{color:#0f2a44}
+code,pre{font-family:Consolas,Menlo,monospace}
+pre{background:#f5f7fa;border:1px solid #d8e0ea;padding:12px;overflow:auto}
+table{border-collapse:collapse;width:100%;margin:14px 0}
+th,td{border:1px solid #cfd8e3;padding:8px 10px;vertical-align:top}
+th{background:#eef3f8;text-align:left}
+.math{display:block;margin:10px 0;padding:8px 10px;background:#fbfcfe;border-left:4px solid #9bb7d4}
+.note{background:#fff8e6;border:1px solid #ead9a4;padding:10px 12px}
+.ok{background:#eefaf0;border:1px solid #b8dfbf;padding:10px 12px}
+.small{color:#555;font-size:0.95em}
+ul{margin-top:6px}
+</style>
+</head>
+<body>
+<h1>Free-Piston-Simulation – komplette technische Dokumentation</h1>
+<p class="small">Stand: aus dem hochgeladenen Archiv <code>0_MotorSim_V03_260408_0650_V7-1-91_fp_bounce_initial_pressure_leading.zip</code> abgeleitet. Diese Dokumentation beschreibt den tatsächlich implementierten Free‑Piston‑Pfad, nicht ein Wunschmodell.</p>
+
+<h2>1. Modellumfang</h2>
+<p>Die Free‑Piston‑Architektur des Projekts beschreibt einen <strong>eindimensionalen freien Kolben</strong> mit:</p>
+<ul>
+  <li>genau <strong>einem</strong> Zylindervolumen,</li>
+  <li>beliebig vielen <strong>Plena</strong>,</li>
+  <li>beliebig vielen <strong>Umgebungsvolumina</strong>,</li>
+  <li>einer mechanisch gekoppelten <strong>Bounce Chamber</strong> als Gasspeicher/Feder,</li>
+  <li>Gaswechsel über <strong>Slots</strong> und <strong>Orifices</strong>,</li>
+  <li>optionalem <strong>Vibe‑Wärmefreisetzungsmodell</strong> im Zylinder.</li>
+</ul>
+
+<div class="note">
+<b>Wichtige Implementierungsgrenzen:</b>
+<ul>
+  <li>Es wird aktuell nur <strong>ein</strong> Zylinder unterstützt.</li>
+  <li>Bei <code>modeling.architecture: free_piston</code> sind aktuell nur <strong>slot</strong> und <strong>orifice</strong> in <code>preprocessing.connections</code> erlaubt; <strong>valve</strong> ist gesperrt.</li>
+  <li>Der Bounce‑Raum ist <strong>kein</strong> explizit integriertes thermodynamisches Zustandsvolumen. Er wirkt als polytrope Gasfeder direkt in der Mechanik.</li>
+  <li>Die Felder <code>free_piston.initial_conditions.combustion_state</code> sind im aktuellen Free‑Piston‑RHS <strong>nicht</strong> an den Zustandsvektor angebunden.</li>
+  <li>Im aktuellen Builder werden für Free‑Piston keine <code>wall_matrix</code>- und <code>evap_matrix</code>-Zeilen aufgebaut. Formal kennt das RHS Wandwärme und Verdampfung, praktisch bleiben sie im aktuellen Free‑Piston‑Build <strong>inaktiv</strong>, solange der Builder nicht erweitert wird.</li>
+</ul>
+</div>
+
+<h2>2. Zustandsvektor</h2>
+<p>Für <code>n</code> Volumina besitzt der Zustandsvektor die Form</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mi mathvariant="bold">y</mi>
+    <mo>=</mo>
+    <msup><mo>[</mo><mi>T</mi></msup>
+  </mrow>
+</math>
+</div>
+<p>konkret als</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mi mathvariant="bold">y</mi>
+    <mo>=</mo>
+    <msup>
+      <mrow>
+        <mo>[</mo>
+        <msub><mi>m</mi><mn>0</mn></msub><mo>,</mo>
+        <msub><mi>U</mi><mn>0</mn></msub><mo>,</mo>
+        <msub><mi>m</mi><mn>1</mn></msub><mo>,</mo>
+        <msub><mi>U</mi><mn>1</mn></msub><mo>,</mo>
+        <mo>&#x2026;</mo><mo>,</mo>
+        <msub><mi>m</mi><mrow><mi>n</mi><mo>-</mo><mn>1</mn></mrow></msub><mo>,</mo>
+        <msub><mi>U</mi><mrow><mi>n</mi><mo>-</mo><mn>1</mn></mrow></msub><mo>,</mo>
+        <mi>x</mi><mo>,</mo><mi>v</mi>
+        <mo>]</mo>
+      </mrow>
+      <mi>T</mi>
+    </msup>
+  </mrow>
+</math>
+</div>
+
+<p>Dabei gilt:</p>
+<ul>
+  <li><code>m_i</code>: Masse des Volumens <code>i</code> [kg]</li>
+  <li><code>U_i</code>: innere Energie des Volumens <code>i</code> [J]</li>
+  <li><code>x</code>: Kolbenlage [m]</li>
+  <li><code>v</code>: Kolbengeschwindigkeit [m/s]</li>
+</ul>
+
+<p>Die Indizes werden im Code so erzeugt:</p>
+<pre>mass_index(i)   = 2*i
+energy_index(i) = 2*i + 1
+x_index         = 2*n
+v_index         = 2*n + 1</pre>
+
+<h2>3. Thermodynamischer Zustand eines Volumens</h2>
+<p>Das Gasmodell ist ideal mit konstanten Stoffwerten <code>cp</code>, <code>cv</code>, <code>R</code>, <code>κ = cp/cv</code>.</p>
+
+<h3>3.1 Temperatur aus Zustand</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mi>T</mi>
+    <mo>=</mo>
+    <mfrac>
+      <mi>U</mi>
+      <mrow><mi>m</mi><msub><mi>c</mi><mi>v</mi></msub></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<h3>3.2 Druck aus Zustand</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mi>p</mi>
+    <mo>=</mo>
+    <mfrac>
+      <mrow><mi>m</mi><mi>R</mi><mi>T</mi></mrow>
+      <mi>V</mi>
+    </mfrac>
+    <mo>=</mo>
+    <mfrac>
+      <mrow><mi>R</mi><mi>U</mi></mrow>
+      <mrow><msub><mi>c</mi><mi>v</mi></msub><mi>V</mi></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<h3>3.3 Anfangsmasse aus p,T,V</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mi>m</mi>
+    <mo>=</mo>
+    <mfrac>
+      <mrow><mi>p</mi><mi>V</mi></mrow>
+      <mrow><mi>R</mi><mi>T</mi></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<h2>4. Freikolben-Geometrie</h2>
+<p>Die Konvention im aktuellen Code lautet:</p>
+<ul>
+  <li><code>x_min_m</code> = OT/TDC des Arbeitszylinders = kleinstes Zylindervolumen</li>
+  <li><code>x_max_m</code> = UT/BDC des Arbeitszylinders = größtes Zylindervolumen</li>
+</ul>
+
+<h3>4.1 Abgeleitete Hauptgrößen</h3>
+<p>Wenn in der Mechanik Durchmesser und Verdichtungsverhältnis vorgegeben sind, werden Kolbenfläche und Restvolumen daraus berechnet.</p>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>A</mi><mi>p</mi></msub>
+    <mo>=</mo>
+    <mfrac><mi>&#x03C0;</mi><mn>4</mn></mfrac>
+    <msubsup><mi>D</mi><mi>p</mi><mn>2</mn></msubsup>
+  </mrow>
+</math>
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>s</mi><mi>nom</mi></msub>
+    <mo>=</mo>
+    <msub><mi>x</mi><mi>max</mi></msub>
+    <mo>-</mo>
+    <msub><mi>x</mi><mi>min</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>V</mi><mi>s</mi></msub>
+    <mo>=</mo>
+    <msub><mi>A</mi><mi>p</mi></msub>
+    <msub><mi>s</mi><mi>nom</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>V</mi><mi>clr</mi></msub>
+    <mo>=</mo>
+    <mfrac>
+      <msub><mi>V</mi><mi>s</mi></msub>
+      <mrow><mi>&#x03B5;</mi><mo>-</mo><mn>1</mn></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<h3>4.2 Zylindervolumen</h3>
+<p>Das aktuelle Modell nimmt einen linearen Volumenhub über die Kolbenlage an:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>V</mi><mi>cyl</mi></msub>
+    <mrow><mo>(</mo><mi>x</mi><mo>)</mo></mrow>
+    <mo>=</mo>
+    <msub><mi>V</mi><mi>clr</mi></msub>
+    <mo>+</mo>
+    <msub><mi>A</mi><mi>p</mi></msub>
+    <mrow><mo>(</mo><mi>x</mi><mo>-</mo><msub><mi>x</mi><mi>min</mi></msub><mo>)</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<h3>4.3 Volumenänderungsrate</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac>
+      <mrow><mi>d</mi><msub><mi>V</mi><mi>cyl</mi></msub></mrow>
+      <mrow><mi>d</mi><mi>t</mi></mrow>
+    </mfrac>
+    <mo>=</mo>
+    <msub><mi>A</mi><mi>p</mi></msub>
+    <mi>v</mi>
+  </mrow>
+</math>
+</div>
+
+<h3>4.4 Abstand von TDC</h3>
+<p>Für Slots wird nicht direkt <code>x</code>, sondern der Arbeitszylinder-Weg von TDC verwendet:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>x</mi><mi>TDC</mi></msub>
+    <mo>=</mo>
+    <mi>x</mi><mo>-</mo><msub><mi>x</mi><mi>min</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<h2>5. Bounce‑Kammer / Gasfeder</h2>
+<p>Die Bounce‑Kammer läuft <strong>entgegengesetzt</strong> zum Arbeitszylinder. Bei OT/TDC des Arbeitszylinders ist ihr Volumen maximal.</p>
+
+<h3>5.1 Bounce-Geometrie</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>V</mi><mi>b,max</mi></msub>
+    <mo>=</mo>
+    <msub><mi>V</mi><mn>0</mn></msub>
+  </mrow>
+</math>
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>V</mi><mi>b</mi></msub>
+    <mrow><mo>(</mo><mi>x</mi><mo>)</mo></mrow>
+    <mo>=</mo>
+    <msub><mi>V</mi><mn>0</mn></msub>
+    <mo>-</mo>
+    <msub><mi>A</mi><mi>b</mi></msub>
+    <mrow><mo>(</mo><mi>x</mi><mo>-</mo><msub><mi>x</mi><mi>min</mi></msub><mo>)</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<p>Ist die Bounce-Geometrie über <code>chamber_diameter_m</code>, <code>chamber_length_m</code> und <code>compression_ratio</code> definiert, dann gelten:</p>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>A</mi><mi>b,geom</mi></msub>
+    <mo>=</mo>
+    <mfrac><mi>&#x03C0;</mi><mn>4</mn></mfrac>
+    <msubsup><mi>D</mi><mi>b</mi><mn>2</mn></msubsup>
+  </mrow>
+</math>
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>V</mi><mi>b,swept</mi></msub>
+    <mo>=</mo>
+    <msub><mi>A</mi><mi>b,geom</mi></msub>
+    <msub><mi>L</mi><mi>b</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>V</mi><mi>b,max</mi></msub>
+    <mo>=</mo>
+    <mfrac>
+      <mrow><msub><mi>V</mi><mi>b,swept</mi></msub><msub><mi>&#x03B5;</mi><mi>b</mi></msub></mrow>
+      <mrow><msub><mi>&#x03B5;</mi><mi>b</mi></msub><mo>-</mo><mn>1</mn></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>V</mi><mi>b,min</mi></msub>
+    <mo>=</mo>
+    <mfrac>
+      <msub><mi>V</mi><mi>b,swept</mi></msub>
+      <mrow><msub><mi>&#x03B5;</mi><mi>b</mi></msub><mo>-</mo><mn>1</mn></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<h3>5.2 Wirksame Bounce-Fläche im Modell</h3>
+<p>Die im RHS benutzte Fläche für die Gegenfeder ist nicht zwingend die geometrische Kreisfläche, sondern die aus Hub und verfügbarem Kolbenfenster abgeleitete wirksame Volumenänderungsfläche:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>A</mi><mi>b</mi></msub>
+    <mo>=</mo>
+    <mfrac>
+      <msub><mi>V</mi><mi>b,swept</mi></msub>
+      <mrow><msub><mi>x</mi><mi>max</mi></msub><mo>-</mo><msub><mi>x</mi><mi>min</mi></msub></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<h3>5.3 Polytroper Bounce-Druck</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>p</mi><mi>b</mi></msub>
+    <mrow><mo>(</mo><mi>x</mi><mo>)</mo></mrow>
+    <mo>=</mo>
+    <msub><mi>p</mi><mn>0</mn></msub>
+    <msup>
+      <mrow>
+        <mo>(</mo>
+        <mfrac><msub><mi>V</mi><mn>0</mn></msub><msub><mi>V</mi><mi>b</mi></msub><mrow><mo>(</mo><mi>x</mi><mo>)</mo></mrow></mfrac>
+        <mo>)</mo>
+      </mrow>
+      <mi>n</mi>
+    </msup>
+  </mrow>
+</math>
+</div>
+
+<p>Wobei <code>n = polytropic_exponent</code>.</p>
+
+<div class="note">
+<b>Wichtig:</b> Im aktuellen Builder ist <code>initial_pressure_Pa</code> am Startpunkt <code>x0_m</code> führend. Das in der Config optional vorhandene <code>p0_Pa</code> ist damit nur Metadatum; das effektiv benutzte Referenz-<code>p0</code> wird aus dem tatsächlichen Startzustand neu berechnet:
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>p</mi><mn>0</mn></msub>
+    <mo>=</mo>
+    <mfrac>
+      <msub><mi>p</mi><mi>init</mi></msub>
+      <msup>
+        <mrow>
+          <mo>(</mo>
+          <mfrac>
+            <msub><mi>V</mi><mn>0</mn></msub>
+            <msub><mi>V</mi><mi>b</mi></msub><mrow><mo>(</mo><msub><mi>x</mi><mn>0</mn></msub><mo>)</mo></mrow>
+          </mfrac>
+          <mo>)</mo>
+        </mrow>
+        <mi>n</mi>
+      </msup>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<h2>6. Lokaler Zykluswinkel des freien Kolbens</h2>
+<p>Der Free‑Piston‑Pfad besitzt keinen echten Kurbeltrieb. Trotzdem benötigt das System einen lokalen Zykluswinkel für Verbrennung, Fenster, Plotting und Referenzen.</p>
+
+<h3>6.1 Hubanteil</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mi>&#x03C6;</mi>
+    <mo>=</mo>
+    <mfrac>
+      <mrow><mi>x</mi><mo>-</mo><msub><mi>x</mi><mi>min</mi></msub></mrow>
+      <mrow><msub><mi>x</mi><mi>max</mi></msub><mo>-</mo><msub><mi>x</mi><mi>min</mi></msub></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<h3>6.2 Kompressionshub-Erkennung</h3>
+<p>Der Code wertet den Hub als Kompression, wenn <code>v &lt; 0</code>. Im Stillstand nahe Totpunkten wird aus Stabilitätsgründen TDC der beendeten Kompression und BDC der beendeten Expansion zugeordnet.</p>
+
+<h3>6.3 Lokaler Winkel</h3>
+<p>Sei <code>&#x0398; = cycle_deg</code> und <code>&#x0398;/2</code> der Halbwinkelbereich.</p>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>&#x03B8;</mi><mi>loc</mi></msub>
+    <mo>=</mo>
+    <mfenced open="{" close="">
+      <mtable>
+        <mtr>
+          <mtd>
+            <mrow>
+              <mfrac><mi>&#x0398;</mi><mn>2</mn></mfrac><mi>&#x03C6;</mi>
+            </mrow>
+          </mtd>
+          <mtd><mtext>bei Expansion / Bewegung weg von TDC</mtext></mtd>
+        </mtr>
+        <mtr>
+          <mtd>
+            <mrow>
+              <mi>&#x0398;</mi><mo>-</mo><mfrac><mi>&#x0398;</mi><mn>2</mn></mfrac><mi>&#x03C6;</mi>
+            </mrow>
+          </mtd>
+          <mtd><mtext>bei Kompression / Bewegung zu TDC</mtext></mtd>
+        </mtr>
+      </mtable>
+    </mfenced>
+  </mrow>
+</math>
+</div>
+
+<p>Für 2T gilt damit: TDC = 0° auf der Expansionsseite bzw. 360° auf der Kompressionsseite; BDC = 180°.</p>
+
+<h3>6.4 Globaler Hilfswinkel</h3>
+<p>Zusätzlich berechnet das RHS einen globalen Hilfswinkel aus <code>engine.speed_rpm</code>:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac>
+      <mrow><mi>d</mi><msub><mi>&#x03B8;</mi><mi>glob</mi></msub></mrow>
+      <mrow><mi>d</mi><mi>t</mi></mrow>
+    </mfrac>
+    <mo>=</mo>
+    <mfrac>
+      <mi>cycle_deg</mi>
+      <msub><mi>t</mi><mi>cycle</mi></msub>
+    </mfrac>
+    <mo>=</mo>
+    <mn>6</mn><mo>&#x22C5;</mo><mi>rpm</mi>
+  </mrow>
+</math>
+</div>
+<p>mit</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>t</mi><mi>cycle</mi></msub>
+    <mo>=</mo>
+    <mfrac>
+      <mi>cycle_deg</mi>
+      <mrow><mn>6</mn><mi>rpm</mi></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+<b>Interpretation:</b> Dieser globale Winkel ist im Free‑Piston‑Fall ein <strong>Hilfstaktgeber</strong>, kein echter mechanischer Kurbelwinkel.
+</div>
+
+<h2>7. Verbindungselemente</h2>
+
+<h3>7.1 Orifice</h3>
+<p>Ein Orifice besitzt konstante geometrische Fläche und konstante Richtungs‑Entladungskoeffizienten.</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>A</mi><mi>geo</mi></msub><mo>=</mo><mi>A</mi>
+  </mrow>
+</math>
+</div>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>A</mi><mi>eff,f</mi></msub><mo>=</mo><msub><mi>C</mi><mi>d,f</mi></msub><mi>A</mi>
+    <mo>,</mo>
+    <msub><mi>A</mi><mi>eff,r</mi></msub><mo>=</mo><msub><mi>C</mi><mi>d,r</mi></msub><mi>A</mi>
+  </mrow>
+</math>
+</div>
+
+<h3>7.2 Slot</h3>
+<p>Im Free‑Piston‑Pfad ist aktuell nur <code>opening_mode: by_distance</code> erlaubt.</p>
+
+<p>Der Slot öffnet, sobald der Kolbenweg von TDC größer als <code>distance_from_tdc_m</code> wird.</p>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mi>u</mi>
+    <mo>=</mo>
+    <msub><mi>x</mi><mi>TDC</mi></msub>
+    <mo>-</mo>
+    <msub><mi>x</mi><mi>open</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>u</mi><mi>clamped</mi></msub>
+    <mo>=</mo>
+    <mrow><mi>min</mi><mo>(</mo><mi>max</mi><mo>(</mo><mi>u</mi><mo>,</mo><mn>0</mn><mo>)</mo><mo>,</mo><mi>height</mi><mo>)</mo></mrow>
+  </mrow>
+</math>
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>A</mi><mi>geo</mi></msub>
+    <mo>=</mo>
+    <mi>width</mi>
+    <mo>&#x22C5;</mo>
+    <msub><mi>u</mi><mi>clamped</mi></msub>
+    <mo>&#x22C5;</mo>
+    <msub><mi>n</mi><mi>holes</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>A</mi><mi>eff,f</mi></msub>
+    <mo>=</mo>
+    <msub><mi>A</mi><mi>geo</mi></msub>
+    <msub><mi>C</mi><mi>d,f</mi></msub>
+    <mo>,</mo>
+    <msub><mi>A</mi><mi>eff,r</mi></msub>
+    <mo>=</mo>
+    <msub><mi>A</mi><mi>geo</mi></msub>
+    <msub><mi>C</mi><mi>d,r</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<div class="note">
+<b>Wichtig:</b> Im aktuellen RHS gehen bei Slots nur <code>width_m</code>, <code>height_m</code>, <code>number_of_identical_holes</code>, <code>distance_from_tdc_m</code> und die Cd-Werte/Tabelle ein. Die Felder <code>piston_height_if_crankcase_m</code>, <code>entrance_angle_deg</code>, <code>open_fillet_radius_m</code> und <code>full_fillet_radius_m</code> werden zwar eingelesen, aber in der effektiven Slot-Flächenberechnung derzeit nicht verwendet.
+</div>
+
+<h2>8. Massenstromgesetz</h2>
+<p>Zwischen zwei Volumina wird der signed de‑Saint‑Venant‑Wantzel‑Ansatz benutzt. Das Vorzeichen ist topologisch definiert:</p>
+<ul>
+  <li><code>mdot &gt; 0</code>: Strom von <code>FROM_VOL</code> nach <code>TO_VOL</code></li>
+  <li><code>mdot &lt; 0</code>: Strom von <code>TO_VOL</code> nach <code>FROM_VOL</code></li>
+</ul>
+
+<p>Es wird stets die Hochdruckseite als Upstream-Seite gewählt.</p>
+
+<h3>8.1 Kritisches Druckverhältnis</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>&#x03C0;</mi><mi>krit</mi></msub>
+    <mo>=</mo>
+    <msup>
+      <mrow>
+        <mo>(</mo>
+        <mfrac><mn>2</mn><mrow><mi>&#x03B3;</mi><mo>+</mo><mn>1</mn></mrow></mfrac>
+        <mo>)</mo>
+      </mrow>
+      <mfrac><mi>&#x03B3;</mi><mrow><mi>&#x03B3;</mi><mo>-</mo><mn>1</mn></mrow></mfrac>
+    </msup>
+  </mrow>
+</math>
+</div>
+
+<h3>8.2 Vorfaktor</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mi>K</mi>
+    <mo>=</mo>
+    <mfrac>
+      <mrow><msub><mi>C</mi><mi>d</mi></msub><mi>A</mi><msub><mi>p</mi><mi>up</mi></msub></mrow>
+      <msqrt><mrow><mi>R</mi><msub><mi>T</mi><mi>up</mi></msub></mrow></msqrt>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<h3>8.3 Choked-Fall</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mover><mi>m</mi><mo>.</mo></mover>
+    <mo>=</mo>
+    <mo>sign</mo>
+    <mo>&#x22C5;</mo>
+    <mi>K</mi>
+    <mo>&#x22C5;</mo>
+    <msqrt>
+      <mrow>
+        <mi>&#x03B3;</mi>
+        <msup>
+          <mrow>
+            <mo>(</mo>
+            <mfrac><mn>2</mn><mrow><mi>&#x03B3;</mi><mo>+</mo><mn>1</mn></mrow></mfrac>
+            <mo>)</mo>
+          </mrow>
+          <mfrac><mrow><mi>&#x03B3;</mi><mo>+</mo><mn>1</mn></mrow><mrow><mi>&#x03B3;</mi><mo>-</mo><mn>1</mn></mrow></mfrac>
+        </msup>
+      </mrow>
+    </msqrt>
+  </mrow>
+</math>
+</div>
+
+<h3>8.4 Nicht gechokter Fall</h3>
+<p>Mit <code>pr = p_down / p_up</code> gilt:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mover><mi>m</mi><mo>.</mo></mover>
+    <mo>=</mo>
+    <mo>sign</mo>
+    <mo>&#x22C5;</mo>
+    <mi>K</mi>
+    <mo>&#x22C5;</mo>
+    <msqrt>
+      <mrow>
+        <mfrac>
+          <mrow><mn>2</mn><mi>&#x03B3;</mi></mrow>
+          <mrow><mi>&#x03B3;</mi><mo>-</mo><mn>1</mn></mrow>
+        </mfrac>
+        <mo>&#x22C5;</mo>
+        <mrow>
+          <mo>(</mo>
+          <msup><mi>pr</mi><mfrac><mn>2</mn><mi>&#x03B3;</mi></mfrac></msup>
+          <mo>-</mo>
+          <msup><mi>pr</mi><mfrac><mrow><mi>&#x03B3;</mi><mo>+</mo><mn>1</mn></mrow><mi>&#x03B3;</mi></mfrac></msup>
+          <mo>)</mo>
+        </mrow>
+      </mrow>
+    </msqrt>
+  </mrow>
+</math>
+</div>
+
+<p>Die Stromenthalpie basiert auf der Upstream-Temperatur:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>h</mi><mi>up</mi></msub>
+    <mo>=</mo>
+    <msub><mi>c</mi><mi>p</mi></msub>
+    <msub><mi>T</mi><mi>up</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<h2>9. Energieterme im Volumen</h2>
+
+<h3>9.1 p·dV-Leistung</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>P</mi><mi>pV</mi></msub>
+    <mo>=</mo>
+    <mi>p</mi>
+    <mfrac><mrow><mi>d</mi><mi>V</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow>
+  </mfrac>
+  </mrow>
+</math>
+</div>
+
+<p>Im Energiebudget wird dieser Term als <code>-p dV/dt</code> verwendet.</p>
+
+<h3>9.2 Wandwärme</h3>
+<p>Formal kann das Free‑Piston‑RHS Wandwärme addieren:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mover><mi>Q</mi><mo>.</mo></mover><msub><mi>wall</mi><mtext></mtext></msub>
+    <mo>=</mo>
+    <mi>h</mi><mi>A</mi>
+    <mrow><mo>(</mo><msub><mi>T</mi><mi>wall</mi></msub><mo>-</mo><mi>T</mi><mo>)</mo></mrow>
+  </mrow>
+</math>
+</div>
+<p>Der aktuelle Free‑Piston‑Builder erzeugt jedoch keine Wandwärmezeilen; damit bleibt der Term in der Praxis Null.</p>
+
+<h3>9.3 Vibe-Wärmefreisetzung</h3>
+<p>Die Verbrennung nutzt eine normierte Vibe-Funktion über den Fortschrittsparameter <code>x in [0,1]</code>.</p>
+
+<h4>9.3.1 Fensterfortschritt</h4>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mi>x</mi>
+    <mo>=</mo>
+    <mfrac>
+      <mrow><mi>&#x0394;&#x03B8;</mi></mrow>
+      <mrow><msub><mi>&#x0394;&#x03B8;</mi><mi>burn</mi></msub></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<h4>9.3.2 Normierter Vibe-Ablauf</h4>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac>
+      <mrow><mi>d</mi><msub><mi>x</mi><mi>b</mi></msub></mrow>
+      <mrow><mi>d</mi><mi>x</mi></mrow>
+    </mfrac>
+    <mo>=</mo>
+    <mi>a</mi>
+    <mrow><mo>(</mo><mi>m</mi><mo>+</mo><mn>1</mn><mo>)</mo></mrow>
+    <msup><mi>x</mi><mi>m</mi></msup>
+    <msup><mi>e</mi><mrow><mo>-</mo><mi>a</mi><msup><mi>x</mi><mrow><mi>m</mi><mo>+</mo><mn>1</mn></mrow></msup></mrow></msup>
+  </mrow>
+</math>
+</div>
+
+<h4>9.3.3 Winkelbezogene Form</h4>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac>
+      <mrow><mi>d</mi><msub><mi>x</mi><mi>b</mi></msub></mrow>
+      <mrow><mi>d</mi><mi>&#x03B8;</mi></mrow>
+    </mfrac>
+    <mo>=</mo>
+    <mfrac>
+      <mrow><mi>d</mi><msub><mi>x</mi><mi>b</mi></msub><mo>/</mo><mi>d</mi><mi>x</mi></mrow>
+      <mrow><msub><mi>&#x0394;&#x03B8;</mi><mi>burn</mi></msub></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<h4>9.3.4 Freisetzungsrate</h4>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mover><mi>Q</mi><mo>.</mo></mover><msub><mi>comb</mi><mtext></mtext></msub>
+    <mo>=</mo>
+    <msub><mi>Q</mi><mi>tot</mi></msub>
+    <mfrac>
+      <mrow><mi>d</mi><msub><mi>x</mi><mi>b</mi></msub></mrow>
+      <mrow><mi>d</mi><mi>&#x03B8;</mi></mrow>
+    </mfrac>
+    <mfrac>
+      <mrow><mi>d</mi><mi>&#x03B8;</mi></mrow>
+      <mrow><mi>d</mi><mi>t</mi></mrow>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+<p>Im Builder wird entweder</p>
+<ul>
+  <li><code>Q_tot = added_energy_per_cycle_J</code> oder</li>
+  <li><code>Q_tot = fuel_mass_per_cycle_kg * lhv_J_per_kg</code></li>
+</ul>
+<p>gebildet. Wenn <code>energy_coupling: stroke_ratio</code> aktiv ist, wird skaliert mit</p>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>Q</mi><mi>tot,eff</mi></msub>
+    <mo>=</mo>
+    <msub><mi>Q</mi><mi>tot</mi></msub>
+    <msup>
+      <mrow>
+        <mo>(</mo>
+        <mfrac><msub><mi>s</mi><mi>nom</mi></msub><msub><mi>s</mi><mi>ref</mi></msub></mfrac>
+        <mo>)</mo>
+      </mrow>
+      <mi>k</mi>
+    </msup>
+  </mrow>
+</math>
+</div>
+
+<h3>9.4 Verdampfungs-Senke</h3>
+<p>Formal existiert ein lineares Verdampfungsmodell:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mover><mi>Q</mi><mo>.</mo></mover><msub><mi>evap</mi><mtext></mtext></msub>
+    <mo>=</mo>
+    <mfrac>
+      <msub><mi>m</mi><mi>evap,cycle</mi></msub>
+      <msub><mi>&#x0394;&#x03B8;</mi><mi>evap</mi></msub>
+    </mfrac>
+    <mfrac>
+      <mrow><mi>d</mi><mi>&#x03B8;</mi></mrow>
+      <mrow><mi>d</mi><mi>t</mi></mrow>
+    </mfrac>
+    <msub><mi>h</mi><mi>lat</mi></msub>
+  </mrow>
+</math>
+</div>
+<p>Im aktuellen Free‑Piston‑Builder bleibt dieser Pfad aber ohne befüllte <code>evap_matrix</code>-Zeilen wirkungslos.</p>
+
+<h2>10. Vollständiges RHS des Free‑Piston‑Pfads</h2>
+
+<h3>10.1 Massenbilanzen</h3>
+<p>Für jedes nicht-fixe Volumen <code>i</code> gilt:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac>
+      <mrow><mi>d</mi><msub><mi>m</mi><mi>i</mi></msub></mrow>
+      <mrow><mi>d</mi><mi>t</mi></mrow>
+    </mfrac>
+    <mo>=</mo>
+    <munderover><mo>&#x2211;</mo><mi>k</mi><mtext>Verbindungen</mtext></munderover>
+    <msub><mi>s</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub>
+    <msub><mover><mi>m</mi><mo>.</mo></mover><mi>k</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<p>mit der Vorzeichenmatrix</p>
+<ul>
+  <li><code>s_ik = -1</code>, wenn Volumen <code>i</code> links/FROM ist,</li>
+  <li><code>s_ik = +1</code>, wenn Volumen <code>i</code> rechts/TO ist.</li>
+</ul>
+
+<p>Für <strong>Environment</strong>-Volumina werden Masse und Energie im RHS hart auf Null gesetzt:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac><mrow><mi>d</mi><mi>m</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mn>0</mn>
+    <mo>,</mo>
+    <mfrac><mrow><mi>d</mi><mi>U</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mn>0</mn>
+  </mrow>
+</math>
+</div>
+
+<h3>10.2 Energiebilanzen</h3>
+<p>Für jedes nicht-fixe Volumen <code>i</code> gilt im Code äquivalent:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac>
+      <mrow><mi>d</mi><msub><mi>U</mi><mi>i</mi></msub></mrow>
+      <mrow><mi>d</mi><mi>t</mi></mrow>
+    </mfrac>
+    <mo>=</mo>
+    <munderover><mo>&#x2211;</mo><mi>k</mi><mtext>Verbindungen</mtext></munderover>
+    <msub><mi>s</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub>
+    <msub><mover><mi>m</mi><mo>.</mo></mover><mi>k</mi></msub>
+    <msub><mi>h</mi><mi>up,k</mi></msub>
+    <mo>-</mo>
+    <msub><mi>p</mi><mi>i</mi></msub>
+    <mfrac><mrow><mi>d</mi><msub><mi>V</mi><mi>i</mi></msub></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+    <mo>+</mo>
+    <msub><mover><mi>Q</mi><mo>.</mo></mover><mrow><mi>wall</mi><mo>,</mo><mi>i</mi></mrow></msub>
+    <mo>+</mo>
+    <msub><mover><mi>Q</mi><mo>.</mo></mover><mrow><mi>comb</mi><mo>,</mo><mi>i</mi></mrow></msub>
+    <mo>-</mo>
+    <msub><mover><mi>Q</mi><mo>.</mo></mover><mrow><mi>evap</mi><mo>,</mo><mi>i</mi></mrow></msub>
+  </mrow>
+</math>
+</div>
+
+<h3>10.3 Mechanische Gleichungen</h3>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac><mrow><mi>d</mi><mi>x</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+    <mo>=</mo>
+    <mi>v</mi>
+  </mrow>
+</math>
+</div>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac><mrow><mi>d</mi><mi>v</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+    <mo>=</mo>
+    <mfrac>
+      <msub><mi>F</mi><mi>net</mi></msub>
+      <msub><mi>m</mi><mi>mov</mi></msub>
+    </mfrac>
+  </mrow>
+</math>
+</div>
+
+mit
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>F</mi><mi>net</mi></msub>
+    <mo>=</mo>
+    <msub><mi>F</mi><mi>gas</mi></msub>
+    <mo>+</mo>
+    <msub><mi>F</mi><mi>bounce</mi></msub>
+    <mo>+</mo>
+    <msub><mi>F</mi><mi>fric</mi></msub>
+    <mo>+</mo>
+    <msub><mi>F</mi><mi>load</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<h4>10.3.1 Gasdruckkraft</h4>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>F</mi><mi>gas</mi></msub>
+    <mo>=</mo>
+    <msub><mi>p</mi><mi>cyl</mi></msub>
+    <msub><mi>A</mi><mi>p</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<h4>10.3.2 Bounce-Gegenkraft</h4>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>F</mi><mi>bounce</mi></msub>
+    <mo>=</mo>
+    <mo>-</mo>
+    <msub><mi>p</mi><mi>b</mi></msub>
+    <msub><mi>A</mi><mi>b</mi></msub>
+  </mrow>
+</math>
+</div>
+
+<h4>10.3.3 Reibung</h4>
+<p>Im Modell <code>coulomb_viscous</code>:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>F</mi><mi>fric</mi></msub>
+    <mo>=</mo>
+    <mo>-</mo>
+    <mrow>
+      <mo>(</mo>
+      <msub><mi>F</mi><mi>c</mi></msub>
+      <mo>&#x22C5;</mo>
+      <mo>sign</mo><mrow><mo>(</mo><mi>v</mi><mo>)</mo></mrow>
+      <mo>+</mo>
+      <msub><mi>c</mi><mi>v</mi></msub>
+      <mi>v</mi>
+      <mo>)</mo>
+    </mrow>
+  </mrow>
+</math>
+</div>
+<p>Für sehr kleine Geschwindigkeiten setzt der Code die Coulomb‑Komponente effektiv auf Null.</p>
+
+<h4>10.3.4 Lastmodell</h4>
+<ul>
+  <li><code>none</code>: <code>F_load = 0</code></li>
+  <li><code>viscous</code> oder <code>electromagnetic_linear</code>:</li>
+</ul>
+
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>F</mi><mi>load</mi></msub>
+    <mo>=</mo>
+    <mo>-</mo>
+    <mi>c</mi><mi>v</mi>
+  </mrow>
+</math>
+</div>
+
+<p>mit <code>c = damping_Ns_per_m</code>.</p>
+
+<p>Für <code>generator_controlled</code> wird die Dämpfung in Totpunktnähe erhöht:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>c</mi><mi>eff</mi></msub>
+    <mo>=</mo>
+    <msub><mi>c</mi><mi>base</mi></msub>
+    <mo>+</mo>
+    <mrow>
+      <mo>(</mo><msub><mi>c</mi><mi>max</mi></msub><mo>-</mo><msub><mi>c</mi><mi>base</mi></msub><mo>)</mo>
+    </mrow>
+    <mo>&#x22C5;</mo>
+    <mi>proximity</mi>
+  </mrow>
+</math>
+</div>
+
+<p>mit <code>proximity ∈ [0,1]</code>, abhängig von Richtung und Abstand zum jeweils angesteuerten Totpunkt innerhalb von <code>control_zone_m</code>.</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>F</mi><mi>load</mi></msub>
+    <mo>=</mo>
+    <mo>-</mo>
+    <msub><mi>c</mi><mi>eff</mi></msub><mi>v</mi>
+  </mrow>
+</math>
+</div>
+
+
+<div class="note">
+<b>Achtung zu Vorzeichen in Exporten:</b> Die in <code>model/free_piston/postprocessing.py</code> ausgegebenen Kraftsignale verwenden die entgegengesetzte Anschauungsrichtung wie die interne RHS-Kraftbilanz: dort ist <code>F_gas = -p_cyl A_p</code> und <code>F_bounce = +p_b A_b</code> für die CSV/Plot-Ausgabe definiert. Für die Dynamik selbst gilt jedoch die in Abschnitt 10.3 dokumentierte RHS-Konvention.
+</div>
+
+<h2>11. Algorithmischer Ablauf des RHS</h2>
+<ol>
+  <li>Free‑Piston‑Meta und Zustandsindizes holen.</li>
+  <li>Zylindermasse, innere Energie, Kolbenlage und Geschwindigkeit aus <code>y</code> lesen.</li>
+  <li>Für jedes Volumen Druck, Temperatur, Volumen und <code>dV/dt</code> bestimmen:
+    <ul>
+      <li>Zylinder: aus <code>x</code> und Zustandsgrößen</li>
+      <li>Environment: fest aus Config</li>
+      <li>Plenum: festes Volumen, Zustand aus <code>m,U</code></li>
+    </ul>
+  </li>
+  <li>Verbindungsweise Öffnungsfläche und Cd ermitteln.</li>
+  <li>Mit de‑Saint‑Venant‑Wantzel den Massenstrom berechnen.</li>
+  <li>Massenterme und Enthalpieterme auf linke und rechte Seite verteilen.</li>
+  <li>Für jedes Volumen <code>-p dV/dt + Q_wall + Q_comb - Q_evap</code> addieren.</li>
+  <li>Mechanische Kräfte aus Arbeitszylinder, Bounce, Reibung und Last berechnen.</li>
+  <li><code>dx/dt = v</code>, <code>dv/dt = F_net/moving_mass</code> setzen.</li>
+  <li>Ableitungsvektor zurückgeben.</li>
+</ol>
+
+<h2>12. Konfigurationsbeschreibung</h2>
+
+<h3>12.1 Top-Level</h3>
+<table>
+<tr><th>Pfad</th><th>Bedeutung</th><th>Hinweise</th></tr>
+<tr><td><code>modeling.architecture</code></td><td>Architekturwahl</td><td>Für Freikolben <code>free_piston</code></td></tr>
+<tr><td><code>free_piston</code></td><td>Mechanik + Startzustände</td><td>Pflicht bei Free‑Piston</td></tr>
+<tr><td><code>preprocessing</code></td><td>Gasdaten, Volumina, Verbindungen, Features</td><td>Pflicht</td></tr>
+<tr><td><code>simulation</code></td><td>Integrator und Zeithorizont</td><td>Pflicht</td></tr>
+<tr><td><code>postprocessing</code></td><td>CSV/Excel/Plots/Sampling</td><td>Pflicht</td></tr>
+</table>
+
+<h3>12.2 <code>free_piston.initial_conditions</code></h3>
+<table>
+<tr><th>Feld</th><th>Typ</th><th>Bedeutung</th><th>Bemerkung</th></tr>
+<tr><td><code>x0_m</code></td><td>float</td><td>Startlage</td><td>Muss innerhalb <code>x_min_m..x_max_m</code> liegen</td></tr>
+<tr><td><code>v0_m_per_s</code></td><td>float</td><td>Startgeschwindigkeit</td><td>Vorzeichen legt erste Hubrichtung fest</td></tr>
+<tr><td><code>cylinder.pressure_Pa</code></td><td>float &gt; 0</td><td>Zylinderdruck am Start</td><td>Führend für Zylinderanfangsmasse</td></tr>
+<tr><td><code>cylinder.temperature_K</code></td><td>float &gt; 0</td><td>Zylindertemperatur am Start</td><td></td></tr>
+<tr><td><code>bounce.pressure_Pa</code></td><td>float &gt; 0</td><td>Startdruck der Legacy-Bounce</td><td>Nur wenn kein <code>bounce_chamber</code>-Volumen verwendet wird</td></tr>
+<tr><td><code>bounce.temperature_K</code></td><td>float &gt; 0</td><td>Starttemperatur der Legacy-Bounce</td><td>Aktuell nur zur Dokumentation/Meta</td></tr>
+<tr><td><code>combustion_state.*</code></td><td>diverse</td><td>Platzhalter für künftige Verbrennungszustände</td><td>Aktuell nicht im RHS genutzt</td></tr>
+</table>
+
+<h3>12.3 <code>free_piston.mechanics</code></h3>
+<table>
+<tr><th>Feld</th><th>Bedeutung</th><th>Regel</th></tr>
+<tr><td><code>moving_mass_kg</code></td><td>Bewegte Masse</td><td>&gt; 0</td></tr>
+<tr><td><code>piston_diameter_m</code></td><td>Kolbendurchmesser</td><td>mit <code>compression_ratio</code> paarweise</td></tr>
+<tr><td><code>compression_ratio</code></td><td>Verdichtungsverhältnis des Arbeitszylinders</td><td>&gt; 1</td></tr>
+<tr><td><code>piston_area_m2</code></td><td>Alternative direkte Flächenvorgabe</td><td>nur mit <code>clearance_volume_m3</code></td></tr>
+<tr><td><code>clearance_volume_m3</code></td><td>Alternative direkte Restvolumenvorgabe</td><td>nur mit <code>piston_area_m2</code></td></tr>
+<tr><td><code>x_min_m</code></td><td>OT/TDC des Arbeitszylinders</td><td></td></tr>
+<tr><td><code>x_max_m</code></td><td>UT/BDC des Arbeitszylinders</td><td><code>x_max_m &gt; x_min_m</code></td></tr>
+</table>
+
+<h3>12.4 <code>free_piston.friction</code></h3>
+<table>
+<tr><th>Feld</th><th>Bedeutung</th></tr>
+<tr><td><code>model</code></td><td>aktuell nur <code>coulomb_viscous</code></td></tr>
+<tr><td><code>fc_N</code></td><td>Coulomb-Reibanteil</td></tr>
+<tr><td><code>cv_Ns_per_m</code></td><td>viskoser Reibbeiwert</td></tr>
+</table>
+
+<h3>12.5 <code>free_piston.load</code></h3>
+<table>
+<tr><th>Feld</th><th>Bedeutung</th><th>Nur für</th></tr>
+<tr><td><code>model</code></td><td><code>none</code>, <code>viscous</code>, <code>electromagnetic_linear</code>, <code>generator_controlled</code></td><td></td></tr>
+<tr><td><code>damping_Ns_per_m</code></td><td>Basisdämpfung</td><td>alle</td></tr>
+<tr><td><code>max_damping_Ns_per_m</code></td><td>Maximaldämpfung in Totpunktnähe</td><td><code>generator_controlled</code></td></tr>
+<tr><td><code>control_zone_m</code></td><td>Zone vor dem Totpunkt</td><td><code>generator_controlled</code></td></tr>
+</table>
+
+<h3>12.6 Bounce: zwei zulässige Varianten</h3>
+<p><b>Variante A:</b> top-level <code>free_piston.bounce</code> (Legacy)</p>
+<table>
+<tr><th>Feld</th><th>Bedeutung</th></tr>
+<tr><td><code>model: gas_spring</code></td><td>polytrope Gasfeder</td></tr>
+<tr><td><code>chamber_diameter_m</code>, <code>chamber_length_m</code>, <code>compression_ratio</code></td><td>neue Geometriedefinition</td></tr>
+<tr><td><code>chamber_volume0_m3</code></td><td>Legacy-Definition von <code>Vmax</code></td></tr>
+<tr><td><code>p0_Pa</code></td><td>optional, aktuell nicht führend</td></tr>
+<tr><td><code>polytropic_exponent</code></td><td>Exponent <code>n</code></td></tr>
+</table>
+
+<p><b>Variante B:</b> <code>preprocessing.volumes</code> mit <code>type: bounce_chamber</code></p>
+<table>
+<tr><th>Feld</th><th>Bedeutung</th></tr>
+<tr><td><code>initial_pressure_Pa</code></td><td>führender Startdruck</td></tr>
+<tr><td><code>initial_temperature_K</code></td><td>Starttemperatur</td></tr>
+<tr><td><code>chamber_diameter_m</code>, <code>chamber_length_m</code>, <code>compression_ratio</code></td><td>neue Geometriedefinition</td></tr>
+<tr><td><code>chamber_volume0_m3</code></td><td>Legacy-Vmax</td></tr>
+<tr><td><code>p0_Pa</code></td><td>optional, nur Meta</td></tr>
+<tr><td><code>polytropic_exponent</code></td><td>Exponent <code>n</code></td></tr>
+</table>
+
+<div class="note">
+Wenn eine <code>bounce_chamber</code> in <code>preprocessing.volumes</code> definiert ist, müssen <code>free_piston.bounce</code> und <code>free_piston.initial_conditions.bounce</code> weggelassen werden.
+</div>
+
+<h3>12.7 <code>preprocessing.gas_properties</code></h3>
+<table>
+<tr><th>Feld</th><th>Bedeutung</th></tr>
+<tr><td><code>cp_J_per_kgK</code></td><td>spezifische Wärmekapazität bei konstantem Druck</td></tr>
+<tr><td><code>cv_J_per_kgK</code></td><td>spezifische Wärmekapazität bei konstantem Volumen</td></tr>
+<tr><td><code>R_J_per_kgK</code></td><td>spezifische Gaskonstante</td></tr>
+</table>
+
+<h3>12.8 <code>preprocessing.features</code></h3>
+<table>
+<tr><th>Feld</th><th>Wirkung</th></tr>
+<tr><td><code>mass_flow</code></td><td>aktiviert Verbindungsströme</td></tr>
+<tr><td><code>wall_heat</code></td><td>formal Wandwärme; im aktuellen FP-Build ohne Wall-Zeilen praktisch ohne Wirkung</td></tr>
+<tr><td><code>combustion</code></td><td>aktiviert Vibe-Therm</td></tr>
+<tr><td><code>evaporation</code></td><td>formal Verdampfung; im aktuellen FP-Build ohne Evap-Zeilen praktisch ohne Wirkung</td></tr>
+<tr><td><code>pv_work</code></td><td>aktiviert <code>-p dV/dt</code></td></tr>
+</table>
+
+<h3>12.9 <code>preprocessing.engine</code></h3>
+<table>
+<tr><th>Feld</th><th>Bedeutung</th></tr>
+<tr><td><code>cycle_type</code></td><td><code>2t</code> oder <code>4t</code> → 360° bzw. 720°</td></tr>
+<tr><td><code>speed_rpm</code></td><td>Hilfsdrehzahl für globalen Winkel und Zyklusperiode</td></tr>
+</table>
+
+<h3>12.10 <code>preprocessing.volumes</code></h3>
+<table>
+<tr><th>Typ</th><th>Beschreibung</th><th>FP-Hinweise</th></tr>
+<tr><td><code>cylinder</code></td><td>Arbeitsraum</td><td>maximal einer; wenn Connections existieren, muss er explizit vorhanden sein</td></tr>
+<tr><td><code>plenum</code></td><td>festes endliches Volumen</td><td>mit dynamischer Masse und Energie</td></tr>
+<tr><td><code>environment</code></td><td>unendliches Randvolumen</td><td>p,T fest; keine Zustandsintegration</td></tr>
+<tr><td><code>bounce_chamber</code></td><td>mechanische Gegenkammer</td><td>nicht an Connections anschließbar</td></tr>
+</table>
+
+<h3>12.11 Zylinder-Submodelle</h3>
+<table>
+<tr><th>Unterblock</th><th>Status im aktuellen FP-Build</th></tr>
+<tr><td><code>wall_heat</code></td><td>formal vorhanden; Builder erzeugt aktuell keine Wall-Zeile</td></tr>
+<tr><td><code>combustion: model: vibe</code></td><td>aktiv aufgebaut und im RHS wirksam</td></tr>
+<tr><td><code>evaporation</code></td><td>formal vorhanden; Builder erzeugt aktuell keine Evap-Zeile</td></tr>
+</table>
+
+<h3>12.12 Vibe-Konfiguration</h3>
+<table>
+<tr><th>Feld</th><th>Bedeutung</th></tr>
+<tr><td><code>start_mode</code></td><td><code>angle</code> oder <code>compression_hub</code></td></tr>
+<tr><td><code>start_deg</code>, <code>duration_deg</code></td><td>bei winkelbasierter Definition</td></tr>
+<tr><td><code>start_hub_m</code>, <code>duration_hub_m</code></td><td>bei hubbasierter Definition auf dem Kompressionshub</td></tr>
+<tr><td><code>a</code>, <code>m</code></td><td>Vibe-Parameter</td></tr>
+<tr><td><code>fuel_mass_per_cycle_kg</code> + <code>lhv_J_per_kg</code></td><td>Energiealternativdefinition</td></tr>
+<tr><td><code>added_energy_per_cycle_J</code></td><td>direkte Gesamtenergie</td></tr>
+<tr><td><code>energy_coupling: stroke_ratio</code></td><td>Hubskalie­rung der Gesamtenergie</td></tr>
+<tr><td><code>stroke_reference_m</code></td><td>Referenzhub</td></tr>
+<tr><td><code>stroke_exponent</code></td><td>Exponenten der Skalie­rung</td></tr>
+<tr><td><code>angle_reference</code></td><td><code>absolute</code>, <code>compression_tdc</code>, <code>gas_exchange_tdc</code></td></tr>
+</table>
+
+<p>Bei <code>start_mode: compression_hub</code> wird im Free‑Piston‑Builder auf Winkel umgerechnet:</p>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>&#x03B8;</mi><mi>start</mi></msub>
+    <mo>=</mo>
+    <mfrac><mi>cycle_deg</mi><mn>2</mn></mfrac>
+    <mo>+</mo>
+    <mfrac><mi>cycle_deg</mi><mn>2</mn></mfrac>
+    <mfrac><msub><mi>s</mi><mi>start</mi></msub><msub><mi>s</mi><mi>nom</mi></msub></mfrac>
+  </mrow>
+</math>
+</div>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>&#x0394;&#x03B8;</mi><mi>burn</mi></msub>
+    <mo>=</mo>
+    <mfrac><mi>cycle_deg</mi><mn>2</mn></mfrac>
+    <mfrac><msub><mi>s</mi><mi>dur</mi></msub><msub><mi>s</mi><mi>nom</mi></msub></mfrac>
+  </mrow>
+</math>
+</div>
+
+<h3>12.13 <code>preprocessing.connections</code></h3>
+<table>
+<tr><th>Typ</th><th>Wichtige Felder</th><th>FP-Hinweis</th></tr>
+<tr><td><code>orifice</code></td><td><code>area_m2</code>, <code>forward_cd</code>, <code>reverse_cd</code></td><td>direkt unterstützt</td></tr>
+<tr><td><code>slot</code></td><td><code>distance_from_tdc_m</code>, <code>width_m</code>, <code>height_m</code>, <code>number_of_identical_holes</code>, Cd-Modell</td><td>nur <code>opening_mode: by_distance</code></td></tr>
+<tr><td><code>valve</code></td><td>Hubkurven, Alpha-K</td><td>im FP-Pfad aktuell verboten</td></tr>
+</table>
+
+<h3>12.14 <code>simulation</code></h3>
+<table>
+<tr><th>Feld</th><th>Bedeutung</th></tr>
+<tr><td><code>dt_s</code></td><td>Integrationsschritt / Basisschritt</td></tr>
+<tr><td><code>total_cycles</code></td><td>Anzahl Referenzzyklen</td></tr>
+<tr><td><code>save_last_cycles</code></td><td>für Ausgabe zurückzuhaltende Zyklen</td></tr>
+<tr><td><code>simulationtime</code></td><td>bei Free‑Piston typischerweise wichtiger als Zyklenzahl</td></tr>
+<tr><td><code>solver.kind</code></td><td>z. B. <code>rk4</code>, <code>euler</code>, <code>scipy_rk45</code></td></tr>
+</table>
+
+<h3>12.15 <code>postprocessing</code></h3>
+<table>
+<tr><th>Feld</th><th>Bedeutung</th></tr>
+<tr><td><code>csv_enabled</code>, <code>excel_enabled</code></td><td>Dateiausgabe</td></tr>
+<tr><td><code>sampling.mode</code></td><td><code>time</code> oder <code>crank_angle</code></td></tr>
+<tr><td><code>sampling.step_s</code> / <code>step_deg</code></td><td>Ausgaberas­ter</td></tr>
+<tr><td><code>plots.layouts.entries</code></td><td>Plotdefinitionen</td></tr>
+</table>
+
+<div class="note">
+Für Free‑Piston sind in der Praxis meist <strong>zeitbasierte</strong> Exporte sinnvoller als Kurbelwinkel-Exporte, weil die reale Schwingfrequenz nicht fest an <code>engine.speed_rpm</code> gebunden ist.
+</div>
+
+<h2>13. Minimales vollständiges YAML-Skelett</h2>
+<pre>modeling:
+  architecture: free_piston
+
+free_piston:
+  initial_conditions:
+    x0_m: 0.05
+    v0_m_per_s: -3.5
+    cylinder:
+      pressure_Pa: 135000.0
+      temperature_K: 340.0
+  mechanics:
+    moving_mass_kg: 0.7
+    piston_diameter_m: 0.0745
+    compression_ratio: 44.0
+    x_min_m: 0.0
+    x_max_m: 0.08
+  friction:
+    model: coulomb_viscous
+    fc_N: 40.0
+    cv_Ns_per_m: 1.5
+  load:
+    model: generator_controlled
+    damping_Ns_per_m: 8.0
+    max_damping_Ns_per_m: 90.0
+    control_zone_m: 0.01
+
+preprocessing:
+  gas_properties:
+    cp_J_per_kgK: 1005.0
+    cv_J_per_kgK: 718.0
+    R_J_per_kgK: 287.0
+  features:
+    mass_flow: true
+    wall_heat: false
+    combustion: true
+    evaporation: false
+    pv_work: true
+  engine:
+    cycle_type: 2t
+    speed_rpm: 25.0
+  volumes:
+    - name: cylinder
+      type: cylinder
+      initial_pressure_Pa: 135000.0
+      initial_temperature_K: 340.0
+      kinematics:
+        type: crank_slider
+        bore_m: 0.0745
+        stroke_m: 0.08
+        conrod_m: 0.12
+        compression_ratio: 50.0
+        phase_deg: 0.0
+      wall_heat: {model: none}
+      combustion:
+        model: vibe
+        start_mode: compression_hub
+        start_hub_m: 0.042
+        duration_hub_m: 0.0036
+        a: 6.9
+        m: 2.0
+        added_energy_per_cycle_J: 420.0
+      evaporation: {model: none}
+
+    - name: bounce
+      type: bounce_chamber
+      model: gas_spring
+      initial_pressure_Pa: 180000.0
+      initial_temperature_K: 300.0
+      chamber_diameter_m: 0.0745
+      chamber_length_m: 0.08
+      compression_ratio: 2.58
+      polytropic_exponent: 1.28
+
+    - name: scavenge_plenum
+      type: plenum
+      initial_pressure_Pa: 160000.0
+      initial_temperature_K: 300.0
+      fixed_volume_m3: 0.002
+      wall_heat: {model: none}
+      combustion: {model: none}
+      evaporation: {model: none}
+
+    - name: exhaust_plenum
+      type: plenum
+      initial_pressure_Pa: 110000.0
+      initial_temperature_K: 300.0
+      fixed_volume_m3: 0.0025
+      wall_heat: {model: none}
+      combustion: {model: none}
+      evaporation: {model: none}
+
+    - name: ambient_in
+      type: environment
+      pressure_Pa: 161325.0
+      temperature_K: 300.0
+
+    - name: ambient_out
+      type: environment
+      pressure_Pa: 101325.0
+      temperature_K: 300.0
+
+  connections:
+    - name: scavenge_feed
+      type: orifice
+      from_volume: ambient_in
+      to_volume: scavenge_plenum
+      area_m2: 8.0e-05
+      forward_cd: 0.75
+      reverse_cd: 0.0
+
+    - name: transfer_slot
+      type: slot
+      from_volume: scavenge_plenum
+      to_volume: cylinder
+      source_of_data: rectangle
+      opening_mode: by_distance
+      distance_from_tdc_m: 0.066
+      opening_angle_deg: null
+      piston_height_if_crankcase_m: 0.0
+      entrance_angle_deg: 0.0
+      width_m: 0.02
+      height_m: 0.014
+      open_fillet_radius_m: 0.0
+      full_fillet_radius_m: 0.0
+      number_of_identical_holes: 4
+      discharge_coefficients:
+        mode: constant
+        forward_cd: 0.82
+        reverse_cd: 0.68</pre>
+
+<h2>14. Praktische Hinweise</h2>
+<ul>
+  <li>Für realistische Free‑Piston‑Verläufe ist <code>simulation.simulationtime</code> zentral; <code>total_cycles</code> ist eher eine Referenzgröße des Frameworks.</li>
+  <li>Da die mechanische Bounds-Prüfung im RHS aktuell auskommentiert ist, können kleine numerische Überläufe von <code>x</code> auftreten; Geometriefunktionen clampen intern zwar bei Volumenberechnungen, <code>x</code> selbst wird aber nicht hart saturiert.</li>
+  <li>Wenn du Gaswechsel modellierst, ist die Konsistenz der Richtung wichtig: positive Massenströme laufen immer von <code>from_volume</code> nach <code>to_volume</code>.</li>
+  <li>Bei Nutzung einer <code>bounce_chamber</code> darf diese nicht in <code>connections</code> vorkommen; sie ist rein mechanisch gekoppelt.</li>
+  <li>Der Zylinder in <code>preprocessing.volumes</code> dient im Free‑Piston‑Pfad auch als Träger der Verbrennungs- und Geometrie-Submodelle, obwohl die eigentliche Volumenkinematik aus <code>free_piston.mechanics</code> stammt.</li>
+</ul>
+
+<h2>15. Kompakte Gleichungssammlung</h2>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>V</mi><mi>cyl</mi></msub><mo>=</mo><msub><mi>V</mi><mi>clr</mi></msub><mo>+</mo><msub><mi>A</mi><mi>p</mi></msub><mrow><mo>(</mo><mi>x</mi><mo>-</mo><msub><mi>x</mi><mi>min</mi></msub><mo>)</mo></mrow>
+  </mrow>
+</math>
+</div>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <msub><mi>V</mi><mi>b</mi></msub><mo>=</mo><msub><mi>V</mi><mn>0</mn></msub><mo>-</mo><msub><mi>A</mi><mi>b</mi></msub><mrow><mo>(</mo><mi>x</mi><mo>-</mo><msub><mi>x</mi><mi>min</mi></msub><mo>)</mo></mrow>
+  </mrow>
+</math>
+</div>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mi>T</mi><mo>=</mo><mfrac><mi>U</mi><mrow><mi>m</mi><msub><mi>c</mi><mi>v</mi></msub></mrow></mfrac>
+    <mo>,</mo>
+    <mi>p</mi><mo>=</mo><mfrac><mrow><mi>m</mi><mi>R</mi><mi>T</mi></mrow><mi>V</mi></mfrac>
+  </mrow>
+</math>
+</div>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac><mrow><mi>d</mi><mi>m</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+    <mo>=</mo><munderover><mo>&#x2211;</mo><mtext>conn</mtext><mtext></mtext></munderover><msub><mi>s</mi><mi>k</mi></msub><msub><mover><mi>m</mi><mo>.</mo></mover><mi>k</mi></msub>
+  </mrow>
+</math>
+</div>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac><mrow><mi>d</mi><mi>U</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+    <mo>=</mo>
+    <munderover><mo>&#x2211;</mo><mtext>conn</mtext><mtext></mtext></munderover><msub><mi>s</mi><mi>k</mi></msub><msub><mover><mi>m</mi><mo>.</mo></mover><mi>k</mi></msub><msub><mi>h</mi><mi>up</mi></msub>
+    <mo>-</mo><mi>p</mi><mfrac><mrow><mi>d</mi><mi>V</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+    <mo>+</mo><mover><mi>Q</mi><mo>.</mo></mover><mi>wall</mi>
+    <mo>+</mo><mover><mi>Q</mi><mo>.</mo></mover><mi>comb</mi>
+    <mo>-</mo><mover><mi>Q</mi><mo>.</mo></mover><mi>evap</mi>
+  </mrow>
+</math>
+</div>
+<div class="math">
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mrow>
+    <mfrac><mrow><mi>d</mi><mi>x</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mi>v</mi>
+    <mo>,</mo>
+    <mfrac><mrow><mi>d</mi><mi>v</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mfrac><mrow><msub><mi>F</mi><mi>gas</mi></msub><mo>+</mo><msub><mi>F</mi><mi>bounce</mi></msub><mo>+</mo><msub><mi>F</mi><mi>fric</mi></msub><mo>+</mo><msub><mi>F</mi><mi>load</mi></msub></mrow><msub><mi>m</mi><mi>mov</mi></msub></mfrac>
+  </mrow>
+</math>
+</div>
+
+<h2>16. Fazit</h2>
+<p>Das aktuelle Free‑Piston‑RHS ist ein gekoppeltes Modell aus:</p>
+<ul>
+  <li>idealer 0D‑Thermodynamik der Volumina,</li>
+  <li>compressiblen Massenströmen über Slots/Orifices,</li>
+  <li>einer linearen Kolben‑Volumenabbildung,</li>
+  <li>einer polytropen Bounce‑Gasfeder,</li>
+  <li>Coulomb‑/viskoser Reibung und optional geregelter Generatorlast,</li>
+  <li>optionalem Vibe‑Energieeintrag im Zylinder.</li>
+</ul>
+<p>Für die weitere Entwicklung sind die größten offenen Punkte: explizite Wandwärme‑ und Verdampfungsanbindung im Builder, echte mechanische Anschläge/Bounds sowie optional echte Zustände für Verbrennungs-/Einspritzlogik.</p>
+
+</body>
+</html>

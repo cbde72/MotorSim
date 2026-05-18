@@ -1,0 +1,77 @@
+Free-Piston Vibe + Generator-Regelung Patch
+===========================================
+
+Ziel
+----
+1. Vibe-Verbrennung im free_piston-Pfad lauffähig machen.
+2. Zugeführte Energie direkt in Joule pro Zyklus vorgeben.
+3. Optionale Hub-Skalierung der Energiezufuhr ergänzen.
+4. Generatorlast als geregeltes Lastmodell vorbereiten, damit der Kolben an den Totpunkten stärker abgebremst wird.
+5. Saubere Beispiel-Konfiguration und ordentliche Skizze bereitstellen.
+
+Geänderte Dateien
+-----------------
+src/thermo0d/config/models.py
+src/thermo0d/config/schema_meta.py
+src/thermo0d/core/model_bundle.py
+src/thermo0d/model/conventional/builder.py
+src/thermo0d/model/free_piston/forces.py
+src/thermo0d/model/free_piston/builder.py
+src/thermo0d/model/free_piston/rhs.py
+src/thermo0d/model/free_piston/postprocessing.py
+src/thermo0d/model/free_piston/signals.py
+src/thermo0d/output/reconstruction.py
+src/thermo0d/gui/signal_catalog.py
+tests/test_free_piston_load_models.py
+Projekte/variants/free_piston_vibe_generator.yaml
+Projekte/variants/plot_fp.yaml
+Projekte/plot_fp.yaml
+
+Wesentliche Änderungen
+----------------------
+- Vibe combustion rows werden jetzt auch im free_piston-Bundle aufgebaut.
+- Neue Vibe-Optionen:
+  - added_energy_per_cycle_J
+  - energy_coupling: none | stroke_ratio
+  - stroke_reference_m
+  - stroke_exponent
+- Die Builder setzen q_total direkt aus der vorgegebenen Energie oder klassisch aus fuel_mass_per_cycle_kg * lhv_J_per_kg.
+- Für stroke_ratio wird q_total statisch mit nominal_stroke / stroke_reference skaliert.
+- Neues Lastmodell: generator_controlled
+  - damping_Ns_per_m
+  - max_damping_Ns_per_m
+  - control_zone_m
+- Nahe x_min bzw. x_max wird die wirksame Dämpfung erhöht, sofern der Kolben weiter in Richtung Endlage läuft.
+- Neue rekonstruierte/ausgegebene Größe:
+  - free_piston_generator_power_W
+- Plot-Layout plot_fp.yaml um Generatorleistung und zugeführte Energie erweitert.
+
+Validierung
+-----------
+Positiv geprüft:
+- RootConfig-Validierung für das neue Beispiel free_piston_vibe_generator.yaml
+- pytest tests/test_free_piston_load_models.py -> 5 passed
+- Simulation des neuen Beispielcases erfolgreich durchgelaufen
+  - CSV geschrieben
+  - Plots geschrieben
+  - cylinder_added_energy_W vorhanden
+  - free_piston_generator_power_W vorhanden
+
+Hinweis zu weiteren Tests
+-------------------------
+Ein größerer Free-Piston-Testblock im Archiv verweist auf Dateien wie
+Projekte/variants/free_piston_phase_a.yaml,
+Projekte/variants/free_piston_phase_a2.yaml,
+Projekte/variants/free_piston_phase_a3.yaml,
+die in diesem Archiv nicht vorhanden sind. Diese Fehler sind daher nicht als Folge des Patches interpretierbar.
+
+Beispiel-Konfiguration
+----------------------
+Siehe:
+Projekte/variants/free_piston_vibe_generator.yaml
+
+Skizze
+------
+Zusätzliche saubere Skizze im Artefakt-Ordner:
+free_piston_generator_sketch_clean.png
+free_piston_generator_sketch_clean.svg

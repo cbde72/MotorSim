@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Generator und Schwungmasse</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="wrap">
+    
+    <div class="sidebar">
+      <section class="card">
+        <div class="badge">Thermo0D · Referenz</div>
+        <h1 style="margin-top:.7rem">System-Dokumentation</h1>
+        <p class="muted">Statische HTML-Referenz für aktuellen Projektstand: Physik, Numerik, Konfiguration, Generatoranbindung und Ausbaupfad.</p>
+      </section>
+      <section class="card">
+        <nav><a href="index.html">Start</a>
+<a href="physik.html">Physik</a>
+<a href="numerik.html">Numerik</a>
+<a href="konfiguration_klassisch.html">Konfiguration classic</a>
+<a href="konfiguration_free_piston.html">Konfiguration free_piston</a>
+<a href="generator_und_schwungmasse.html" style="background:#0e1624">Generator & Schwungmasse</a>
+<a href="verbesserungen_und_next_steps.html">Verbesserungen & Next Steps</a></nav>
+      </section>
+      <section class="card">
+        <div><strong>Pfad</strong></div>
+        <div class="muted"><code>doc/system_reference/index.html</code></div>
+      </section>
+    </div>
+    
+    <main><section class="card"><h2>Aktueller Stand der Generatoranbindung</h2><p>Im Freikolbenpfad ist die Generatorlast aktuell als <strong>mechanisches Last-Ersatzmodell</strong> implementiert. Die verfügbaren Modi sind:</p><ul><li><code>none</code> – keine externe Last</li><li><code>viscous</code> – konstante lineare Dämpfung <code>F = c · v</code></li><li><code>electromagnetic_linear</code> – aktuell dieselbe lineare Dämpfungslogik wie <code>viscous</code>, nur semantisch anders benannt</li><li><code>generator_controlled</code> – ortsabhängig erhöhte Dämpfung in einer <code>control_zone_m</code> nahe den Totpunkten</li></ul><pre>F_load = c_eff(x,v) · v
+P_gen = max(F_load · v, 0)</pre><p>Das ist praktisch, um Totpunktnähe und Energierückgewinnung näherungsweise zu modellieren, aber noch kein elektrodynamisches Spulen-/Magnetmodell.</p></section><section class="card"><h2>Was fehlt für eine physikalisch stärkere Generatoranbindung?</h2><ul><li>elektrische Zustandsgrößen wie Spulenstrom oder Busspannung</li><li>Gegen-EMK abhängig von Geschwindigkeit und translatorischer Position</li><li>Leistungselektronik bzw. Stromregelung</li><li>Abbildung von Eisen-/Kupferverlusten</li><li>ggf. Kopplung an Last- oder Batteriesystem</li></ul><div class="callout">Empfohlener nächster Zwischenschritt: ein <strong>quasi-stationäres Generator-Kennfeld</strong> <code>F_gen(x, v, i_cmd)</code> plus eine einfache Stromregelung. Damit bleibt das Modell 0D-tauglich, ist aber deutlich physikalischer als reine viskose Dämpfung.</div></section><section class="card"><h2>Kurbelwellenmoment über Schwungscheibe: aktueller Stand</h2><p>Im klassischen Pfad gibt es derzeit keine explizite Kurbelwelle mit Schwungmasse als dynamischen Zustand. Die Drehzahl ist vorgegeben. Dadurch existiert aktuell auch kein integriertes Modell</p><pre>J · ω̇ = M_gas - M_last - M_friction</pre><p>mit daraus resultierender Drehzahldynamik.</p></section><section class="card"><h2>Empfohlene Erweiterung für den klassischen Pfad</h2><h3>Neuer Zustandsvektor</h3><ul><li><code>phi</code> – Kurbelwinkel</li><li><code>omega</code> – Kurbelwellendrehzahl</li></ul><h3>Neue Mechanikgleichung</h3><pre>phi̇ = omega
+J_total · omegȧ = M_indicated(phi, p_cyl, geometry) - M_load(omega) - M_friction(omega)</pre><h3>Schwungscheibe</h3><p>Die Schwungscheibe geht über ihr Trägheitsmoment direkt in <code>J_total</code> ein. Größeres <code>J_total</code> glättet den Drehzahlverlauf, reduziert aber die Beschleunigungsfähigkeit.</p><h3>Generator an der Kurbelwelle</h3><p>Ein einfacher erster Ansatz wäre eine drehzahlabhängige Last</p><pre>M_gen = c_gen · omega</pre><p>oder ein Kennfeld <code>M_gen(omega, i_cmd)</code>. Die elektrische Leistung wäre dann näherungsweise <code>P = M_gen · omega</code>.</p></section><section class="card"><h2>Empfohlene Reihenfolge für die Umsetzung</h2><ol><li>klassische Kurbelwellendynamik mit <code>J_total</code>, <code>phi</code>, <code>omega</code></li><li>Lastmoment an der Welle als Kennfeld oder viscous torque</li><li>Schwungscheibenparameter in die Konfiguration</li><li>Mehrzylinder-Kopplung auf gemeinsame Welle</li><li>danach Generator-/Netzmodell, falls nötig</li></ol></section></main>
+  </div>
+</body>
+</html>

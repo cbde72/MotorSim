@@ -1,0 +1,8 @@
+Free-piston x-convention patch v2
+
+Fixes after first x-convention patch:
+- cylinder uses OT=x_min, UT=x_max consistently
+- bounce chamber mirrored correctly to UT/BDC side
+- gas/bounce force signs adapted to the new x direction
+- geometry helpers now clamp x to [x_min, x_max] for derived volumes/travel
+- builder/postprocessing/reconstruction updated to new helper signatures

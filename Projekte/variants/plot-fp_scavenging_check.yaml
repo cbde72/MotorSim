@@ -1,0 +1,226 @@
+name: Free-Piston Scavenging Check
+style:
+  preset_name: Light Engineering
+  font_family: DejaVu Sans
+  font_size: 6
+  axis_label_size: 6
+  tick_label_size: 6
+  title_size: 6
+  figure_title_size: 6
+  subplot_title_visible: true
+  figure_title_visible: false
+  grid_visible: true
+  grid_alpha: 0.3
+  legend_visible: true
+  legend_position: best
+  tight_layout: true
+  default_line_width: 0.9
+  default_marker_size: 3.5
+figures:
+- title: Spuelung - Slot Overlap und Massenstroeme
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Transfer und Exhaust ueber Zeit
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_flow
+      title: Massenstrom [g/s]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_area
+      title: A_eff [mm2]
+      side: right
+      color: '#667085'
+      limit_mode: auto
+    series:
+    - signal_key: transfer_slot_mdot_kg_per_s
+      label: transfer mdot
+      axis_id: ax_flow
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_mdot_kg_per_s
+      label: exhaust mdot
+      axis_id: ax_flow
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: transfer_slot_A_eff_forward_mm2
+      label: transfer A_eff_fwd
+      axis_id: ax_area
+      color: '#98a2b3'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_A_eff_forward_mm2
+      label: exhaust A_eff_fwd
+      axis_id: ax_area
+      color: '#7a5af8'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+
+- title: Spuelung - Modellantwort
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Diagnose des 0D-Spuelmodells
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_rate
+      title: Rate [g/s]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_frac
+      title: Anteil / Eta [-]
+      side: right
+      color: '#667085'
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 1.05
+    series:
+    - signal_key: cylinder_scavenging_transfer_in_kg_per_s
+      label: transfer_in
+      axis_id: ax_rate
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: cylinder_scavenging_exhaust_out_kg_per_s
+      label: exhaust_out
+      axis_id: ax_rate
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: cylinder_scavenging_burned_correction_kg_per_s
+      label: burned_correction
+      axis_id: ax_rate
+      color: '#027a48'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: cylinder_scavenging_short_circuit_fraction
+      label: short_circuit
+      axis_id: ax_frac
+      color: '#f79009'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_scavenging_efficiency_0to1
+      label: eta_scav
+      axis_id: ax_frac
+      color: '#7a5af8'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+
+- title: Spuelung - Zusammensetzung im Zylinder
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Restgas und Luft im Zylinder
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_mass
+      title: Masse [mg]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_frac
+      title: Anteil [-]
+      side: right
+      color: '#667085'
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 1.05
+    series:
+    - signal_key: cylinder_m_air_kg
+      label: m_air
+      axis_id: ax_mass
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: cylinder_m_burned_kg
+      label: m_burned
+      axis_id: ax_mass
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: cylinder_share_air_0to1
+      label: share_air
+      axis_id: ax_frac
+      color: '#12b76a'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_share_burned_0to1
+      label: share_burned
+      axis_id: ax_frac
+      color: '#7a5af8'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+
+- title: Spuelung - Rueckwirkung auf Verdichtung und Peak
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Druck, Hub und gelatchte Luftmasse
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_p
+      title: Druck [bar]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_aux
+      title: Hub [mm] / Luftmasse [mg]
+      side: right
+      color: '#667085'
+      limit_mode: auto
+    series:
+    - signal_key: cylinder_p_bar
+      label: cylinder p
+      axis_id: ax_p
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: free_piston_distance_from_tdc_mm
+      label: dist to TDC
+      axis_id: ax_aux
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: free_piston_combustion_mass_latched_kg
+      label: latched air mass
+      axis_id: ax_aux
+      color: '#027a48'
+      line_style: '--'
+      scale_factor: 1000000.0
+      unit_preset: raw

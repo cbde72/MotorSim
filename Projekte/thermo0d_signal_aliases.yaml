@@ -1,0 +1,1811 @@
+format: thermo0d-signal-aliases-v1
+signals:
+- key: t_s
+  unit: s
+  short_name: t
+  source: global
+  default_name: Zeit
+  display_name: Zeit
+  category: global
+  signal_family: global
+  signal_kind: state
+- key: cycle_index
+  unit: '-'
+  short_name: cycle
+  source: global
+  default_name: Zyklusindex
+  display_name: Zyklusindex
+  category: global
+  signal_family: global
+  signal_kind: index
+- key: cylinder_m_kg
+  unit: kg
+  short_name: m
+  source: volume_state
+  default_name: 'cylinder: Masse'
+  display_name: 'cylinder: Masse'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: cylinder_U_J
+  unit: J
+  short_name: U
+  source: volume_state
+  default_name: 'cylinder: Innere Energie'
+  display_name: 'cylinder: Innere Energie'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: cylinder_T_K
+  unit: K
+  short_name: T
+  source: volume_state
+  default_name: 'cylinder: Temperatur'
+  display_name: 'cylinder: Temperatur'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: cylinder_p_Pa
+  unit: Pa
+  short_name: p
+  source: volume_state
+  default_name: 'cylinder: Druck'
+  display_name: 'cylinder: Druck'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: cylinder_V_m3
+  unit: m³
+  short_name: V
+  source: volume_state
+  default_name: 'cylinder: Volumen'
+  display_name: 'cylinder: Volumen'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: cylinder_dVdt_m3_per_s
+  unit: m³/s
+  short_name: dV/dt
+  source: volume_state
+  default_name: 'cylinder: Volumenänderungsrate'
+  display_name: 'cylinder: Volumenänderungsrate'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: cylinder_theta_deg
+  unit: deg
+  short_name: θ
+  source: volume_state
+  default_name: 'cylinder: Kurbelwinkel'
+  display_name: 'cylinder: Kurbelwinkel'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: cylinder_mdot_in_kg_per_s
+  unit: kg/s
+  short_name: ṁ_in
+  source: cylinder_balance
+  default_name: 'cylinder: Einströmender Massenstrom'
+  display_name: 'cylinder: Einströmender Massenstrom'
+  category: volumes
+  signal_family: mass_balance
+  signal_kind: state
+- key: cylinder_mdot_out_kg_per_s
+  unit: kg/s
+  short_name: ṁ_out
+  source: cylinder_balance
+  default_name: 'cylinder: Ausströmender Massenstrom'
+  display_name: 'cylinder: Ausströmender Massenstrom'
+  category: volumes
+  signal_family: mass_balance
+  signal_kind: state
+- key: cylinder_A_eff_in_m2
+  unit: m²
+  short_name: A_eff,in
+  source: cylinder_balance
+  default_name: 'cylinder: Effektiver Einlassquerschnitt'
+  display_name: 'cylinder: Effektiver Einlassquerschnitt'
+  category: volumes
+  signal_family: mass_balance
+  signal_kind: state
+- key: cylinder_A_eff_out_m2
+  unit: m²
+  short_name: A_eff,out
+  source: cylinder_balance
+  default_name: 'cylinder: Effektiver Auslassquerschnitt'
+  display_name: 'cylinder: Effektiver Auslassquerschnitt'
+  category: volumes
+  signal_family: mass_balance
+  signal_kind: state
+- key: cylinder_enthalpy_in_W
+  unit: W
+  short_name: Ĥ_in
+  source: cylinder_balance
+  default_name: 'cylinder: Enthalpiestrom ein'
+  display_name: 'cylinder: Enthalpiestrom ein'
+  category: energy
+  signal_family: energy
+  signal_kind: rate
+- key: cylinder_enthalpy_out_W
+  unit: W
+  short_name: Ĥ_out
+  source: cylinder_balance
+  default_name: 'cylinder: Enthalpiestrom aus'
+  display_name: 'cylinder: Enthalpiestrom aus'
+  category: energy
+  signal_family: energy
+  signal_kind: rate
+- key: cylinder_wall_heat_W
+  unit: W
+  short_name: Q̇_wall
+  source: heat_transfer
+  default_name: 'cylinder: Zylinderwandwärme'
+  display_name: 'cylinder: Zylinderwandwärme'
+  category: energy
+  signal_family: energy
+  signal_kind: rate
+- key: cylinder_heat_transfer_power_W
+  unit: W
+  short_name: Q̇_ht
+  source: heat_transfer
+  default_name: 'cylinder: Wärmeleistung Zylinder'
+  display_name: cylinder_heat_transfer_power_W
+  category: energy
+  signal_family: energy
+  signal_kind: rate
+- key: cylinder_htc_W_per_m2K
+  unit: W/m²K
+  short_name: HTC
+  source: heat_transfer
+  default_name: 'cylinder: Heat-Transfer-Coefficient'
+  display_name: cylinder_htc_W_per_m2K
+  category: volumes
+  signal_family: mass_balance
+  signal_kind: state
+- key: cylinder_added_energy_W
+  unit: W
+  short_name: Q̇_add
+  source: combustion
+  default_name: 'cylinder: Zugeführte Energie'
+  display_name: 'cylinder: Zugeführte Energie'
+  category: energy
+  signal_family: energy
+  signal_kind: rate
+- key: cylinder_evaporation_sink_W
+  unit: W
+  short_name: Q̇_evap
+  source: evaporation
+  default_name: 'cylinder: Verdampfungsenthalpie-Senke'
+  display_name: 'cylinder: Verdampfungsenthalpie-Senke'
+  category: energy
+  signal_family: energy
+  signal_kind: rate
+- key: cylinder_piston_work_W
+  unit: W
+  short_name: P_pV
+  source: pv_work
+  default_name: 'cylinder: Kolbenarbeit'
+  display_name: 'cylinder: Kolbenarbeit'
+  category: energy
+  signal_family: energy
+  signal_kind: rate
+- key: cylinder_wall_heat_cycle_J
+  unit: J
+  short_name: Q_wall
+  source: cycle_integral
+  default_name: 'cylinder: Zylinderwandwärme'
+  display_name: 'cylinder: Zylinderwandwärme'
+  category: energy
+  signal_family: energy
+  signal_kind: cumulative
+- key: cylinder_added_energy_cycle_J
+  unit: J
+  short_name: Q_add
+  source: cycle_integral
+  default_name: 'cylinder: Zugeführte Energie'
+  display_name: 'cylinder: Zugeführte Energie'
+  category: energy
+  signal_family: energy
+  signal_kind: cumulative
+- key: cylinder_enthalpy_in_cycle_J
+  unit: J
+  short_name: H_in
+  source: cycle_integral
+  default_name: 'cylinder: Enthalpie ein'
+  display_name: 'cylinder: Enthalpie ein'
+  category: energy
+  signal_family: energy
+  signal_kind: cumulative
+- key: cylinder_enthalpy_out_cycle_J
+  unit: J
+  short_name: H_out
+  source: cycle_integral
+  default_name: 'cylinder: Enthalpie aus'
+  display_name: 'cylinder: Enthalpie aus'
+  category: energy
+  signal_family: energy
+  signal_kind: cumulative
+- key: cylinder_evaporation_sink_cycle_J
+  unit: J
+  short_name: Q_evap
+  source: cycle_integral
+  default_name: 'cylinder: Verdampfungsenthalpie-Senke'
+  display_name: 'cylinder: Verdampfungsenthalpie-Senke'
+  category: energy
+  signal_family: energy
+  signal_kind: cumulative
+- key: cylinder_piston_work_cycle_J
+  unit: J
+  short_name: W_pV
+  source: cycle_integral
+  default_name: 'cylinder: Kolbenarbeit'
+  display_name: 'cylinder: Kolbenarbeit'
+  category: energy
+  signal_family: energy
+  signal_kind: cumulative
+- key: bounce_m_kg
+  unit: kg
+  short_name: m
+  source: volume_state
+  default_name: 'bounce: Masse'
+  display_name: 'bounce: Masse'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: bounce_U_J
+  unit: J
+  short_name: U
+  source: volume_state
+  default_name: 'bounce: Innere Energie'
+  display_name: 'bounce: Innere Energie'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: bounce_T_K
+  unit: K
+  short_name: T
+  source: volume_state
+  default_name: 'bounce: Temperatur'
+  display_name: 'bounce: Temperatur'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: bounce_p_Pa
+  unit: Pa
+  short_name: p
+  source: volume_state
+  default_name: 'bounce: Druck'
+  display_name: 'bounce: Druck'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: bounce_V_m3
+  unit: m³
+  short_name: V
+  source: volume_state
+  default_name: 'bounce: Volumen'
+  display_name: 'bounce: Volumen'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: bounce_dVdt_m3_per_s
+  unit: m³/s
+  short_name: dV/dt
+  source: volume_state
+  default_name: 'bounce: Volumenänderungsrate'
+  display_name: 'bounce: Volumenänderungsrate'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: bounce_theta_deg
+  unit: deg
+  short_name: θ
+  source: volume_state
+  default_name: 'bounce: Kurbelwinkel'
+  display_name: 'bounce: Kurbelwinkel'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: receiver_m_kg
+  unit: kg
+  short_name: m
+  source: volume_state
+  default_name: 'receiver: Masse'
+  display_name: 'receiver: Masse'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: receiver_U_J
+  unit: J
+  short_name: U
+  source: volume_state
+  default_name: 'receiver: Innere Energie'
+  display_name: 'receiver: Innere Energie'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: receiver_T_K
+  unit: K
+  short_name: T
+  source: volume_state
+  default_name: 'receiver: Temperatur'
+  display_name: 'receiver: Temperatur'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: receiver_p_Pa
+  unit: Pa
+  short_name: p
+  source: volume_state
+  default_name: 'receiver: Druck'
+  display_name: 'receiver: Druck'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: receiver_V_m3
+  unit: m³
+  short_name: V
+  source: volume_state
+  default_name: 'receiver: Volumen'
+  display_name: 'receiver: Volumen'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: receiver_dVdt_m3_per_s
+  unit: m³/s
+  short_name: dV/dt
+  source: volume_state
+  default_name: 'receiver: Volumenänderungsrate'
+  display_name: 'receiver: Volumenänderungsrate'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: receiver_theta_deg
+  unit: deg
+  short_name: θ
+  source: volume_state
+  default_name: 'receiver: Kurbelwinkel'
+  display_name: 'receiver: Kurbelwinkel'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: exhaust_plenum_m_kg
+  unit: kg
+  short_name: m
+  source: volume_state
+  default_name: 'exhaust_plenum: Masse'
+  display_name: 'exhaust_plenum: Masse'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: exhaust_plenum_U_J
+  unit: J
+  short_name: U
+  source: volume_state
+  default_name: 'exhaust_plenum: Innere Energie'
+  display_name: 'exhaust_plenum: Innere Energie'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: exhaust_plenum_T_K
+  unit: K
+  short_name: T
+  source: volume_state
+  default_name: 'exhaust_plenum: Temperatur'
+  display_name: 'exhaust_plenum: Temperatur'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: exhaust_plenum_p_Pa
+  unit: Pa
+  short_name: p
+  source: volume_state
+  default_name: 'exhaust_plenum: Druck'
+  display_name: 'exhaust_plenum: Druck'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: exhaust_plenum_V_m3
+  unit: m³
+  short_name: V
+  source: volume_state
+  default_name: 'exhaust_plenum: Volumen'
+  display_name: 'exhaust_plenum: Volumen'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: exhaust_plenum_dVdt_m3_per_s
+  unit: m³/s
+  short_name: dV/dt
+  source: volume_state
+  default_name: 'exhaust_plenum: Volumenänderungsrate'
+  display_name: 'exhaust_plenum: Volumenänderungsrate'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: exhaust_plenum_theta_deg
+  unit: deg
+  short_name: θ
+  source: volume_state
+  default_name: 'exhaust_plenum: Kurbelwinkel'
+  display_name: 'exhaust_plenum: Kurbelwinkel'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_in_m_kg
+  unit: kg
+  short_name: m
+  source: volume_state
+  default_name: 'ambient_in: Masse'
+  display_name: 'ambient_in: Masse'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_in_U_J
+  unit: J
+  short_name: U
+  source: volume_state
+  default_name: 'ambient_in: Innere Energie'
+  display_name: 'ambient_in: Innere Energie'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_in_T_K
+  unit: K
+  short_name: T
+  source: volume_state
+  default_name: 'ambient_in: Temperatur'
+  display_name: 'ambient_in: Temperatur'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_in_p_Pa
+  unit: Pa
+  short_name: p
+  source: volume_state
+  default_name: 'ambient_in: Druck'
+  display_name: 'ambient_in: Druck'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_in_V_m3
+  unit: m³
+  short_name: V
+  source: volume_state
+  default_name: 'ambient_in: Volumen'
+  display_name: 'ambient_in: Volumen'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_in_dVdt_m3_per_s
+  unit: m³/s
+  short_name: dV/dt
+  source: volume_state
+  default_name: 'ambient_in: Volumenänderungsrate'
+  display_name: 'ambient_in: Volumenänderungsrate'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_in_theta_deg
+  unit: deg
+  short_name: θ
+  source: volume_state
+  default_name: 'ambient_in: Kurbelwinkel'
+  display_name: 'ambient_in: Kurbelwinkel'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_out_m_kg
+  unit: kg
+  short_name: m
+  source: volume_state
+  default_name: 'ambient_out: Masse'
+  display_name: 'ambient_out: Masse'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_out_U_J
+  unit: J
+  short_name: U
+  source: volume_state
+  default_name: 'ambient_out: Innere Energie'
+  display_name: 'ambient_out: Innere Energie'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_out_T_K
+  unit: K
+  short_name: T
+  source: volume_state
+  default_name: 'ambient_out: Temperatur'
+  display_name: 'ambient_out: Temperatur'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_out_p_Pa
+  unit: Pa
+  short_name: p
+  source: volume_state
+  default_name: 'ambient_out: Druck'
+  display_name: 'ambient_out: Druck'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_out_V_m3
+  unit: m³
+  short_name: V
+  source: volume_state
+  default_name: 'ambient_out: Volumen'
+  display_name: 'ambient_out: Volumen'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_out_dVdt_m3_per_s
+  unit: m³/s
+  short_name: dV/dt
+  source: volume_state
+  default_name: 'ambient_out: Volumenänderungsrate'
+  display_name: 'ambient_out: Volumenänderungsrate'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: ambient_out_theta_deg
+  unit: deg
+  short_name: θ
+  source: volume_state
+  default_name: 'ambient_out: Kurbelwinkel'
+  display_name: 'ambient_out: Kurbelwinkel'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: scavenge_plenum_m_kg
+  unit: kg
+  short_name: m
+  source: volume_state
+  default_name: 'scavenge_plenum: Masse'
+  display_name: 'scavenge_plenum: Masse'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: scavenge_plenum_U_J
+  unit: J
+  short_name: U
+  source: volume_state
+  default_name: 'scavenge_plenum: Innere Energie'
+  display_name: 'scavenge_plenum: Innere Energie'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: scavenge_plenum_T_K
+  unit: K
+  short_name: T
+  source: volume_state
+  default_name: 'scavenge_plenum: Temperatur'
+  display_name: 'scavenge_plenum: Temperatur'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: scavenge_plenum_p_Pa
+  unit: Pa
+  short_name: p
+  source: volume_state
+  default_name: 'scavenge_plenum: Druck'
+  display_name: 'scavenge_plenum: Druck'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: scavenge_plenum_V_m3
+  unit: m³
+  short_name: V
+  source: volume_state
+  default_name: 'scavenge_plenum: Volumen'
+  display_name: 'scavenge_plenum: Volumen'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: scavenge_plenum_dVdt_m3_per_s
+  unit: m³/s
+  short_name: dV/dt
+  source: volume_state
+  default_name: 'scavenge_plenum: Volumenänderungsrate'
+  display_name: 'scavenge_plenum: Volumenänderungsrate'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: scavenge_plenum_theta_deg
+  unit: deg
+  short_name: θ
+  source: volume_state
+  default_name: 'scavenge_plenum: Kurbelwinkel'
+  display_name: 'scavenge_plenum: Kurbelwinkel'
+  category: volumes
+  signal_family: state
+  signal_kind: state
+- key: bounce_in_cv_valve_lift_m
+  unit: m
+  short_name: h_valve
+  source: connection_geometry
+  default_name: 'bounce_in_cv: Ventilhub'
+  display_name: 'bounce_in_cv: Ventilhub'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: bounce_in_cv_slot_height_m
+  unit: m
+  short_name: h_slot
+  source: connection_geometry
+  default_name: 'bounce_in_cv: Slot-Höhe'
+  display_name: 'bounce_in_cv: Slot-Höhe'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: bounce_in_cv_A_geom_m2
+  unit: m²
+  short_name: A_geom
+  source: connection_geometry
+  default_name: 'bounce_in_cv: Geometrische Öffnungsfläche'
+  display_name: 'bounce_in_cv: Geometrische Öffnungsfläche'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: bounce_in_cv_A_eff_forward_m2
+  unit: m²
+  short_name: A_eff,fwd
+  source: connection_geometry
+  default_name: 'bounce_in_cv: Effektiver Querschnitt vorwärts'
+  display_name: 'bounce_in_cv: Effektiver Querschnitt vorwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: bounce_in_cv_A_eff_reverse_m2
+  unit: m²
+  short_name: A_eff,rev
+  source: connection_geometry
+  default_name: 'bounce_in_cv: Effektiver Querschnitt rückwärts'
+  display_name: 'bounce_in_cv: Effektiver Querschnitt rückwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: bounce_in_cv_mdot_kg_per_s
+  unit: kg/s
+  short_name: ṁ
+  source: connection_flow
+  default_name: 'bounce_in_cv: Massenstrom'
+  display_name: 'bounce_in_cv: Massenstrom'
+  category: connections
+  signal_family: flow
+  signal_kind: rate
+- key: bounce_out_cv_valve_lift_m
+  unit: m
+  short_name: h_valve
+  source: connection_geometry
+  default_name: 'bounce_out_cv: Ventilhub'
+  display_name: 'bounce_out_cv: Ventilhub'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: bounce_out_cv_slot_height_m
+  unit: m
+  short_name: h_slot
+  source: connection_geometry
+  default_name: 'bounce_out_cv: Slot-Höhe'
+  display_name: 'bounce_out_cv: Slot-Höhe'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: bounce_out_cv_A_geom_m2
+  unit: m²
+  short_name: A_geom
+  source: connection_geometry
+  default_name: 'bounce_out_cv: Geometrische Öffnungsfläche'
+  display_name: 'bounce_out_cv: Geometrische Öffnungsfläche'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: bounce_out_cv_A_eff_forward_m2
+  unit: m²
+  short_name: A_eff,fwd
+  source: connection_geometry
+  default_name: 'bounce_out_cv: Effektiver Querschnitt vorwärts'
+  display_name: 'bounce_out_cv: Effektiver Querschnitt vorwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: bounce_out_cv_A_eff_reverse_m2
+  unit: m²
+  short_name: A_eff,rev
+  source: connection_geometry
+  default_name: 'bounce_out_cv: Effektiver Querschnitt rückwärts'
+  display_name: 'bounce_out_cv: Effektiver Querschnitt rückwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: bounce_out_cv_mdot_kg_per_s
+  unit: kg/s
+  short_name: ṁ
+  source: connection_flow
+  default_name: 'bounce_out_cv: Massenstrom'
+  display_name: 'bounce_out_cv: Massenstrom'
+  category: connections
+  signal_family: flow
+  signal_kind: rate
+- key: transfer_slot_valve_lift_m
+  unit: m
+  short_name: h_valve
+  source: connection_geometry
+  default_name: 'transfer_slot: Ventilhub'
+  display_name: 'transfer_slot: Ventilhub'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: transfer_slot_slot_height_m
+  unit: m
+  short_name: h_slot
+  source: connection_geometry
+  default_name: 'transfer_slot: Slot-Höhe'
+  display_name: 'transfer_slot: Slot-Höhe'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: transfer_slot_A_geom_m2
+  unit: m²
+  short_name: A_geom
+  source: connection_geometry
+  default_name: 'transfer_slot: Geometrische Öffnungsfläche'
+  display_name: 'transfer_slot: Geometrische Öffnungsfläche'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: transfer_slot_A_eff_forward_m2
+  unit: m²
+  short_name: A_eff,fwd
+  source: connection_geometry
+  default_name: 'transfer_slot: Effektiver Querschnitt vorwärts'
+  display_name: 'transfer_slot: Effektiver Querschnitt vorwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: transfer_slot_A_eff_reverse_m2
+  unit: m²
+  short_name: A_eff,rev
+  source: connection_geometry
+  default_name: 'transfer_slot: Effektiver Querschnitt rückwärts'
+  display_name: 'transfer_slot: Effektiver Querschnitt rückwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: transfer_slot_mdot_kg_per_s
+  unit: kg/s
+  short_name: ṁ
+  source: connection_flow
+  default_name: 'transfer_slot: Massenstrom'
+  display_name: 'transfer_slot: Massenstrom'
+  category: connections
+  signal_family: flow
+  signal_kind: rate
+- key: exhaust_slot_valve_lift_m
+  unit: m
+  short_name: h_valve
+  source: connection_geometry
+  default_name: 'exhaust_slot: Ventilhub'
+  display_name: 'exhaust_slot: Ventilhub'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: exhaust_slot_slot_height_m
+  unit: m
+  short_name: h_slot
+  source: connection_geometry
+  default_name: 'exhaust_slot: Slot-Höhe'
+  display_name: 'exhaust_slot: Slot-Höhe'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: exhaust_slot_A_geom_m2
+  unit: m²
+  short_name: A_geom
+  source: connection_geometry
+  default_name: 'exhaust_slot: Geometrische Öffnungsfläche'
+  display_name: 'exhaust_slot: Geometrische Öffnungsfläche'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: exhaust_slot_A_eff_forward_m2
+  unit: m²
+  short_name: A_eff,fwd
+  source: connection_geometry
+  default_name: 'exhaust_slot: Effektiver Querschnitt vorwärts'
+  display_name: 'exhaust_slot: Effektiver Querschnitt vorwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: exhaust_slot_A_eff_reverse_m2
+  unit: m²
+  short_name: A_eff,rev
+  source: connection_geometry
+  default_name: 'exhaust_slot: Effektiver Querschnitt rückwärts'
+  display_name: 'exhaust_slot: Effektiver Querschnitt rückwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: exhaust_slot_mdot_kg_per_s
+  unit: kg/s
+  short_name: ṁ
+  source: connection_flow
+  default_name: 'exhaust_slot: Massenstrom'
+  display_name: 'exhaust_slot: Massenstrom'
+  category: connections
+  signal_family: flow
+  signal_kind: rate
+- key: exhaust_bleed_valve_lift_m
+  unit: m
+  short_name: h_valve
+  source: connection_geometry
+  default_name: 'exhaust_bleed: Ventilhub'
+  display_name: 'exhaust_bleed: Ventilhub'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: exhaust_bleed_slot_height_m
+  unit: m
+  short_name: h_slot
+  source: connection_geometry
+  default_name: 'exhaust_bleed: Slot-Höhe'
+  display_name: 'exhaust_bleed: Slot-Höhe'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: exhaust_bleed_A_geom_m2
+  unit: m²
+  short_name: A_geom
+  source: connection_geometry
+  default_name: 'exhaust_bleed: Geometrische Öffnungsfläche'
+  display_name: 'exhaust_bleed: Geometrische Öffnungsfläche'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: exhaust_bleed_A_eff_forward_m2
+  unit: m²
+  short_name: A_eff,fwd
+  source: connection_geometry
+  default_name: 'exhaust_bleed: Effektiver Querschnitt vorwärts'
+  display_name: 'exhaust_bleed: Effektiver Querschnitt vorwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: exhaust_bleed_A_eff_reverse_m2
+  unit: m²
+  short_name: A_eff,rev
+  source: connection_geometry
+  default_name: 'exhaust_bleed: Effektiver Querschnitt rückwärts'
+  display_name: 'exhaust_bleed: Effektiver Querschnitt rückwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: exhaust_bleed_mdot_kg_per_s
+  unit: kg/s
+  short_name: ṁ
+  source: connection_flow
+  default_name: 'exhaust_bleed: Massenstrom'
+  display_name: 'exhaust_bleed: Massenstrom'
+  category: connections
+  signal_family: flow
+  signal_kind: rate
+- key: scavenge_feed_valve_lift_m
+  unit: m
+  short_name: h_valve
+  source: connection_geometry
+  default_name: 'scavenge_feed: Ventilhub'
+  display_name: 'scavenge_feed: Ventilhub'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: scavenge_feed_slot_height_m
+  unit: m
+  short_name: h_slot
+  source: connection_geometry
+  default_name: 'scavenge_feed: Slot-Höhe'
+  display_name: 'scavenge_feed: Slot-Höhe'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: scavenge_feed_A_geom_m2
+  unit: m²
+  short_name: A_geom
+  source: connection_geometry
+  default_name: 'scavenge_feed: Geometrische Öffnungsfläche'
+  display_name: 'scavenge_feed: Geometrische Öffnungsfläche'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: scavenge_feed_A_eff_forward_m2
+  unit: m²
+  short_name: A_eff,fwd
+  source: connection_geometry
+  default_name: 'scavenge_feed: Effektiver Querschnitt vorwärts'
+  display_name: 'scavenge_feed: Effektiver Querschnitt vorwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: scavenge_feed_A_eff_reverse_m2
+  unit: m²
+  short_name: A_eff,rev
+  source: connection_geometry
+  default_name: 'scavenge_feed: Effektiver Querschnitt rückwärts'
+  display_name: 'scavenge_feed: Effektiver Querschnitt rückwärts'
+  category: connections
+  signal_family: geometry
+  signal_kind: geometry
+- key: scavenge_feed_mdot_kg_per_s
+  unit: kg/s
+  short_name: ṁ
+  source: connection_flow
+  default_name: 'scavenge_feed: Massenstrom'
+  display_name: 'scavenge_feed: Massenstrom'
+  category: connections
+  signal_family: flow
+  signal_kind: rate
+- key: free_piston_x_m
+  unit: m
+  short_name: x
+  source: free_piston
+  default_name: Kolbenposition
+  display_name: Kolbenposition
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: free_piston_distance_from_tdc_m
+  unit: m
+  short_name: s
+  source: free_piston
+  default_name: Abstand von TDC
+  display_name: Abstand von TDC
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: free_piston_v_m_per_s
+  unit: m/s
+  short_name: v
+  source: free_piston
+  default_name: Kolbengeschwindigkeit
+  display_name: Kolbengeschwindigkeit
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: free_piston_a_m_per_s2
+  unit: m/s²
+  short_name: a
+  source: free_piston
+  default_name: Kolbenbeschleunigung
+  display_name: Kolbenbeschleunigung
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: free_piston_F_gas_N
+  unit: N
+  short_name: F_gas
+  source: free_piston
+  default_name: Gasdruckkraft
+  display_name: Gasdruckkraft
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: free_piston_F_bounce_N
+  unit: N
+  short_name: F_bounce
+  source: free_piston
+  default_name: Bounce-Kraft
+  display_name: Bounce-Kraft
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: free_piston_F_friction_N
+  unit: N
+  short_name: F_fric
+  source: free_piston
+  default_name: Reibkraft
+  display_name: Reibkraft
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: free_piston_F_load_N
+  unit: N
+  short_name: F_load
+  source: free_piston
+  default_name: Lastkraft
+  display_name: Lastkraft
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: free_piston_F_net_N
+  unit: N
+  short_name: F_net
+  source: free_piston
+  default_name: Nettokraft
+  display_name: Nettokraft
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: free_piston_generator_power_W
+  unit: W
+  short_name: P_gen
+  source: free_piston
+  default_name: Generatorleistung
+  display_name: Generatorleistung
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: bounce_volume_m3
+  unit: m³
+  short_name: V_b
+  source: free_piston
+  default_name: Bounce-Volumen
+  display_name: Bounce-Volumen
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: bounce_pressure_Pa
+  unit: Pa
+  short_name: p_b
+  source: free_piston
+  default_name: Bounce-Druck
+  display_name: Bounce-Druck
+  category: free_piston
+  signal_family: mechanics
+  signal_kind: state
+- key: theta_local_deg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: theta_local_deg
+  display_name: theta_local_deg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: theta_deg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: theta_deg
+  display_name: theta_deg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: free_piston_x_mm
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: free_piston_x_mm
+  display_name: free_piston_x_mm
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: free_piston_distance_from_tdc_mm
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: free_piston_distance_from_tdc_mm
+  display_name: free_piston_distance_from_tdc_mm
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_volume_cm3
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_volume_cm3
+  display_name: bounce_volume_cm3
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_pressure_bar
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_pressure_bar
+  display_name: bounce_pressure_bar
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_p_bar
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_p_bar
+  display_name: cylinder_p_bar
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_V_cm3
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_V_cm3
+  display_name: cylinder_V_cm3
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: receiver_p_bar
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: receiver_p_bar
+  display_name: receiver_p_bar
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: receiver_V_cm3
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: receiver_V_cm3
+  display_name: receiver_V_cm3
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_plenum_p_bar
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_plenum_p_bar
+  display_name: exhaust_plenum_p_bar
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_plenum_V_cm3
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_plenum_V_cm3
+  display_name: exhaust_plenum_V_cm3
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_in_p_bar
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_in_p_bar
+  display_name: ambient_in_p_bar
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_in_V_cm3
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_in_V_cm3
+  display_name: ambient_in_V_cm3
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_out_p_bar
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_out_p_bar
+  display_name: ambient_out_p_bar
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_out_V_cm3
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_out_V_cm3
+  display_name: ambient_out_V_cm3
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_in_cv_A_geom_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_in_cv_A_geom_mm2
+  display_name: bounce_in_cv_A_geom_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_in_cv_A_eff_forward_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_in_cv_A_eff_forward_mm2
+  display_name: bounce_in_cv_A_eff_forward_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_in_cv_A_eff_reverse_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_in_cv_A_eff_reverse_mm2
+  display_name: bounce_in_cv_A_eff_reverse_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_in_cv_open_0to1
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_in_cv_open_0to1
+  display_name: bounce_in_cv_open_0to1
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: transfer_slot_slot_height_mm
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: transfer_slot_slot_height_mm
+  display_name: transfer_slot_slot_height_mm
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: transfer_slot_A_geom_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: transfer_slot_A_geom_mm2
+  display_name: transfer_slot_A_geom_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: transfer_slot_A_eff_forward_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: transfer_slot_A_eff_forward_mm2
+  display_name: transfer_slot_A_eff_forward_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: transfer_slot_A_eff_reverse_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: transfer_slot_A_eff_reverse_mm2
+  display_name: transfer_slot_A_eff_reverse_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_slot_slot_height_mm
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_slot_slot_height_mm
+  display_name: exhaust_slot_slot_height_mm
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_slot_A_geom_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_slot_A_geom_mm2
+  display_name: exhaust_slot_A_geom_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_slot_A_eff_forward_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_slot_A_eff_forward_mm2
+  display_name: exhaust_slot_A_eff_forward_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_slot_A_eff_reverse_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_slot_A_eff_reverse_mm2
+  display_name: exhaust_slot_A_eff_reverse_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_bleed_A_geom_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_bleed_A_geom_mm2
+  display_name: exhaust_bleed_A_geom_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_bleed_A_eff_forward_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_bleed_A_eff_forward_mm2
+  display_name: exhaust_bleed_A_eff_forward_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_bleed_A_eff_reverse_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_bleed_A_eff_reverse_mm2
+  display_name: exhaust_bleed_A_eff_reverse_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_A_eff_in_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_A_eff_in_mm2
+  display_name: cylinder_A_eff_in_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_A_eff_out_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_A_eff_out_mm2
+  display_name: cylinder_A_eff_out_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_combustion_air_mass_latched_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_combustion_air_mass_latched_kg
+  display_name: cylinder_combustion_air_mass_latched_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_combustion_fuel_mass_latched_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_combustion_fuel_mass_latched_kg
+  display_name: cylinder_combustion_fuel_mass_latched_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_combustion_energy_latched_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_combustion_energy_latched_J
+  display_name: cylinder_combustion_energy_latched_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_lambda
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_lambda
+  display_name: cylinder_lambda
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: free_piston_slot_area_sum_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: free_piston_slot_area_sum_mm2
+  display_name: free_piston_slot_area_sum_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: free_piston_combustion_mass_latched_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: free_piston_combustion_mass_latched_kg
+  display_name: free_piston_combustion_mass_latched_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: free_piston_combustion_fuel_mass_latched_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: free_piston_combustion_fuel_mass_latched_kg
+  display_name: free_piston_combustion_fuel_mass_latched_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: free_piston_combustion_energy_latched_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: free_piston_combustion_energy_latched_J
+  display_name: free_piston_combustion_energy_latched_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: free_piston_combustion_lambda
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: free_piston_combustion_lambda
+  display_name: free_piston_combustion_lambda
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_combustion_active_0to1
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_combustion_active_0to1
+  display_name: cylinder_combustion_active_0to1
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_burn_window_index
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_burn_window_index
+  display_name: cylinder_burn_window_index
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_released_energy_window_progress_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_released_energy_window_progress_J
+  display_name: cylinder_released_energy_window_progress_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_released_energy_window_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_released_energy_window_J
+  display_name: cylinder_released_energy_window_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_mdot_in_cycle_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_mdot_in_cycle_kg
+  display_name: cylinder_mdot_in_cycle_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_mdot_out_cycle_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_mdot_out_cycle_kg
+  display_name: cylinder_mdot_out_cycle_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_delta_U_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_delta_U_cycle_J
+  display_name: cylinder_delta_U_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_enthalpy_net_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_enthalpy_net_cycle_J
+  display_name: cylinder_enthalpy_net_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_energy_balance_residual_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_energy_balance_residual_J
+  display_name: cylinder_energy_balance_residual_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_delta_m_cycle_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_delta_m_cycle_kg
+  display_name: cylinder_delta_m_cycle_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: cylinder_mass_balance_residual_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: cylinder_mass_balance_residual_kg
+  display_name: cylinder_mass_balance_residual_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: receiver_delta_U_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: receiver_delta_U_cycle_J
+  display_name: receiver_delta_U_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: receiver_enthalpy_net_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: receiver_enthalpy_net_cycle_J
+  display_name: receiver_enthalpy_net_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: receiver_energy_balance_residual_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: receiver_energy_balance_residual_J
+  display_name: receiver_energy_balance_residual_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: receiver_delta_m_cycle_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: receiver_delta_m_cycle_kg
+  display_name: receiver_delta_m_cycle_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: receiver_mass_balance_residual_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: receiver_mass_balance_residual_kg
+  display_name: receiver_mass_balance_residual_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_plenum_delta_U_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_plenum_delta_U_cycle_J
+  display_name: exhaust_plenum_delta_U_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_plenum_enthalpy_net_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_plenum_enthalpy_net_cycle_J
+  display_name: exhaust_plenum_enthalpy_net_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_plenum_energy_balance_residual_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_plenum_energy_balance_residual_J
+  display_name: exhaust_plenum_energy_balance_residual_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_plenum_delta_m_cycle_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_plenum_delta_m_cycle_kg
+  display_name: exhaust_plenum_delta_m_cycle_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: exhaust_plenum_mass_balance_residual_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: exhaust_plenum_mass_balance_residual_kg
+  display_name: exhaust_plenum_mass_balance_residual_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_in_delta_U_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_in_delta_U_cycle_J
+  display_name: ambient_in_delta_U_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_in_enthalpy_net_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_in_enthalpy_net_cycle_J
+  display_name: ambient_in_enthalpy_net_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_in_energy_balance_residual_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_in_energy_balance_residual_J
+  display_name: ambient_in_energy_balance_residual_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_in_delta_m_cycle_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_in_delta_m_cycle_kg
+  display_name: ambient_in_delta_m_cycle_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_in_mass_balance_residual_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_in_mass_balance_residual_kg
+  display_name: ambient_in_mass_balance_residual_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_out_delta_U_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_out_delta_U_cycle_J
+  display_name: ambient_out_delta_U_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_out_enthalpy_net_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_out_enthalpy_net_cycle_J
+  display_name: ambient_out_enthalpy_net_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_out_energy_balance_residual_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_out_energy_balance_residual_J
+  display_name: ambient_out_energy_balance_residual_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_out_delta_m_cycle_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_out_delta_m_cycle_kg
+  display_name: ambient_out_delta_m_cycle_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: ambient_out_mass_balance_residual_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: ambient_out_mass_balance_residual_kg
+  display_name: ambient_out_mass_balance_residual_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_p_bar
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_p_bar
+  display_name: bounce_p_bar
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_V_cm3
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_V_cm3
+  display_name: bounce_V_cm3
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_out_cv_A_geom_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_out_cv_A_geom_mm2
+  display_name: bounce_out_cv_A_geom_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_out_cv_A_eff_forward_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_out_cv_A_eff_forward_mm2
+  display_name: bounce_out_cv_A_eff_forward_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_out_cv_A_eff_reverse_mm2
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_out_cv_A_eff_reverse_mm2
+  display_name: bounce_out_cv_A_eff_reverse_mm2
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_out_cv_open_0to1
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_out_cv_open_0to1
+  display_name: bounce_out_cv_open_0to1
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_delta_U_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_delta_U_cycle_J
+  display_name: bounce_delta_U_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_enthalpy_net_cycle_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_enthalpy_net_cycle_J
+  display_name: bounce_enthalpy_net_cycle_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_energy_balance_residual_J
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_energy_balance_residual_J
+  display_name: bounce_energy_balance_residual_J
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_delta_m_cycle_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_delta_m_cycle_kg
+  display_name: bounce_delta_m_cycle_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived
+- key: bounce_mass_balance_residual_kg
+  unit: ''
+  short_name: ''
+  source: csv_header
+  default_name: bounce_mass_balance_residual_kg
+  display_name: bounce_mass_balance_residual_kg
+  category: connections
+  signal_family: derived
+  signal_kind: derived

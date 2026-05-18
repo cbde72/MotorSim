@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verbesserungen und Next Steps</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="wrap">
+    
+    <div class="sidebar">
+      <section class="card">
+        <div class="badge">Thermo0D · Referenz</div>
+        <h1 style="margin-top:.7rem">System-Dokumentation</h1>
+        <p class="muted">Statische HTML-Referenz für aktuellen Projektstand: Physik, Numerik, Konfiguration, Generatoranbindung und Ausbaupfad.</p>
+      </section>
+      <section class="card">
+        <nav><a href="index.html">Start</a>
+<a href="physik.html">Physik</a>
+<a href="numerik.html">Numerik</a>
+<a href="konfiguration_klassisch.html">Konfiguration classic</a>
+<a href="konfiguration_free_piston.html">Konfiguration free_piston</a>
+<a href="generator_und_schwungmasse.html">Generator & Schwungmasse</a>
+<a href="verbesserungen_und_next_steps.html" style="background:#0e1624">Verbesserungen & Next Steps</a></nav>
+      </section>
+      <section class="card">
+        <div><strong>Pfad</strong></div>
+        <div class="muted"><code>doc/system_reference/index.html</code></div>
+      </section>
+    </div>
+    
+    <main><section class="card"><h2>Verbesserungsvorschläge: Stoffwerte und Gemischzustände</h2><h3>1. Verbrannt / unverbrannt / Restgas getrennt führen</h3><p>Der wichtigste physikalische Ausbau ist aus meiner Sicht eine Trennung der Zylindermasse in mindestens drei Anteile:</p><ul><li><strong>m_unburned</strong> – unverbranntes Frischgas bzw. Gemisch</li><li><strong>m_burned</strong> – verbranntes Gas</li><li><strong>m_residual</strong> – eingeschlossenes Restgas aus dem vorigen Zyklus</li></ul><p>Vorteile:</p><ul><li>sauberere Abbildung von Ladungswechsel, Restgasverdünnung und effektiver Verbrennungsmasse</li><li>realistischere Verbrennungsstartbedingungen</li><li>bessere Grundlage für Lambda, Brennverlauf und NOx-/Temperaturtrends</li></ul></section><section class="card"><h2>2. Temperaturabhängige Stoffwerte</h2><p>Der aktuelle Kern arbeitet mit konstanten Werten <code>cp</code>, <code>cv</code>, <code>R</code>. Für hohe Verdichtung und Verbrennung ist der nächste sinnvolle Schritt:</p><ul><li><code>cp(T, composition)</code></li><li><code>cv(T, composition)</code></li><li><code>kappa(T, composition)</code></li><li>Mischungsregeln aus verbranntem/unverbranntem/restgas-Anteil</li></ul><div class="callout">Schon ein einfacher Lookup gegen Temperatur mit linearen Tabellen wäre ein großer Sprung gegenüber konstantem <code>κ</code>.</div></section><section class="card"><h2>3. Verbrennung physikalisch erweitern</h2><ul><li>Vibe auf chemisch/thermodynamisch begrenzte freisetzbare Energie abstützen</li><li>Einspritzung als eigener Massenstrom in den Zylinderzustand einführen</li><li>Verdampfung mit Tropfen-/Film- oder wenigstens Einspritzfenster koppeln</li><li>Verbrennungswirkungsgrad bzw. unvollständige Verbrennung zulassen</li></ul></section><section class="card"><h2>4. Restgasmodell im Gaswechsel</h2><ul><li>expliziter Restgasanteil im Zylinder nach Auslassschluss</li><li>Spülwirkungsgrad für 2T-/Freikolben-Fälle</li><li>Massentracking pro Species oder mindestens pro Gasfraktion</li></ul></section><section class="card"><h2>5. Next Steps – empfohlene Priorisierung</h2><ol><li><strong>Species-/Fraktionsmodell</strong>: unburned / burned / residual</li><li><strong>temperaturabhängige Stoffwerte</strong> für diese Fraktionen</li><li><strong>klassische Kurbelwellendynamik</strong> mit Schwungscheibe und Lastmoment</li><li><strong>Generator-Kennfeldmodell</strong> im Freikolbenpfad</li><li><strong>Verbrennung + Einspritzung</strong> stärker koppeln</li><li><strong>Wandwärmevalidierung</strong> mit realeren Stoffwerten und Referenzzuständen</li></ol></section><section class="card"><h2>Architekturvorschlag für den Ausbau</h2><pre>state per volume:
+  m_total
+  m_unburned
+  m_burned
+  m_residual
+  U
+
+derived:
+  Y_unburned, Y_burned, Y_residual
+  cp(T,Y), cv(T,Y), R(Y), kappa(T,Y)
+
+combustion:
+  dm_unburned_to_burned/dt
+  dQchem/dt
+
+gas exchange:
+  species-aware inflow/outflow</pre><p>Damit bleibt der Solveraufbau erhalten, aber der thermodynamische Kern wird wesentlich belastbarer.</p></section></main>
+  </div>
+</body>
+</html>

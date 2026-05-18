@@ -1,0 +1,253 @@
+versioning:
+  package_version: 7.1.93
+  config_schema_version: 5
+  loaded_config_schema_version: 5
+  migration_applied: false
+test_description: Free-piston with Vibe heat release on the compression stroke, direct
+  added energy in J, hub scaling and controlled generator load near both dead centers
+modeling:
+  architecture: free_piston
+free_piston:
+  initial_conditions:
+    x0_m: 0.054
+    v0_m_per_s: -4.6
+    cylinder:
+      pressure_Pa: 121325.0
+      temperature_K: 306.0
+    combustion_state:
+      burned_fraction_0to1: 0.0
+      released_energy_J: 0.0
+      ignition_armed: false
+      injection_armed: false
+  mechanics:
+    moving_mass_kg: 0.7
+    piston_diameter_m: 0.0605
+    compression_ratio: 50
+    x_min_m: 0.0
+    x_max_m: 0.10807
+  friction:
+    model: coulomb_viscous
+    fc_N: 40.0
+    cv_Ns_per_m: 0
+  load:
+    model: generator_controlled
+    damping_Ns_per_m: 0.0
+    max_damping_Ns_per_m: 3000.0
+    control_zone_m: 0.006
+preprocessing:
+  gas_properties:
+    cp_J_per_kgK: 1005.0
+    cv_J_per_kgK: 718.0
+    R_J_per_kgK: 287.0
+  features:
+    mass_flow: true
+    wall_heat: false
+    combustion: true
+    evaporation: false
+    pv_work: true
+  engine:
+    cycle_type: 2t
+    speed_rpm: 25.0
+  volumes:
+  - name: cylinder
+    type: cylinder
+    initial_pressure_Pa: 121325.0
+    initial_temperature_K: 306.0
+    kinematics:
+      type: crank_slider
+      bore_m: 1.0745
+      stroke_m: 1.08
+      conrod_m: 1.12
+      compression_ratio: 50.0
+      phase_deg: 0.0
+    wall_heat:
+      model: none
+    combustion:
+      model: vibe
+      start_mode: compression_hub
+      start_hub_m: 0.08737 #0.0552
+      duration_mode: time
+      duration_ms: 1.5
+      #duration_hub_m: 0.0142
+      a: 6.9
+      m: 2.0
+      energy_coupling: none
+      stroke_reference_m: 0.010807
+      stroke_exponent: 0.01
+      fueling_mode: lambda_from_cylinder_mass_at_slot_close
+      lambda_target: 1.0
+      lhv_J_per_kg: 43000000.0
+      afr_stoich_kg_air_per_kg_fuel: 14.5
+      combustion_efficiency_0to1: 0.98
+      slot_open_threshold_m2: 1.0e-07
+      slot_closed_threshold_m2: 1.0e-09
+      compression_velocity_threshold_m_per_s: 0.02
+
+      #start_mode: compression_hub
+      #start_hub_m: 0.004
+      #duration_mode: time
+      #duration_ms: 1.8
+      #duration_mode: compression_hub
+      #duration_hub_m: 0.006
+      #start_mode: angle
+      #start_deg: -10.0
+      #duration_mode: angle
+      #duration_deg: 25.0
+      #start_mode: hign_position
+      #hign_mm: 15.0
+    evaporation:
+      model: none
+  - name: bounce
+    type: bounce_chamber
+    model: gas_exchange
+    initial_pressure_Pa: 241325.0
+    initial_temperature_K: 300.0
+    chamber_diameter_m: 0.07
+    chamber_length_m: 0.10807
+    compression_ratio: 16
+    polytropic_exponent: 1.3
+  - name: receiver
+    type: plenum
+    initial_pressure_Pa: 201325.0
+    initial_temperature_K: 300.0
+    fixed_volume_m3: 0.00048
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+  - name: exhaust_plenum
+    type: plenum
+    initial_pressure_Pa: 110000.0
+    initial_temperature_K: 300.0
+    fixed_volume_m3: 0.00260279
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+  - name: ambient_in
+    type: environment
+    pressure_Pa: 101325.0
+    temperature_K: 300.0
+  - name: ambient_out
+    type: environment
+    pressure_Pa: 101325.0
+    temperature_K: 300.0
+  connections:
+  - name: bounce_in_cv
+    type: check_valve
+    from_volume: ambient_in
+    to_volume: bounce
+    diameter_mm: 55
+    discharge_coefficient: 0.82
+    cracking_pressure_Pa: 0.0
+  - name: bounce_out_cv
+    type: check_valve
+    from_volume: bounce
+    to_volume: receiver
+    diameter_mm: 55.3
+    discharge_coefficient: 0.82
+    cracking_pressure_Pa: 100.0
+  - name: transfer_slot
+    type: slot
+    from_volume: receiver
+    to_volume: cylinder
+    source_of_data: rectangle
+    opening_mode: by_distance
+    distance_from_tdc_mm: 92.07
+    opening_angle_deg: null
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 0.0
+    width_mm: 26.0
+    height_mm: 16.0
+    open_fillet_radius_m: 0.0
+    full_fillet_radius_m: 0.0
+    number_of_identical_holes: 6
+    discharge_coefficients:
+      mode: constant
+      forward_cd: 0.9
+      reverse_cd: 0.9
+  - name: exhaust_slot
+    type: slot
+    from_volume: cylinder
+    to_volume: exhaust_plenum
+    source_of_data: rectangle
+    opening_mode: by_distance
+    distance_from_tdc_mm: 90.6
+    opening_angle_deg: null
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 0.0
+    width_mm: 24
+    height_mm: 18
+    open_fillet_radius_m: 0.0
+    full_fillet_radius_m: 0.0
+    number_of_identical_holes: 6
+    discharge_coefficients:
+      mode: constant
+      forward_cd: 0.95
+      reverse_cd: 0.8
+  - name: exhaust_bleed
+    type: orifice
+    from_volume: exhaust_plenum
+    to_volume: ambient_out
+    diameter_mm: 12.0
+    forward_cd: 0.72
+    reverse_cd: 0.55
+simulation:
+  dt_s: 1.0e-05
+  total_cycles: 3
+  save_last_cycles: 2
+  simulationtime: 0.2
+  solver:
+    kind: rk4
+    rtol: 1.0e-05
+    atol: 1.0e-07
+postprocessing:
+  csv_enabled: true
+  csv_path: results/free_piston_Genset_V04.csv
+  csv_separator: ;
+  excel_enabled: true
+  excel_path: results/free_piston_Genset_V04.xlsx
+  sampling:
+    mode: time
+    step_s: 0.0001
+  final_cycle_uniform_angle_export:
+    enabled: false
+    step_deg: 1.0
+  check_report:
+    enabled: false
+    html_enabled: false
+  plots:
+    enabled: true
+    source: export_rows
+    layouts:
+      auto_create_defaults: true
+      entries:
+      - enabled: true
+        path: plot_Energy.yaml
+        prefix: plot_fp
+      #- enabled: false
+      #  path: plot-fp4.yaml
+      #  prefix: plot_fp
+      #- enabled: false
+      #  path: plot-fp_pressure.yaml
+      #  prefix: plot_fp_pressure
+      #- enabled: false
+      #  path: plot-fp_mdot.yaml
+      #  prefix: plot_fp_mdot
+      #- enabled: false
+      #  path: plot-fp_mass.yaml
+      #  prefix: plot_fp_mass
+    output_dir: results/plots
+  console:
+    run_summary:
+      enabled: true
+    cycle_summary:
+      enabled: false
+    check_report:
+      enabled: false
+    geometry:
+      enabled: false

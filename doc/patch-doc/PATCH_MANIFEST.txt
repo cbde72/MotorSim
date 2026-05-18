@@ -1,0 +1,16 @@
+Free-Piston Coldflow kompletter Patch
+Enthaltene Dateien:
+
+src/thermo0d/config/models.py
+src/thermo0d/input/builder_common.py
+src/thermo0d/model/conventional/builder.py
+src/thermo0d/model/free_piston/builder.py
+src/thermo0d/model/free_piston/rhs.py
+examples/free_piston_coldflow.yaml
+examples/free_piston_phase_a.yaml
+examples/free_piston_phase_a2.yaml
+tests/test_free_piston_coldflow.py
+
+Hinweis:
+- Diese Dateien in das Projektwurzelverzeichnis kopieren und vorhandene Dateien überschreiben.
+- Danach __pycache__-Ordner unter src/thermo0d loeschen.

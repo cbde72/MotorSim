@@ -1,0 +1,41 @@
+metric,value,unit,status,details
+check_case_class,fired_scavenged_2T,-,green,Automatisch erkannte Fallklasse für die Ampelbewertung.
+check_cycle_type,2T,-,green,Aus dem Modell abgeleiteter Zyklustyp für die Bewertung.
+last_cycle_points,72,count,green,Anzahl Stützstellen im letzten Zyklus.
+cylinder_bore_mm,54.0,mm,green,Zylindergeometrie: Bohrung.
+cylinder_stroke_mm,54.0,mm,green,Zylindergeometrie: Hub.
+cylinder_conrod_mm,95.0,mm,green,Zylindergeometrie: Pleuellänge.
+cylinder_bore_area_mm2,2290.221044466959,mm²,green,Zylindergeometrie: Bohrungsfläche.
+cylinder_swept_cm3,123.67193640121579,cm³,green,Zylindergeometrie: Hubvolumen.
+cylinder_clearance_cm3,17.66741948588797,cm³,green,Zylindergeometrie: Restvolumen.
+transfer_slot_slot_height_max_mm,12.0,mm,green,Slotgeometrie: maximale offene Höhe.
+transfer_slot_A_geom_max_mm2,240.0,mm²,green,Slotgeometrie: maximale geometrische Öffnungsfläche.
+transfer_slot_A_eff_forward_max_mm2,184.8,mm²,green,Slotgeometrie: maximale effektive Vorwärtsfläche.
+transfer_slot_A_eff_reverse_max_mm2,163.20000000000002,mm²,green,Slotgeometrie: maximale effektive Rückwärtsfläche.
+exhaust_slot_slot_height_max_mm,14.0,mm,green,Slotgeometrie: maximale offene Höhe.
+exhaust_slot_A_geom_max_mm2,224.0,mm²,green,Slotgeometrie: maximale geometrische Öffnungsfläche.
+exhaust_slot_A_eff_forward_max_mm2,161.28,mm²,green,Slotgeometrie: maximale effektive Vorwärtsfläche.
+exhaust_slot_A_eff_reverse_max_mm2,152.32,mm²,green,Slotgeometrie: maximale effektive Rückwärtsfläche.
+theta_first_deg,5.0,deg,green,Erster lokaler Kurbelwinkel des Prüfzyklus.
+theta_last_deg,360.0,deg,green,Letzter lokaler Kurbelwinkel des Prüfzyklus.
+overall_status,red,-,red,Gesamtampel für fired_scavenged_2T.
+pmin_bar,0.9834347789137644,bar,green,Minimaler Zylinderdruck im letzten Zyklus (fired_scavenged_2T).
+pmax_bar,7.243612670013105,bar,green,Maximaler Zylinderdruck im letzten Zyklus (fired_scavenged_2T).
+Tmin_K,400.43542289390354,K,green,Minimale Zylindertemperatur im letzten Zyklus (fired_scavenged_2T).
+Tmax_K,654.617134497317,K,green,Maximale Zylindertemperatur im letzten Zyklus (fired_scavenged_2T).
+mmin_kg,6.661183747924474e-05,kg,green,Minimale Zylindermasse im letzten Zyklus.
+mmax_kg,0.00012153425625655262,kg,green,Maximale Zylindermasse im letzten Zyklus.
+delta_m_cycle_kg,-7.192774191427703e-07,kg,green,Massenänderung des Zylinders über den letzten Zyklus.
+mdot_in_cycle_kg,5.502763922672953e-05,kg,green,Integrierte Einströmmasse über den letzten Zyklus.
+mdot_out_cycle_kg,5.5477593283659055e-05,kg,green,Integrierte Ausströmmasse über den letzten Zyklus.
+mass_balance_residual_kg,-2.6932336221324727e-07,kg,red,"Sollte nahe 0 liegen: Δm - (m_in - m_out), bewertet relativ zur durchgesetzten bzw. gespeicherten Masse."
+mass_balance_residual_rel,-0.0022160283899275227,-,red,Normierte Massenbilanzrestgröße für die Fallklassen-Ampel.
+delta_U_cycle_J,11.742217003881958,J,green,Änderung der inneren Energie im letzten Zyklus.
+enthalpy_in_cycle_J,28.53538045463004,J,green,Integrierte Enthalpie in den Zylinder.
+enthalpy_out_cycle_J,22.917147725937095,J,green,Integrierte Enthalpie aus dem Zylinder.
+wall_heat_cycle_J,-49.17429071018644,J,green,Integrierte Wandwärme.
+added_energy_cycle_J,20.60600219189592,J,green,Integrierte zugeführte Energie/Verbrennung.
+evaporation_sink_cycle_J,4.499999999999984,J,green,Integrierte Verdampfungsenthalpie-Senke.
+piston_work_cycle_J,-0.9460553104928219,J,green,Integrierte p*dV-Arbeit.
+energy_balance_residual_J,38.246217482986694,J,red,Sollte nahe 0 liegen: ΔU - (H_net + Q_wall + Q_add - Q_evap - W_pv).
+energy_balance_residual_rel,0.30191471989608787,-,red,Normierte Energiebilanzrestgröße für die Fallklassen-Ampel.

@@ -1,0 +1,36 @@
+Free-piston Vibe + controlled generator update
+
+Implemented:
+- Free-piston builder now maps cylinder combustion.model: vibe into comb_matrix.
+- Vibe combustion accepts direct energy input via added_energy_per_cycle_J.
+- Hub coupling for energy input via energy_coupling_mode: stroke_ratio.
+- New free-piston load model: generator_controlled.
+- Generator braking uses speed and remaining stopping distance near x_min/x_max.
+- New output signal: free_piston_generator_power_W.
+- New example config: Projekte/variants/free_piston_vibe_generator_controlled.yaml.
+- Updated clean sketch with controller and generator block.
+
+Generator model details:
+- control_zone_m: activates regulation near the end stops.
+- target_margin_m: desired remaining distance before hard end stop.
+- min_stop_distance_m: lower clamp for braking calculation.
+- max_force_N: optional load force clamp.
+- k_stop: gain for stopping-force demand.
+- damping_Ns_per_m: base linear load component.
+- efficiency_0to1: electrical power estimate for exported generator power.
+
+Combustion model details:
+- Existing configs with fuel_mass_per_cycle_kg still work.
+- New configs may specify added_energy_per_cycle_J instead.
+- Effective energy is converted internally to equivalent fuel mass using lhv_J_per_kg.
+- For energy_coupling_mode: stroke_ratio, the effective added energy scales with
+  ((x_max - x_min) / stroke_reference_m) ** stroke_exponent and is clamped by
+  min_energy_coupling_factor / max_energy_coupling_factor.
+
+Validated locally:
+- pytest tests/test_free_piston_generator_controlled.py tests/test_free_piston_load_models.py
+- run_simulation.py with Projekte/variants/free_piston_vibe_generator_controlled.yaml
+
+Known limitation:
+- The hub-coupling currently uses the configured free-piston stroke window, not a
+  cycle-by-cycle measured half-stroke from turning-point tracking inside the solver.

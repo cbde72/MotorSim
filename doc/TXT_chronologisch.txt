@@ -1,0 +1,269 @@
+﻿Thermo0D / MotorSim - zusammengefuehrte TXT-Dokumentation
+
+Diese Datei fasst die TXT-Dateien aus doc/ zusammen. Die Reihenfolge ist so chronologisch wie aus Dateizeitstempeln und Dateinamen ableitbar.
+
+Quellenreihenfolge
+
+1. FREE_PISTON_SLOT_REFERENCE_PATCH.txt - 2026-04-21 15:36:20
+2. FREE_PISTON_THERMO_COMPONENTS_CHANGED_FILES.txt - 2026-04-21 15:36:20
+3. PATCH_MANIFEST.txt - 2026-04-21 15:36:20
+4. PHASE_C_CHANGED_FILES.txt - 2026-04-21 15:36:20
+5. PHASE_C_STATUS.txt - 2026-04-21 15:36:20
+6. PHASE1_CHANGED_FILES.txt - 2026-04-21 15:36:20
+7. PHASE1_MASS_FRACTION_PLOTS_README.txt - 2026-04-21 15:36:20
+8. PHASE1_PHASE2_CHANGED_FILES.txt - 2026-04-21 15:36:20
+9. PLOT_FP_UPDATE_NOTES.txt - 2026-04-21 15:36:20
+10. README_phase_c_patch.txt - 2026-04-21 15:36:20
+11. THERMO_MODEL_TOGGLE_PATCH_NOTES.txt - 2026-04-21 15:36:20
+
+============================================================
+
+Quelle: FREE_PISTON_SLOT_REFERENCE_PATCH.txt
+Zeitstempel: 2026-04-21 15:36:20
+
+Free-piston slot reference patch
+================================
+
+Problem fixed
+-------------
+In the free-piston path, slot opening_mode=by_distance was evaluated with the
+raw state coordinate x_m. The shared slot logic, however, expects piston travel
+measured from compression TDC. Because the free-piston cylinder geometry uses
+x_max_m as the TDC-side position, this caused an inconsistent reference between
+cylinder volume and slot opening.
+
+Implemented fix
+---------------
+1. Added helper:
+   src/thermo0d/model/free_piston/geometry.py
+   - cylinder_distance_from_tdc(x_m, x_max_m)
+
+2. Free-piston RHS now passes distance-from-TDC into the shared slot logic:
+   src/thermo0d/model/free_piston/rhs.py
+
+3. Reconstruction / CSV / plots now use the same distance-from-TDC reference:
+   src/thermo0d/output/reconstruction.py
+
+4. Free-piston postprocessing exports the derived signal:
+   free_piston_distance_from_tdc_m
+   src/thermo0d/model/free_piston/postprocessing.py
+
+5. Signal catalog extended with the new diagnostic signal:
+   src/thermo0d/gui/signal_catalog.py
+
+6. Regression tests added:
+   tests/test_free_piston_slot_reference.py
+
+Verification
+------------
+Passing tests:
+- tests/test_free_piston_slot_reference.py
+- tests/test_free_piston_coldflow.py
+- tests/test_gui_signal_catalog.py
+
+Command used:
+PYTHONPATH=src pytest -q tests/test_free_piston_slot_reference.py tests/test_free_piston_coldflow.py tests/test_gui_signal_catalog.py
+
+Result on tuned oscillating config
+----------------------------------
+Using the patched code with free_piston_coldflow_oscillating.yaml:
+- transfer_slot_slot_height_m: max 0.012 m
+- exhaust_slot_slot_height_m: max 0.014 m
+- slots are no longer stuck at zero
+
+============================================================
+
+Quelle: FREE_PISTON_THERMO_COMPONENTS_CHANGED_FILES.txt
+Zeitstempel: 2026-04-21 15:36:20
+
+src/thermo0d/model/free_piston/rhs.py
+src/thermo0d/model/free_piston/postprocessing.py
+src/thermo0d/physics/quellen_props.py
+src/thermo0d/output/reconstruction.py
+
+============================================================
+
+Quelle: PATCH_MANIFEST.txt
+Zeitstempel: 2026-04-21 15:36:20
+
+Free-Piston Coldflow kompletter Patch
+Enthaltene Dateien:
+
+src/thermo0d/config/models.py
+src/thermo0d/input/builder_common.py
+src/thermo0d/model/conventional/builder.py
+src/thermo0d/model/free_piston/builder.py
+src/thermo0d/model/free_piston/rhs.py
+examples/free_piston_coldflow.yaml
+examples/free_piston_phase_a.yaml
+examples/free_piston_phase_a2.yaml
+tests/test_free_piston_coldflow.py
+
+Hinweis:
+- Diese Dateien in das Projektwurzelverzeichnis kopieren und vorhandene Dateien Ã¼berschreiben.
+- Danach __pycache__-Ordner unter src/thermo0d loeschen.
+
+============================================================
+
+Quelle: PHASE_C_CHANGED_FILES.txt
+Zeitstempel: 2026-04-21 15:36:20
+
+Changed files for Phase-C green archive:
+- README_phase_c_patch.txt
+- examples/free_piston_phase_a3.yaml
+- examples/free_piston_phase_c.yaml
+- PHASE_C_STATUS.txt
+
+============================================================
+
+Quelle: PHASE_C_STATUS.txt
+Zeitstempel: 2026-04-21 15:36:20
+
+...................                                                      [100%]
+...................                                                      [100%]
+
+Phase-C archive status: GREEN
+
+Applied changes:
+- Added examples/free_piston_phase_a3.yaml as Phase-C baseline config.
+- Added examples/free_piston_phase_c.yaml as named Phase-C example config.
+- Updated README_phase_c_patch.txt to match the actual archive contents.
+
+Validation commands:
+- PYTHONPATH=src pytest -q tests/test_free_piston_phase_a.py tests/test_free_piston_phase_a2.py tests/test_free_piston_phase_c.py tests/test_free_piston_coldflow.py tests/test_gui_signal_catalog.py -q
+- PYTHONPATH=src pytest -q tests/test_free_piston_*.py -q
+
+============================================================
+
+Quelle: PHASE1_CHANGED_FILES.txt
+Zeitstempel: 2026-04-21 15:36:20
+
+src/thermo0d/core/state_layout.py
+src/thermo0d/compute/jacobian.py
+src/thermo0d/compute/analysis.py
+src/thermo0d/physics/quellen_props.py
+src/thermo0d/physics/rhs.py
+src/thermo0d/model/conventional/builder.py
+src/thermo0d/model/free_piston/builder.py
+src/thermo0d/model/free_piston/rhs.py
+src/thermo0d/model/free_piston/combustion_latch.py
+src/thermo0d/model/free_piston/postprocessing.py
+src/thermo0d/output/reconstruction.py
+PHASE1_MASS_MODEL_NOTES.md
+
+============================================================
+
+Quelle: PHASE1_MASS_FRACTION_PLOTS_README.txt
+Zeitstempel: 2026-04-21 15:36:20
+
+Phase 1 Zusatzpaket: Massenanteile je Volumen
+
+Enthalten:
+- src/thermo0d/output/reconstruction.py
+- src/thermo0d/model/free_piston/postprocessing.py
+- Projekte/variants/plot_fp_phase1_masses_by_volume.yaml
+- Projekte/variants/plot_fp_phase1_mass_fractions_by_volume.yaml
+
+Neu exportierte Anteilssignale je Volumen:
+- <vol>_m_inventory_total_kg
+- <vol>_share_air_0to1
+- <vol>_share_fuel_vapor_0to1
+- <vol>_share_fuel_liquid_0to1
+- <vol>_share_fuel_total_0to1
+- <vol>_share_burned_0to1
+- <vol>_share_unburned_0to1
+
+Definition der Anteile:
+- Gesamtinventar = m_gas + m_fuel_liquid
+- Luftanteil = m_air / Gesamtinventar
+- gasfÃ¶rmiger Kraftstoffanteil = m_fuel_vapor / Gesamtinventar
+- flÃ¼ssiger Kraftstoffanteil = m_fuel_liquid / Gesamtinventar
+- verbrannter Anteil = m_burned / Gesamtinventar
+
+Hinweis:
+- Die Prozentplots zeigen vier disjunkte Komponenten: Luft, gasfÃ¶rmiger Kraftstoff, flÃ¼ssiger Kraftstoff, verbrannt.
+- Diese vier Anteile summieren sich idealerweise zu 100 %.
+
+Einbindung in die Simulations-YAML:
+postprocessing:
+  plots:
+    enabled: true
+    source: export_rows
+    layouts:
+      auto_create_defaults: false
+      entries:
+        - path: plot_fp_phase1_masses_by_volume.yaml
+          prefix: fp_mass_by_volume
+        - path: plot_fp_phase1_mass_fractions_by_volume.yaml
+          prefix: fp_mass_fraction_by_volume
+
+============================================================
+
+Quelle: PHASE1_PHASE2_CHANGED_FILES.txt
+Zeitstempel: 2026-04-21 15:36:20
+
+src/thermo0d/core/state_layout.py
+src/thermo0d/compute/jacobian.py
+src/thermo0d/compute/analysis.py
+src/thermo0d/physics/quellen_props.py
+src/thermo0d/physics/rhs.py
+src/thermo0d/model/conventional/builder.py
+src/thermo0d/model/free_piston/builder.py
+src/thermo0d/model/free_piston/rhs.py
+src/thermo0d/model/free_piston/combustion_latch.py
+src/thermo0d/model/free_piston/postprocessing.py
+src/thermo0d/output/reconstruction.py
+
+============================================================
+
+Quelle: PLOT_FP_UPDATE_NOTES.txt
+Zeitstempel: 2026-04-21 15:36:20
+
+plot_fp.yaml erweitert: Slots und effektive Oeffnungsquerschnitte jetzt explizit ueber Zeit und ueber Kolbenweg x.
+Hinweis: Im Free-Piston-Code wird by_distance relativ zu TDC ausgewertet; der Kolbenweg-Plot benutzt dennoch die Modellkoordinate free_piston_x_m, wie angefordert.
+
+============================================================
+
+Quelle: README_phase_c_patch.txt
+Zeitstempel: 2026-04-21 15:36:20
+
+Phase-C patch for free-piston path.
+
+Included changes:
+- Free-piston geometry entries in console/check-report
+- Oscillation metrics from turning points
+- Check-report/geometry console output enabled for free-piston runs
+- Free-piston default plot layouts over time
+- Signal catalog support for free-piston signals
+- RootConfig accepts versioning metadata
+- New example configs: examples/free_piston_phase_a3.yaml and examples/free_piston_phase_c.yaml
+- New tests: tests/test_free_piston_phase_c.py
+
+Validated locally with:
+PYTHONPATH=src pytest -q tests/test_free_piston_phase_a.py tests/test_free_piston_phase_a2.py tests/test_free_piston_phase_c.py tests/test_gui_signal_catalog.py -q
+
+============================================================
+
+Quelle: THERMO_MODEL_TOGGLE_PATCH_NOTES.txt
+Zeitstempel: 2026-04-21 15:36:20
+
+This patch adds a configurable thermodynamic model switch:
+
+preprocessing:
+  gas_properties:
+    cp_J_per_kgK: 1005.0
+    cv_J_per_kgK: 718.0
+    R_J_per_kgK: 287.0
+    thermo_model: constant      # constant | quellen_step1
+
+Notes on free_piston.initial_conditions.combustion_state:
+- burned_fraction_0to1 / burned_mass_percent: used to initialize the burned-mass tracer in the cylinder.
+- released_energy_J: currently bookkeeping / restart metadata, not the switch for the thermodynamic model.
+- ignition_armed / injection_armed: currently bookkeeping / restart metadata, not used as the thermo-model selector.
+
+Important config issue found in Projekte/variants/free_piston_GenSet_V09d.yaml:
+- bounce initial_temperature_K is set to 30002217.287760466 K (line 120 in this archive state).
+- This is physically invalid and can drive the simulation unstable until cylinder mass collapses.
+- Set it back to a realistic value (for example 300.0 K) before debugging further mass-balance issues.
+
+============================================================

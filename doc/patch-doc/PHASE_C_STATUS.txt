@@ -1,0 +1,13 @@
+...................                                                      [100%]
+...................                                                      [100%]
+
+Phase-C archive status: GREEN
+
+Applied changes:
+- Added examples/free_piston_phase_a3.yaml as Phase-C baseline config.
+- Added examples/free_piston_phase_c.yaml as named Phase-C example config.
+- Updated README_phase_c_patch.txt to match the actual archive contents.
+
+Validation commands:
+- PYTHONPATH=src pytest -q tests/test_free_piston_phase_a.py tests/test_free_piston_phase_a2.py tests/test_free_piston_phase_c.py tests/test_free_piston_coldflow.py tests/test_gui_signal_catalog.py -q
+- PYTHONPATH=src pytest -q tests/test_free_piston_*.py -q

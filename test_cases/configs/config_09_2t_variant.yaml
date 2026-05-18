@@ -1,0 +1,124 @@
+test_description: Variant test for config_09_2t_variant.yaml
+preprocessing:
+  gas_properties:
+    cp_J_per_kgK: 1005.0
+    cv_J_per_kgK: 718.0
+    R_J_per_kgK: 287.0
+  features:
+    mass_flow: true
+    wall_heat: true
+    combustion: true
+    evaporation: true
+    pv_work: true
+  engine:
+    cycle_type: 2t
+    speed_rpm: 3400.0
+  volumes:
+  - name: cylinder
+    type: cylinder
+    initial_mass_kg: 0.00042
+    initial_temperature_K: 390.0
+    kinematics:
+      type: crank_slider
+      bore_m: 0.054
+      stroke_m: 0.054
+      conrod_m: 0.095
+      compression_ratio: 8.0
+      phase_deg: 0.0
+    wall_heat:
+      model: woschni
+      c1: 3.0
+      c2: 0.8
+      c3: -0.55
+      wall_temperature_K: 410.0
+      wall_area_m2: 0.02
+    combustion:
+      model: vibe
+      start_deg: 350.0
+      duration_deg: 40.0
+      a: 6.908
+      m: 2.0
+      fuel_mass_per_cycle_kg: 1.2e-05
+      lhv_J_per_kg: 43000000.0
+      angle_reference: compression_tdc
+    evaporation:
+      model: simple
+      start_deg: 335.0
+      duration_deg: 22.0
+      evaporated_mass_per_cycle_kg: 1.2e-05
+      latent_heat_J_per_kg: 330000.0
+      angle_reference: compression_tdc
+  - name: scavenge_plenum
+    type: plenum
+    initial_mass_kg: 0.0012
+    initial_temperature_K: 310.0
+    fixed_volume_m3: 0.0014
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+  - name: exhaust_plenum
+    type: plenum
+    initial_mass_kg: 0.0011
+    initial_temperature_K: 600.0
+    fixed_volume_m3: 0.0018
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+  connections:
+  - name: transfer_slot
+    type: slot
+    from_volume: scavenge_plenum
+    to_volume: cylinder
+    source_of_data: rectangle
+    opening_mode: by_angle
+    distance_from_tdc_m: null
+    opening_angle_deg: 120.0
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 20.0
+    width_m: 0.01
+    height_m: 0.012
+    open_fillet_radius_m: 0.001
+    full_fillet_radius_m: 0.001
+    number_of_identical_holes: 3
+    discharge_coefficients:
+      mode: table
+      table_file: data/slot_cd_table.csv
+  - name: exhaust_slot
+    type: slot
+    from_volume: cylinder
+    to_volume: exhaust_plenum
+    source_of_data: rectangle
+    opening_mode: by_distance
+    distance_from_tdc_m: 0.018
+    opening_angle_deg: null
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 0.0
+    width_m: 0.016
+    height_m: 0.014
+    open_fillet_radius_m: 0.001
+    full_fillet_radius_m: 0.001
+    number_of_identical_holes: 1
+    discharge_coefficients:
+      mode: constant
+      forward_cd: 0.75
+      reverse_cd: 0.68
+simulation:
+  dt_s: 1.0e-05
+  total_cycles: 4
+  save_last_cycles: 2
+  solver:
+    kind: euler
+    rtol: 1.0e-06
+    atol: 1.0e-09
+postprocessing:
+  csv_path: results/config_09_2t_variant.csv
+  csv_separator: ','
+  sampling:
+    mode: crank_angle
+    step_deg: 7.5

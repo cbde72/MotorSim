@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Free-Piston Dokumentation – Phase A.1 und A.2</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --panel2:#1f2937;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
+      --accent:#38bdf8;
+      --ok:#22c55e;
+      --warn:#f59e0b;
+      --border:#334155;
+      --code:#0b1220;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Segoe UI, Roboto, Arial, sans-serif;line-height:1.55;background:var(--bg);color:var(--text)}
+    .wrap{max-width:1100px;margin:0 auto;padding:32px 20px 64px}
+    h1,h2,h3{line-height:1.2;margin-top:1.4em}
+    h1{font-size:2.1rem;margin-top:0}
+    h2{font-size:1.45rem;border-bottom:1px solid var(--border);padding-bottom:.35rem}
+    h3{font-size:1.1rem}
+    p,li{font-size:1rem}
+    .lead{color:var(--muted);font-size:1.05rem;margin-bottom:1.2rem}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:18px 18px 10px;margin:18px 0;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;font-size:.85rem;margin-right:8px;border:1px solid var(--border);background:#0b1220}
+    .ok{color:var(--ok)}
+    .warn{color:var(--warn)}
+    code,pre{font-family:Consolas, Menlo, Monaco, monospace}
+    pre{background:var(--code);color:#dbeafe;padding:14px;border-radius:10px;border:1px solid var(--border);overflow:auto;white-space:pre-wrap;word-break:break-word}
+    table{width:100%;border-collapse:collapse;margin:14px 0 18px;table-layout:fixed}
+    th,td{border:1px solid var(--border);padding:10px 12px;vertical-align:top;word-wrap:break-word}
+    th{background:#0b1220;text-align:left}
+    .toc a{color:var(--accent);text-decoration:none}
+    .toc li{margin:.25rem 0}
+    .muted{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+    .small{font-size:.92rem}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Free-Piston Dokumentation – Phase A.1 und A.2</h1>
+    <p class="lead">
+      Diese Dokumentation beschreibt den vorhandenen Stand des Free-Piston-Pfads in den Phasen
+      <strong>A.1</strong> und <strong>A.2</strong>. Fokus: Architekturumschalter, Config-Semantik,
+      Zustände, Bundle-Aufbau, minimal lauffähiger RHS, numerischer Pfad und Abgrenzung zu späteren Phasen.
+    </p>
+
+    <div class="card">
+      <span class="pill ok">A.1 grün</span>
+      <span class="pill ok">A.2 grün</span>
+      <span class="pill">Stand: dokumentierter A.1/A.2-Patchpfad</span>
+      <p>
+        A.1 liefert den architekturseparaten Aufbaupfad mit <code>modeling.architecture = free_piston</code>,
+        eigener <code>free_piston</code>-Sektion und zusätzlichen Zuständen <code>x</code> und <code>v</code>.
+        A.2 ergänzt einen minimal lauffähigen Free-Piston-RHS, einen separaten Simulationspfad und zeitbasierte Ausgaben.
+      </p>
+    </div>
+
+    <h2 id="inhalt">Inhalt</h2>
+    <div class="card toc">
+      <ol>
+        <li><a href="#zielbild">Zielbild A.1 und A.2</a></li>
+        <li><a href="#a1">Phase A.1 – Architekturumschalter und neue Zustände</a></li>
+        <li><a href="#a2">Phase A.2 – Minimal lauffähiger Free-Piston-RHS</a></li>
+        <li><a href="#gleichungen">Modellgleichungen</a></li>
+        <li><a href="#datenfluss">Aktueller Datenfluss</a></li>
+        <li><a href="#dateien">Wichtige Dateien und Rollen</a></li>
+        <li><a href="#config">Config-Semantik</a></li>
+        <li><a href="#output">Output und CSV</a></li>
+        <li><a href="#numba">Hotpath, Dict-Freiheit, Numba-Richtung</a></li>
+        <li><a href="#abgrenzung">Abgrenzung zu späteren Phasen</a></li>
+      </ol>
+    </div>
+
+    <h2 id="zielbild">1. Zielbild A.1 und A.2</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Phase A.1</h3>
+        <ul>
+          <li>Neuer Architekturumschalter <code>modeling.architecture = free_piston</code></li>
+          <li>Neue Config-Sektion <code>free_piston</code></li>
+          <li>Zusätzliche Zustände <code>x</code> und <code>v</code></li>
+          <li>Eigenständiger Builder-Zweig</li>
+          <li>Bundle-Aufbau ohne vollständige Physik</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Phase A.2</h3>
+        <ul>
+          <li>Separater minimaler Free-Piston-RHS</li>
+          <li>Numerisch lauffähiger Integrationspfad</li>
+          <li><code>V(x)</code> und <code>dV/dt</code> aktiv</li>
+          <li>Zeitbasierte Signale und CSV</li>
+          <li>RHS-Hotpath ohne Dict-Zugriffe</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 id="a1">2. Phase A.1 – Architekturumschalter und neue Zustände</h2>
+    <div class="card">
+      <h3>Kerninhalt</h3>
+      <p>
+        A.1 führt die Architekturentscheidung <code>classic</code> versus <code>free_piston</code> auf
+        Modellebene ein. Der Free-Piston-Pfad besitzt einen eigenen Bundle-Aufbau, verwendet eine
+        eigene Config-Sektion und erweitert den Zustandsvektor um die mechanischen Zustände
+        <code>x</code> (Kolbenposition) und <code>v</code> (Kolbengeschwindigkeit).
+      </p>
+      <h3>Erreichte Punkte</h3>
+      <ul>
+        <li>Architekturumschalter im Config-Modell</li>
+        <li>Free-Piston-Config als führende Semantik</li>
+        <li>Eigenes State-Layout mit <code>x</code> und <code>v</code></li>
+        <li>Eigenständiger Free-Piston-Builder</li>
+        <li>Initialisierung des Zylinderzustands aus <code>free_piston.initial_conditions</code></li>
+        <li>Konfliktprüfung auf widersprüchliche klassische/free-piston-Initialwerte</li>
+      </ul>
+      <h3>Funktionale Aussage von A.1</h3>
+      <p>
+        Das System kann den Free-Piston-Modellpfad aufbauen, validieren und als separates Bundle
+        bereitstellen, auch wenn die vollständige Physik noch nicht vorhanden wäre.
+      </p>
+    </div>
+
+    <h2 id="a2">3. Phase A.2 – Minimal lauffähiger Free-Piston-RHS</h2>
+    <div class="card">
+      <h3>Kerninhalt</h3>
+      <p>
+        A.2 erweitert den reinen Architekturpfad um einen minimalen, lauffähigen physikalischen Pfad.
+        Der Free-Piston-Zustandsraum wird integriert, das Volumen ist von der Kolbenposition abhängig,
+        und die Mechanik wird mit einer einfachen Kräftebilanz gekoppelt.
+      </p>
+      <h3>Erreichte Punkte</h3>
+      <ul>
+        <li>Separates Modul <code>free_piston/rhs.py</code></li>
+        <li>Separates Modul <code>free_piston/simulator.py</code></li>
+        <li>Minimale Thermodynamik in <code>free_piston/thermo.py</code></li>
+        <li>Zeitbasiertes Postprocessing in <code>free_piston/postprocessing.py</code></li>
+        <li>Direkte Runner-/Executor-Unterstützung</li>
+        <li>Beispielkonfiguration <code>free_piston_phase_a2.yaml</code></li>
+      </ul>
+      <h3>Funktionale Aussage von A.2</h3>
+      <p>
+        Der Free-Piston-Pfad ist nicht mehr nur eine Architekturhülle, sondern ein minimal lauffähiges
+        Modell mit eigener Integration und eigener Ergebnisbildung.
+      </p>
+    </div>
+
+    <h2 id="gleichungen">4. Modellgleichungen</h2>
+    <div class="card">
+      <h3>Geometrie</h3>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mi>V</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo>
+        <mo>=</mo>
+        <msub><mi>V</mi><mi>c</mi></msub>
+        <mo>+</mo>
+        <msub><mi>A</mi><mi>p</mi></msub>
+        <mi>x</mi>
+      </math>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mfrac><mrow><mi>d</mi><mi>V</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+        <mo>=</mo>
+        <msub><mi>A</mi><mi>p</mi></msub>
+        <mi>v</mi>
+      </math>
+      <h3>Thermodynamik</h3>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mi>T</mi><mo>=</mo><mfrac><mi>U</mi><mrow><mi>m</mi><msub><mi>c</mi><mi>v</mi></msub></mrow></mfrac>
+      </math>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mi>p</mi><mo>=</mo><mfrac><mrow><mi>m</mi><mi>R</mi><mi>T</mi></mrow><mi>V</mi></mfrac>
+      </math>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mfrac><mrow><mi>d</mi><mi>m</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mn>0</mn>
+      </math>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mfrac><mrow><mi>d</mi><mi>U</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+        <mo>=</mo><mo>-</mo><mi>p</mi>
+        <mfrac><mrow><mi>d</mi><mi>V</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+      </math>
+      <h3>Mechanik</h3>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mfrac><mrow><mi>d</mi><mi>x</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mi>v</mi>
+      </math>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mfrac><mrow><mi>d</mi><mi>v</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+        <mo>=</mo>
+        <mfrac>
+          <mrow><msub><mi>F</mi><mi>gas</mi></msub><mo>+</mo><msub><mi>F</mi><mi>bounce</mi></msub><mo>+</mo><msub><mi>F</mi><mi>fric</mi></msub><mo>+</mo><msub><mi>F</mi><mi>load</mi></msub></mrow>
+          <msub><mi>m</mi><mi>p</mi></msub>
+        </mfrac>
+      </math>
+      <p class="small muted">Der vorhandene A.2-Stand ist leicht reicher als das nackte Lehrbuch-Minimalmodell: zusätzlich zu Gasdruck können Bounce-, Reibungs- und Lastanteile im Minimalpfad enthalten sein.</p>
+    </div>
+
+    <h2 id="datenfluss">5. Aktueller Datenfluss</h2>
+    <div class="card">
+      <pre>RootConfig
+  -> modeling.architecture = free_piston
+  -> free_piston.*
+
+model_builder
+  -> build_free_piston_bundle(config)
+
+free_piston/builder.py
+  -> state_layout
+  -> y_init
+  -> FreePistonModelData
+  -> ModelBundle(architecture="free_piston")
+
+executor / runner
+  -> simulate_free_piston(...)
+
+free_piston/rhs.py
+  -> dy/dt für [m, U, x, v]
+
+free_piston/simulator.py
+  -> ODE-Integration
+  -> Signalbildung / Postprocessing
+
+free_piston/postprocessing.py
+  -> zeitbasierte Signale / CSV</pre>
+    </div>
+
+    <h2 id="dateien">6. Wichtige Dateien und Rollen</h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>Datei</th><th>Rolle</th><th>Phase</th></tr></thead>
+        <tbody>
+          <tr><td><code>src/thermo0d/config/models.py</code></td><td>Architekturumschalter, Free-Piston-Config, Validierung</td><td>A.1 / A.2</td></tr>
+          <tr><td><code>src/thermo0d/core/state_layout.py</code></td><td>State-Layout mit <code>x</code>, <code>v</code> und Zustandslabels</td><td>A.1 / A.2</td></tr>
+          <tr><td><code>src/thermo0d/core/model_bundle.py</code></td><td>Free-Piston-Metadaten im Bundle</td><td>A.1 / A.2</td></tr>
+          <tr><td><code>src/thermo0d/model/free_piston/builder.py</code></td><td>Eigenständiger Free-Piston-Bundle-Aufbau</td><td>A.1 / A.2</td></tr>
+          <tr><td><code>src/thermo0d/model/free_piston/geometry.py</code></td><td><code>V(x)</code>, <code>dV/dt</code>, Bounds-Helfer</td><td>A.1 / A.2</td></tr>
+          <tr><td><code>src/thermo0d/model/free_piston/thermo.py</code></td><td>Minimale Thermodynamik für A.2</td><td>A.2</td></tr>
+          <tr><td><code>src/thermo0d/model/free_piston/rhs.py</code></td><td>Minimaler Free-Piston-RHS</td><td>A.2</td></tr>
+          <tr><td><code>src/thermo0d/model/free_piston/simulator.py</code></td><td>Integrationsadapter / ODE-Simulationspfad</td><td>A.2</td></tr>
+          <tr><td><code>src/thermo0d/model/free_piston/postprocessing.py</code></td><td>Zeitbasierte Signalableitung und Ergebnisbildung</td><td>A.2</td></tr>
+          <tr><td><code>src/thermo0d/compute/executor.py</code></td><td>Dispatch in den Free-Piston-Simulationspfad</td><td>A.2</td></tr>
+          <tr><td><code>examples/free_piston_phase_a.yaml</code></td><td>Referenz für A.1</td><td>A.1</td></tr>
+          <tr><td><code>examples/free_piston_phase_a2.yaml</code></td><td>Referenz für A.2</td><td>A.2</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="config">7. Config-Semantik</h2>
+    <div class="card">
+      <p>Der Free-Piston-Pfad wird über die Architekturwahl aktiviert:</p>
+      <pre>modeling:
+  architecture: free_piston</pre>
+      <p>Die führende Konfigurationssektion ist:</p>
+      <pre>free_piston:
+  geometry:
+    clearance_volume_m3: ...
+    piston_area_m2: ...
+  mechanics:
+    ...
+  thermo:
+    ...
+  initial_conditions:
+    mechanics:
+      x_m: ...
+      v_m_per_s: ...
+    cylinder:
+      pressure_Pa: ...
+      temperature_K: ...</pre>
+      <p>Die Zylinder-Initialwerte stammen im Free-Piston-Pfad aus <code>free_piston.initial_conditions.cylinder</code> und nicht aus klassischen Kurbeldynamik-Pfaden. A.1/A.2 sind so angelegt, dass sie keinen klassischen Zylinder-Platzhalter mehr benötigen.</p>
+    </div>
+
+    <h2 id="output">8. Output und CSV</h2>
+    <div class="card">
+      <p>Der A.2-Pfad arbeitet bewusst zeitbasiert und nicht kurbelwinkelbasiert.</p>
+      <p>Typische Signale im Free-Piston-Output:</p>
+      <ul>
+        <li><code>t_s</code></li>
+        <li><code>free_piston_x_m</code></li>
+        <li><code>free_piston_v_m_per_s</code></li>
+        <li><code>cylinder_volume_m3</code></li>
+        <li><code>cylinder_pressure_Pa</code></li>
+        <li><code>cylinder_temperature_K</code></li>
+        <li><code>cylinder_gas_mass_kg</code></li>
+        <li><code>cylinder_internal_energy_J</code></li>
+        <li>Kraftanteile je nach A.2-Minimalmodell</li>
+      </ul>
+      <p class="small muted">Der volle klassische Winkel-/Zyklus-Output ist nicht Ziel von A.1/A.2 und gehört in spätere Phasen.</p>
+    </div>
+
+    <h2 id="numba">9. Hotpath, Dict-Freiheit, Numba-Richtung</h2>
+    <div class="card">
+      <p>Eine zentrale Randbedingung für A.2 ist, den neuen RHS-Hotpath so zu strukturieren, dass er in derselben Richtung wie das klassische Modell bleibt:</p>
+      <ul>
+        <li>zustandsbasiert über Arrays</li>
+        <li>skalare Berechnungen im Hotpath</li>
+        <li>keine Signal-Dicts im RHS</li>
+        <li>keine dynamische, schwer jit-freundliche Zugriffsschicht im Kernpfad</li>
+      </ul>
+      <p>Damit bleibt die Free-Piston-RHS-Struktur grundsätzlich numba-freundlich und konzeptionell kompatibel zur Performance-Richtung des klassischen/conventional Pfads.</p>
+    </div>
+
+    <h2 id="abgrenzung">10. Abgrenzung zu späteren Phasen</h2>
+    <div class="card">
+      <h3>Nicht Teil von A.1/A.2</h3>
+      <ul>
+        <li>vollständige Verbrennung im Free-Piston-Pfad</li>
+        <li>theta-unabhängige Event-/Timing-Logik für Einspritzung oder Verbrennung</li>
+        <li>vollständiger Gaswechsel mit allen klassischen Varianten</li>
+        <li>vollständige Integration in den gesamten klassischen Signal-/Plot-Stack</li>
+        <li>erweiterte Mehrraum-/Mehrzylinder-Kopplungen</li>
+      </ul>
+      <h3>Typische nächste Phase B.1</h3>
+      <ul>
+        <li>Signal- und Output-Stack enger an den regulären Hauptpfad anbinden</li>
+        <li>weitere Entkopplung von klassischen Spezialannahmen</li>
+        <li>erste Erweiterungen für Ereignislogik / Gaswechsel / Verbrennung</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Zusammenfassung</h2>
+      <p><strong>A.1</strong> macht den Free-Piston-Pfad architekturseparat und zustandsseitig sichtbar. <strong>A.2</strong> macht ihn erstmals numerisch lauffähig. Zusammen bilden beide Phasen einen belastbaren Grundstein für spätere Free-Piston-Physik, ohne die Struktur des klassischen Modells im Hotpath unnötig zu verunreinigen.</p>
+    </div>
+  </div>
+</body>
+</html>

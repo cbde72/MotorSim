@@ -1,0 +1,38 @@
+project_root: ../..
+base_config: Projekte/variants/free_piston_GenSet_V09j.yaml
+sweep_name: load_damp_04
+output_dir: Projekte/results/sweeps/load_damp_04
+excel: false
+keep_temp_configs: false
+
+description_template: "Free-piston sweep | {parameter_name}={value}"
+outdir_template: '{sweep_name}_{run_tag}'
+csv_name_template: '{run_tag}.csv'
+excel_name_template: '{run_tag}.xlsx'
+
+parameter:
+  path: free_piston.load.control_zone_m
+  label: load_damp
+  round_digits: 4
+  #range:
+  #  start: 0.009
+  #  step: 0.001
+  #  end: 0.013
+  linspace:
+    start: 0.0055
+    end: 0.009
+    num: 20
+  #values:
+  #  - 0.005
+  #  - 0.01
+  #  - 0.011
+  #  - 0.012
+  #  - 0.013
+collect:
+  copy_configs: true
+  copy_csv: true
+  copy_plots: true
+  copy_excel: false
+  copy_readme: true
+  plots_dir_name: plots
+  delete_source_plots_after_collect: false

@@ -1,0 +1,236 @@
+# Projektkonfiguration
+# Solveroptionen: euler | rk4 | scipy_rk45 | scipy_bdf | scipy_radau
+# postprocessing.sampling.mode: time | crank_angle
+#   time        -> step_s
+#   crank_angle -> step_deg
+
+# Vollständige Optionsübersicht siehe examples/config_schema_documented.yaml
+# ============================================================================
+# Beispielprojekt: 1-Zylinder-4-Takt
+# ----------------------------------------------------------------------------
+# Diese Datei zeigt die strikt getrennten Bereiche:
+#   1) preprocessing  -> Modellaufbau, Physikdaten, Topologie, Anfangszustand
+#   2) simulation     -> Integrations- und Solver-Einstellungen
+#   3) postprocessing -> Exportpfade, CSV-Format und Ausgabe-Abtastung
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# PREPROCESSING
+# ----------------------------------------------------------------------------
+# Alles in diesem Block beschreibt den physikalischen Modellaufbau vor dem
+# eigentlichen Simulationslauf. Hier stehen also Stoffwerte, Features,
+# Motordaten, Volumina und Verbindungen.
+preprocessing:
+  # Konstante Stoffwerte des idealisierten Arbeitsgases.
+  gas_properties:
+    # Spezifische Wärmekapazität bei konstantem Druck [J/(kg*K)].
+    cp_J_per_kgK: 1005.0
+    # Spezifische Wärmekapazität bei konstantem Volumen [J/(kg*K)].
+    cv_J_per_kgK: 718.0
+    # Spezifische Gaskonstante [J/(kg*K)].
+    R_J_per_kgK: 287.0
+
+  # Globale Aktivierung einzelner Energie- und Massenbilanz-Terme.
+  features:
+    # Aktiviert Massenströme über Ventile/Schlitze.
+    mass_flow: true
+    # Aktiviert Wandwärmeübergang.
+    wall_heat: true
+    # Aktiviert Verbrennungswärmefreisetzung.
+    combustion: true
+    # Aktiviert Verdampfungsenthalpie als Energiesenke.
+    evaporation: true
+    # Aktiviert p*dV-Arbeit im Zylinder.
+    pv_work: true
+
+  # Globale Motordaten.
+  engine:
+    # Motorkonzept: '2t' oder '4t'.
+    cycle_type: 4t
+    # Drehzahl [1/min].
+    speed_rpm: 2500.0
+
+  # Liste aller Kontrollvolumina im 0D-Netzwerk.
+  volumes:
+    # ------------------------------------------------------------------------
+    # Zylinder
+    # ------------------------------------------------------------------------
+    - name: cylinder
+      # Volumentyp: 'cylinder' oder 'plenum'.
+      type: cylinder
+      # Anfangsdruck im Volumen [Pa].
+      initial_pressure_Pa: 1080650.993791
+      # Anfangstemperatur [K].
+      initial_temperature_K: 360.0
+      # Kinematikmodell des Zylinders.
+      kinematics:
+        # Aktuell unterstützt: 'crank_slider'.
+        type: crank_slider
+        # Bohrung [m].
+        bore_m: 0.086
+        # Hub [m].
+        stroke_m: 0.086
+        # Pleuellänge [m].
+        conrod_m: 0.143
+        # Verdichtungsverhältnis [-].
+        compression_ratio: 10.5
+        # Phasenverschiebung des Zylinders [deg Kurbelwinkel].
+        phase_deg: 0.0
+      # Wandwärmemodell für dieses Volumen.
+      wall_heat:
+        # 'woschni' aktiviert das einfache Woschni-Modell.
+        model: woschni
+        # Modellparameter c1 [-].
+        c1: 3.26
+        # Modellparameter c2 [-].
+        c2: 0.8
+        # Modellparameter c3 [-].
+        c3: -0.55
+        # Wandtemperatur [K].
+        wall_temperature_K: 430.0
+        # Effektive Wärmeübertragerfläche [m^2].
+        wall_area_m2: 0.032
+      # Verbrennungsmodell für dieses Volumen.
+      combustion:
+        # 'vibe' aktiviert die Vibe-Wärmefreisetzung.
+        model: vibe
+        # Startwinkel der Verbrennung [deg].
+        start_deg: 350.0
+        # Dauer der Verbrennung [deg].
+        duration_deg: 55.0
+        # Vibe-Parameter a [-].
+        a: 6.908
+        # Vibe-Parameter m [-].
+        m: 2.0
+        # Kraftstoffmasse pro Arbeitsspiel [kg].
+        fuel_mass_per_cycle_kg: 0.000020
+        # Unterer Heizwert [J/kg].
+        lhv_J_per_kg: 43000000.0
+        # Bezugswinkel: 'absolute', 'compression_tdc' oder 'gas_exchange_tdc'.
+        angle_reference: compression_tdc
+      # Verdampfungsmodell für dieses Volumen.
+      evaporation:
+        # 'simple' aktiviert ein lineares Verdampfungsmodell.
+        model: simple
+        # Startwinkel der Verdampfung [deg].
+        start_deg: 330.0
+        # Dauer der Verdampfung [deg].
+        duration_deg: 30.0
+        # Verdampfte Masse pro Arbeitsspiel [kg].
+        evaporated_mass_per_cycle_kg: 0.000020
+        # Verdampfungsenthalpie [J/kg].
+        latent_heat_J_per_kg: 350000.0
+        # Bezugswinkel wie oben.
+        angle_reference: compression_tdc
+
+    # ------------------------------------------------------------------------
+    # Ansaugplenum
+    # ------------------------------------------------------------------------
+    - name: intake_plenum
+      type: plenum
+      initial_pressure_Pa: 105042.000000
+      initial_temperature_K: 305.0
+      # Festes Volumen eines Plenums [m^3].
+      fixed_volume_m3: 0.0025
+      # 'none' deaktiviert das jeweilige Teilmodell.
+      wall_heat:
+        model: none
+      combustion:
+        model: none
+      evaporation:
+        model: none
+
+    # ------------------------------------------------------------------------
+    # Abgasplenum
+    # ------------------------------------------------------------------------
+    - name: exhaust_plenum
+      type: plenum
+      initial_pressure_Pa: 149240.000000
+      initial_temperature_K: 650.0
+      fixed_volume_m3: 0.0030
+      wall_heat:
+        model: none
+      combustion:
+        model: none
+      evaporation:
+        model: none
+
+  # Liste aller gasdynamischen Verbindungen im Netzwerk.
+  connections:
+    # ------------------------------------------------------------------------
+    # Einlassventil
+    # ------------------------------------------------------------------------
+    - name: intake_valve
+      # Verbindungstyp 'valve'.
+      type: valve
+      # Quellvolumen des Massenstroms.
+      from_volume: intake_plenum
+      # Zielvolumen des Massenstroms.
+      to_volume: cylinder
+      # Öffnungsbezugspunkt des Profils [deg].
+      opening_angle_deg: 330.0
+      # Winkelbezug für opening_angle_deg.
+      opening_reference: compression_tdc
+      # Winkelbasis der Hubdatei: 'crank' oder 'cam'.
+      profile_angle_domain: crank
+      # Skalierungsfaktor für den Hub [-].
+      lift_scale: 1.0
+      # Skalierungsfaktor für die Dauer [-].
+      # Ventilspiel [m].
+      lash_m: 0.0001
+      # CSV-Datei mit Ventilhubprofil: Spalte 1 Winkel, Spalte 2 Hub.
+      lift_file: data/intake_valve_lift.csv
+      # CSV-Datei mit alpha-k-Tabelle: Spalte 1 Hub, Spalte 2 Einströmen,
+      # Spalte 3 Ausströmen.
+      alpha_k_file: data/intake_alpha_k.csv
+
+    # ------------------------------------------------------------------------
+    # Auslassventil
+    # ------------------------------------------------------------------------
+    - name: exhaust_valve
+      type: valve
+      from_volume: cylinder
+      to_volume: exhaust_plenum
+      opening_angle_deg: 120.0
+      opening_reference: compression_tdc
+      profile_angle_domain: crank
+      lift_scale: 1.0
+      lash_m: 0.0001
+      lift_file: data/exhaust_valve_lift.csv
+      alpha_k_file: data/exhaust_alpha_k.csv
+
+# ----------------------------------------------------------------------------
+# SIMULATION
+# ----------------------------------------------------------------------------
+# Dieser Block enthält ausschließlich die numerische Zeitintegration.
+simulation:
+  # Feste Integrationsschrittweite [s].
+  dt_s: 0.00002
+  # Anzahl vollständig zu simulierender Arbeitsspiele.
+  total_cycles: 3
+  # Anzahl der letzten Arbeitsspiele, die im Export behalten werden.
+  save_last_cycles: 2
+  # Solver-Konfiguration.
+  solver:
+    # Registrierter Solvername, z. B. 'euler', 'rk4', 'scipy_rk45', 'scipy_bdf' oder 'scipy_radau'.
+    kind: rk4
+    # Relative Toleranz für Solver, die sie auswerten.
+    rtol: 1.0e-6
+    # Absolute Toleranz für Solver, die sie auswerten.
+    atol: 1.0e-9
+
+# ----------------------------------------------------------------------------
+# POSTPROCESSING
+# ----------------------------------------------------------------------------
+# Dieser Block enthält ausschließlich Export und Ausgabeabtastung.
+postprocessing:
+  # Zielpfad für die CSV-Ausgabe relativ zur YAML-Datei.
+  csv_path: /mnt/data/work_patch/test_cases/runner_time_csv/work/run_time.csv
+  # CSV-Trennzeichen, frei wählbar durch den Benutzer.
+  csv_separator: ";"
+  # Abtastdefinition für den Export.
+  sampling:
+    # Kurbelwinkelbasierte Ausgabe.
+    mode: crank_angle
+    # Abtastschritt [deg] für die Exportdatei.
+    step_deg: 1.0

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Free-Piston Section Preview mit CSV</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #101a2e;
+      --panel2: #16233c;
+      --text: #e5edf8;
+      --muted: #94a3b8;
+      --grid: #233251;
+      --cyan: #38bdf8;
+      --red: #f87171;
+      --orange: #f59e0b;
+      --green: #34d399;
+      --stroke: #cbd5e1;
+      --steel: #7c8aa6;
+      --piston: #8b9bb4;
+      --shadow: rgba(0,0,0,0.25);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #08101d 0%, #0b1220 100%);
+      color: var(--text);
+      font: 14px/1.4 "Segoe UI", system-ui, sans-serif;
+    }
+    .wrap {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 18px;
+    }
+    .panel {
+      background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+      border: 1px solid #22314b;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px var(--shadow);
+    }
+    .left {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+    h1 { font-size: 20px; margin: 0; line-height: 1.2; }
+    .sub { color: var(--muted); font-size: 13px; }
+    .controls {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid #22314b;
+      border-radius: 14px;
+    }
+    .row { display: grid; gap: 6px; }
+    .row.two { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row.inline { grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+    label { color: var(--muted); font-size: 12px; }
+    input[type="range"], select {
+      width: 100%;
+      accent-color: var(--cyan);
+      background: #0f172a;
+    }
+    input[type="number"], input[type="file"], select {
+      width: 100%;
+      background: #0f172a;
+      color: var(--text);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    input[type="file"] { padding: 7px 10px; }
+    button {
+      background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%);
+      color: white;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .secondary {
+      background: linear-gradient(180deg, #243b63 0%, #1e2f4d 100%);
+    }
+    .btns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .metric {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid #22314b;
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .metric .k { color: var(--muted); font-size: 11px; }
+    .metric .v { font-size: 18px; font-weight: 700; margin-top: 2px; }
+    .metric small { color: var(--muted); }
+    .canvas-wrap {
+      position: relative;
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+    svg {
+      width: 100%;
+      height: min(78vh, 860px);
+      display: block;
+      border-radius: 14px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)),
+        linear-gradient(90deg, rgba(255,255,255,0.015), rgba(255,255,255,0.0));
+      border: 1px solid #22314b;
+    }
+    .legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 0 4px;
+    }
+    .dot {
+      width: 10px; height: 10px; border-radius: 999px; display: inline-block; margin-right: 6px;
+    }
+    .foot { color: var(--muted); font-size: 12px; padding: 4px; }
+    .statbox {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    code {
+      background: rgba(255,255,255,0.05);
+      border-radius: 6px;
+      padding: 1px 5px;
+      color: #dbeafe;
+    }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <aside class="panel left">
+      <div>
+        <h1>Free-Piston Section Preview</h1>
+        <div class="sub">CSV-fähige Version im selben Dark-UI-Stil wie deine hochgeladene Section-Preview. Demo-Daten laufen sofort, echte Simulations-CSV ist optional.</div>
+      </div>
+
+      <div class="controls">
+        <div class="btns">
+          <button id="playBtn">Play</button>
+          <button id="pauseBtn" class="secondary">Pause</button>
+          <button id="resetBtn" class="secondary">Reset</button>
+        </div>
+
+        <div class="row">
+          <label for="frameSlider">Zeitposition</label>
+          <input id="frameSlider" type="range" min="0" max="1000" value="0" step="1" />
+          <div class="sub" id="timeLabel">t = 0.0000 s</div>
+        </div>
+
+        <div class="row two">
+          <div>
+            <label for="csvFile">CSV laden</label>
+            <input id="csvFile" type="file" accept=".csv,.txt" />
+          </div>
+          <div>
+            <label for="separator">CSV-Trennzeichen</label>
+            <select id="separator">
+              <option value="auto">auto</option>
+              <option value=";">Semikolon ;</option>
+              <option value=",">Komma ,</option>
+              <option value="tab">Tab</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="btns">
+          <button id="demoBtn" class="secondary">Demo-Daten</button>
+          <button id="reloadBtn" class="secondary">Geometrie neu anwenden</button>
+          <button id="fitBtn" class="secondary">Datenbereich fitten</button>
+        </div>
+
+        <div class="row two">
+          <div>
+            <label for="playbackSpeed">Abspieltempo</label>
+            <input id="playbackSpeed" type="number" value="1" min="0.1" max="20" step="0.1" />
+          </div>
+          <div>
+            <label for="scaleMode">Darstellung</label>
+            <select id="scaleMode">
+              <option value="dynamic">Automatisch an Daten</option>
+              <option value="manual">Manuelle Geometrie</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row two">
+          <div>
+            <label for="xMin">x_min [m]</label>
+            <input id="xMin" type="number" value="-0.04" step="0.001" />
+          </div>
+          <div>
+            <label for="xMax">x_max [m]</label>
+            <input id="xMax" type="number" value="0.04" step="0.001" />
+          </div>
+        </div>
+
+        <div class="row two">
+          <div>
+            <label for="transferOpen">Transfer öffnet ab Abstand TDC [m]</label>
+            <input id="transferOpen" type="number" value="0.055" step="0.001" />
+          </div>
+          <div>
+            <label for="exhaustOpen">Auslass öffnet ab Abstand TDC [m]</label>
+            <input id="exhaustOpen" type="number" value="0.045" step="0.001" />
+          </div>
+        </div>
+
+        <div class="row two">
+          <div>
+            <label for="transferHeight">Transfer Fensterhöhe [m]</label>
+            <input id="transferHeight" type="number" value="0.012" step="0.001" />
+          </div>
+          <div>
+            <label for="exhaustHeight">Auslass Fensterhöhe [m]</label>
+            <input id="exhaustHeight" type="number" value="0.014" step="0.001" />
+          </div>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric"><div class="k">Zeit</div><div class="v" id="kpiTime">0.0000 s</div><small>aktueller Frame</small></div>
+        <div class="metric"><div class="k">Freikolben x</div><div class="v" id="kpiX">0.0000 m</div><small>Zustandskoordinate</small></div>
+        <div class="metric"><div class="k">Abstand von TDC</div><div class="v" id="kpiTdc">0.0000 m</div><small>für by_distance maßgeblich</small></div>
+        <div class="metric"><div class="k">Datenquelle</div><div class="v" id="sourceLabel">Demo</div><small id="rowsLabel">0 Zeilen</small></div>
+        <div class="metric"><div class="k">Transfer offen</div><div class="v" id="kpiTr">0.00 mm</div><small id="kpiTrA">Aeff 0.0 mm²</small></div>
+        <div class="metric"><div class="k">Auslass offen</div><div class="v" id="kpiEx">0.00 mm</div><small id="kpiExA">Aeff 0.0 mm²</small></div>
+      </div>
+
+      <div class="controls">
+        <div class="sub">Erwartete CSV-Signale: <code>t_s</code>, <code>free_piston_x_m</code>, optional <code>free_piston_distance_from_tdc_m</code>, <code>transfer_slot_slot_height_m</code>, <code>exhaust_slot_slot_height_m</code>, <code>transfer_slot_A_eff_forward_m2</code>, <code>exhaust_slot_A_eff_forward_m2</code>.</div>
+        <div class="statbox"><strong>CSV-Status</strong><span id="csvStatus">keine Datei geladen</span></div>
+        <div class="statbox"><strong>Zeitspanne</strong><span id="spanLabel">0.0000 s</span></div>
+        <div class="statbox"><strong>Bezug</strong><span class="mono">distance_from_tdc = x_max - x</span></div>
+      </div>
+    </aside>
+
+    <main class="panel canvas-wrap">
+      <svg id="svg" viewBox="0 0 980 860" xmlns="http://www.w3.org/2000/svg" aria-label="Free piston section preview"></svg>
+      <div class="legend">
+        <span><span class="dot" style="background:#38bdf8"></span>Transfer / Spülluft</span>
+        <span><span class="dot" style="background:#f87171"></span>Auslass</span>
+        <span><span class="dot" style="background:#8b9bb4"></span>Kolben</span>
+        <span><span class="dot" style="background:#34d399"></span>offener Bereich / wirksame Öffnung</span>
+      </div>
+      <div class="foot">Die Slot-Logik folgt dem bereinigten Bezug: <code>distance_from_tdc = x_max - x</code>. Fehlen CSV-Spalten, werden Slot-Höhen und <code>A_eff</code> aus Geometrie und Position rekonstruiert.</div>
+    </main>
+  </div>
+
+<script>
+const svg = document.getElementById('svg');
+const slider = document.getElementById('frameSlider');
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+const csvFile = document.getElementById('csvFile');
+const separatorSel = document.getElementById('separator');
+const demoBtn = document.getElementById('demoBtn');
+const reloadBtn = document.getElementById('reloadBtn');
+const fitBtn = document.getElementById('fitBtn');
+const playbackSpeedEl = document.getElementById('playbackSpeed');
+const sourceLabel = document.getElementById('sourceLabel');
+const rowsLabel = document.getElementById('rowsLabel');
+const spanLabel = document.getElementById('spanLabel');
+const csvStatus = document.getElementById('csvStatus');
+const timeLabel = document.getElementById('timeLabel');
+const el = id => document.getElementById(id);
+
+let data = [];
+let playing = false;
+let raf = null;
+let playStartTs = 0;
+let playStartT = 0;
+
+function fmt(x, n=4){ return Number.isFinite(x) ? x.toFixed(n) : '—'; }
+function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+function parseNum(v){ const n = Number(String(v).trim().replace(',', '.')); return Number.isFinite(n) ? n : NaN; }
+
+function detectSep(text){
+  if(separatorSel.value === ';') return ';';
+  if(separatorSel.value === ',') return ',';
+  if(separatorSel.value === 'tab') return '\t';
+  const first = text.split(/\r?\n/).find(Boolean) || '';
+  const counts = {';': (first.match(/;/g)||[]).length, ',': (first.match(/,/g)||[]).length, '\t': (first.match(/\t/g)||[]).length};
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0] || ';';
+}
+
+function generateDemo(){
+  const out = [];
+  const tEnd = 0.16;
+  const n = 1100;
+  const xMax = 0.04;
+  for(let i=0;i<n;i++){
+    const t = tEnd*i/(n-1);
+    const amp = 0.038*Math.exp(-t*2.2);
+    const x = 0.005 + amp*Math.cos(2*Math.PI*11.1*t);
+    const dist = xMax - x;
+    const trH = clamp(dist - 0.055, 0, 0.012);
+    const exH = clamp(dist - 0.045, 0, 0.014);
+    const trA = (trH/0.012)*(2*0.020*0.012*0.82);
+    const exA = (exH/0.014)*(2*0.024*0.014*0.78);
+    out.push({ t_s:t, free_piston_x_m:x, free_piston_distance_from_tdc_m:dist,
+      transfer_slot_slot_height_m:trH, exhaust_slot_slot_height_m:exH,
+      transfer_slot_A_eff_forward_m2:trA, exhaust_slot_A_eff_forward_m2:exA });
+  }
+  setData(out, 'Demo');
+}
+
+function parseCsv(text){
+  const sep = detectSep(text);
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length>0);
+  if(lines.length < 2) throw new Error('CSV hat zu wenige Zeilen.');
+  const header = lines[0].split(sep).map(s => s.trim());
+  const idx = Object.fromEntries(header.map((h,i)=>[h,i]));
+  for(const k of ['t_s','free_piston_x_m']) if(!(k in idx)) throw new Error('Pflichtspalte fehlt: ' + k);
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    const cols = lines[i].split(sep);
+    const row = {};
+    for(const h of header) row[h] = parseNum(cols[idx[h]] ?? '');
+    if(Number.isFinite(row.t_s) && Number.isFinite(row.free_piston_x_m)) rows.push(row);
+  }
+  if(!rows.length) throw new Error('Keine numerischen Daten erkannt.');
+  applyGeometryFallbacks(rows);
+  return rows;
+}
+
+function applyGeometryFallbacks(rows){
+  const xVals = rows.map(r=>r.free_piston_x_m).filter(Number.isFinite);
+  const dynamicXMin = Math.min(...xVals);
+  const dynamicXMax = Math.max(...xVals);
+  const manualXMin = parseNum(el('xMin').value);
+  const manualXMax = parseNum(el('xMax').value);
+  const useManual = el('scaleMode').value === 'manual';
+  const refXMin = useManual && Number.isFinite(manualXMin) ? manualXMin : dynamicXMin;
+  const refXMax = useManual && Number.isFinite(manualXMax) ? manualXMax : dynamicXMax;
+  el('xMin').value = refXMin.toFixed(4);
+  el('xMax').value = refXMax.toFixed(4);
+  const trOpen = parseNum(el('transferOpen').value), exOpen = parseNum(el('exhaustOpen').value);
+  const trHmax = parseNum(el('transferHeight').value), exHmax = parseNum(el('exhaustHeight').value);
+  for(const r of rows){
+    if(!Number.isFinite(r.free_piston_distance_from_tdc_m)) r.free_piston_distance_from_tdc_m = refXMax - r.free_piston_x_m;
+    if(!Number.isFinite(r.transfer_slot_slot_height_m)) r.transfer_slot_slot_height_m = clamp(r.free_piston_distance_from_tdc_m - trOpen, 0, trHmax);
+    if(!Number.isFinite(r.exhaust_slot_slot_height_m)) r.exhaust_slot_slot_height_m = clamp(r.free_piston_distance_from_tdc_m - exOpen, 0, exHmax);
+    if(!Number.isFinite(r.transfer_slot_A_eff_forward_m2)) r.transfer_slot_A_eff_forward_m2 = (r.transfer_slot_slot_height_m/trHmax)*(2*0.020*trHmax*0.82);
+    if(!Number.isFinite(r.exhaust_slot_A_eff_forward_m2)) r.exhaust_slot_A_eff_forward_m2 = (r.exhaust_slot_slot_height_m/exHmax)*(2*0.024*exHmax*0.78);
+  }
+}
+
+function setData(rows, source){
+  data = rows.sort((a,b)=>a.t_s-b.t_s);
+  slider.min = 0; slider.max = Math.max(0, data.length - 1); slider.value = 0;
+  sourceLabel.textContent = source;
+  rowsLabel.textContent = `${data.length} Zeilen`;
+  spanLabel.textContent = `${fmt(data.at(-1)?.t_s ?? 0, 4)} s`;
+  csvStatus.textContent = source === 'Demo' ? 'Demo-Daten aktiv' : 'CSV erfolgreich geladen';
+  drawFrame(0);
+}
+
+function getFrame(i){ return data[clamp(i, 0, data.length - 1)] || null; }
+
+function drawFrame(i){
+  const r = getFrame(i);
+  if(!r) return;
+  slider.value = i;
+  const xMin = parseNum(el('xMin').value), xMax = parseNum(el('xMax').value);
+  const trOpen = parseNum(el('transferOpen').value), exOpen = parseNum(el('exhaustOpen').value);
+  const trHeight = parseNum(el('transferHeight').value), exHeight = parseNum(el('exhaustHeight').value);
+  const t = r.t_s;
+  const x = r.free_piston_x_m;
+  const dist = r.free_piston_distance_from_tdc_m;
+  const trH = r.transfer_slot_slot_height_m;
+  const exH = r.exhaust_slot_slot_height_m;
+  const trA = r.transfer_slot_A_eff_forward_m2;
+  const exA = r.exhaust_slot_A_eff_forward_m2;
+
+  el('kpiTime').textContent = `${fmt(t,4)} s`;
+  el('kpiX').textContent = `${fmt(x,4)} m`;
+  el('kpiTdc').textContent = `${fmt(dist,4)} m`;
+  el('kpiTr').textContent = `${fmt(trH*1000,2)} mm`;
+  el('kpiEx').textContent = `${fmt(exH*1000,2)} mm`;
+  el('kpiTrA').textContent = `Aeff ${fmt(trA*1e6,1)} mm²`;
+  el('kpiExA').textContent = `Aeff ${fmt(exA*1e6,1)} mm²`;
+  timeLabel.textContent = `t = ${fmt(t,4)} s`;
+
+  const W = 980, H = 860;
+  const cx = 490;
+  const topY = 90;
+  const boreW = 180;
+  const cylH = 600;
+  const totalRange = Math.max(1e-9, (xMax - xMin));
+  const pxPerM = cylH / totalRange;
+  const left = cx - boreW/2, right = cx + boreW/2;
+  const pistonY = topY + dist * pxPerM;
+  const pistonH = 48;
+  const trTop = topY + trOpen * pxPerM;
+  const trHpx = trHeight * pxPerM;
+  const exTop = topY + exOpen * pxPerM;
+  const exHpx = exHeight * pxPerM;
+  const trOpenY = trTop + (trHeight - trH) * pxPerM;
+  const trOpenH = trH * pxPerM;
+  const exOpenY = exTop + (exHeight - exH) * pxPerM;
+  const exOpenH = exH * pxPerM;
+
+  const grid = [];
+  const distRange = xMax - xMin;
+  const step = distRange <= 0.04 ? 0.005 : 0.01;
+  for (let d = 0; d <= distRange + 1e-12; d += step) {
+    const y = topY + d * pxPerM;
+    const mm = d * 1000;
+    const isMajor = Math.round(mm) % 10 === 0;
+    grid.push(`
+      <line x1="140" y1="${y}" x2="840" y2="${y}" stroke="${isMajor ? '#233251' : '#1b2943'}" stroke-width="1" />
+      <text x="120" y="${y+4}" fill="#94a3b8" font-size="${isMajor ? '12' : '10'}" text-anchor="end">${mm.toFixed(0)}</text>
+    `);
+  }
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="cylFill" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stop-color="#132238"/>
+        <stop offset="100%" stop-color="#0b1424"/>
+      </linearGradient>
+      <linearGradient id="steelGrad" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stop-color="#a8b6ce"/>
+        <stop offset="100%" stop-color="#65748f"/>
+      </linearGradient>
+      <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="rgba(0,0,0,0.35)"/>
+      </filter>
+      <marker id="arrowEnd" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#34d399"/>
+      </marker>
+    </defs>
+
+    <g filter="url(#softShadow)">
+      <rect x="${left-24}" y="${topY-20}" width="${boreW+48}" height="${cylH+80}" rx="24" fill="#0f172a" stroke="#2b3b57" stroke-width="2"/>
+      <rect x="${left}" y="${topY}" width="${boreW}" height="${cylH}" rx="18" fill="url(#cylFill)" stroke="#b6c2d2" stroke-width="3"/>
+      <rect x="${left+12}" y="${topY+12}" width="${boreW-24}" height="${cylH-24}" rx="12" fill="none" stroke="#3a4b66" stroke-width="1.3"/>
+    </g>
+
+    ${grid.join('')}
+
+    <text x="150" y="58" fill="#e5edf8" font-size="22" font-weight="700">Section Preview – Free Piston / Slotöffnung relativ zu TDC</text>
+    <text x="150" y="80" fill="#94a3b8" font-size="13">Skalierung vertikal: Abstand von TDC [mm]</text>
+
+    <rect x="${left-10}" y="${topY-28}" width="${boreW+20}" height="28" rx="10" fill="url(#steelGrad)" stroke="#dbe6f7" stroke-width="2"/>
+    <text x="${right+70}" y="${topY+5}" fill="#dbeafe" font-size="13">TDC / Kopfebene</text>
+    <line x1="${right+12}" y1="${topY}" x2="${right+64}" y2="${topY}" stroke="#dbeafe" stroke-width="2" />
+
+    <rect x="${left-78}" y="${trTop}" width="78" height="${trHpx}" rx="6" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+    <rect x="${left-78}" y="${trOpenY}" width="78" height="${trOpenH}" rx="6" fill="#34d399" opacity="0.88"/>
+    <rect x="${left-120}" y="${trTop+5}" width="26" height="${Math.max(0,trHpx-10)}" rx="5" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+    <rect x="${left-120}" y="${trOpenY+5}" width="26" height="${Math.max(0,trOpenH-10)}" rx="5" fill="#34d399" opacity="0.88"/>
+    <text x="${left-130}" y="${trTop-10}" fill="#38bdf8" font-size="14" text-anchor="start">Transfer / Spülung</text>
+    <text x="${left-130}" y="${trTop+trHpx+18}" fill="#94a3b8" font-size="12" text-anchor="start">Öffnet ab ${(trOpen*1000).toFixed(1)} mm, Höhe ${(trHeight*1000).toFixed(1)} mm</text>
+
+    <rect x="${right}" y="${exTop}" width="78" height="${exHpx}" rx="6" fill="#0f172a" stroke="#f87171" stroke-width="2"/>
+    <rect x="${right}" y="${exOpenY}" width="78" height="${exOpenH}" rx="6" fill="#34d399" opacity="0.88"/>
+    <rect x="${right+94}" y="${exTop+5}" width="26" height="${Math.max(0,exHpx-10)}" rx="5" fill="#0f172a" stroke="#f87171" stroke-width="2"/>
+    <rect x="${right+94}" y="${exOpenY+5}" width="26" height="${Math.max(0,exOpenH-10)}" rx="5" fill="#34d399" opacity="0.88"/>
+    <text x="${right+132}" y="${exTop-10}" fill="#f87171" font-size="14" text-anchor="end">Auslass</text>
+    <text x="${right+132}" y="${exTop+exHpx+18}" fill="#94a3b8" font-size="12" text-anchor="end">Öffnet ab ${(exOpen*1000).toFixed(1)} mm, Höhe ${(exHeight*1000).toFixed(1)} mm</text>
+
+    <g filter="url(#softShadow)">
+      <rect x="${left+10}" y="${pistonY}" width="${boreW-20}" height="${pistonH}" rx="10" fill="#8b9bb4" stroke="#d7e1ef" stroke-width="2"/>
+      <rect x="${left+18}" y="${pistonY+8}" width="${boreW-36}" height="10" rx="4" fill="#b7c4d8" opacity="0.9"/>
+      <rect x="${left+18}" y="${pistonY+24}" width="${boreW-36}" height="8" rx="4" fill="#6d7f9b" opacity="0.95"/>
+    </g>
+    <line x1="${left-10}" y1="${pistonY}" x2="${right+10}" y2="${pistonY}" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="7 6"/>
+    <text x="${right+70}" y="${pistonY+5}" fill="#fbbf24" font-size="13">Kolbenoberkante</text>
+    <line x1="${right+12}" y1="${pistonY}" x2="${right+64}" y2="${pistonY}" stroke="#fbbf24" stroke-width="2" />
+
+    <line x1="${cx}" y1="${topY}" x2="${cx}" y2="${pistonY}" stroke="#34d399" stroke-width="3" marker-end="url(#arrowEnd)"/>
+    <text x="${cx+16}" y="${(topY+pistonY)/2}" fill="#34d399" font-size="16" font-weight="700">distance_from_tdc = ${(dist*1000).toFixed(1)} mm</text>
+
+    <rect x="130" y="740" width="720" height="86" rx="14" fill="rgba(255,255,255,0.03)" stroke="#22314b" stroke-width="1.5"/>
+    <text x="160" y="770" fill="#e5edf8" font-size="18" font-weight="700">Koordinatenbezug</text>
+    <text x="160" y="798" fill="#cbd5e1" font-size="14">Free-Piston-Zustand: x = ${(x*1000).toFixed(1)} mm</text>
+    <text x="160" y="820" fill="#94a3b8" font-size="13">Bereinigter Slot-Bezug: distance_from_tdc = x_max - x = ${(xMax*1000).toFixed(1)} - (${(x*1000).toFixed(1)}) = ${(dist*1000).toFixed(1)} mm</text>
+  `;
+}
+
+function stopPlayback(){
+  playing = false;
+  if(raf) cancelAnimationFrame(raf);
+  raf = null;
+  playStartTs = 0;
+}
+
+function animate(ts){
+  if(!playing || data.length < 2) return;
+  if(!playStartTs){
+    playStartTs = ts;
+    const start = getFrame(Number(slider.value));
+    playStartT = start?.t_s ?? 0;
+  }
+  const speed = parseFloat(playbackSpeedEl.value) || 1;
+  const elapsed = (ts - playStartTs) / 1000 * speed;
+  const targetT = playStartT + elapsed;
+  const tEnd = data.at(-1).t_s;
+  if(targetT >= tEnd){
+    drawFrame(data.length - 1);
+    stopPlayback();
+    return;
+  }
+  let lo = 0, hi = data.length - 1;
+  while(lo < hi){
+    const mid = Math.floor((lo + hi) / 2);
+    if(data[mid].t_s < targetT) lo = mid + 1; else hi = mid;
+  }
+  drawFrame(lo);
+  raf = requestAnimationFrame(animate);
+}
+
+slider.addEventListener('input', () => { stopPlayback(); drawFrame(Number(slider.value)); });
+playBtn.addEventListener('click', () => { if(!data.length) return; if(!playing){ playing = true; raf = requestAnimationFrame(animate);} });
+pauseBtn.addEventListener('click', stopPlayback);
+resetBtn.addEventListener('click', () => { stopPlayback(); drawFrame(0); });
+demoBtn.addEventListener('click', () => { stopPlayback(); generateDemo(); });
+reloadBtn.addEventListener('click', () => {
+  if(!data.length) return;
+  stopPlayback();
+  applyGeometryFallbacks(data);
+  drawFrame(Number(slider.value));
+  csvStatus.textContent = 'Geometrieparameter neu angewendet';
+});
+fitBtn.addEventListener('click', () => {
+  if(!data.length) return;
+  const xs = data.map(r => r.free_piston_x_m).filter(Number.isFinite);
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  el('xMin').value = xMin.toFixed(4);
+  el('xMax').value = xMax.toFixed(4);
+  stopPlayback();
+  applyGeometryFallbacks(data);
+  drawFrame(Number(slider.value));
+  csvStatus.textContent = 'x_min / x_max an Datenbereich angepasst';
+});
+
+csvFile.addEventListener('change', async (ev) => {
+  const file = ev.target.files?.[0];
+  if(!file) return;
+  stopPlayback();
+  try {
+    const text = await file.text();
+    const rows = parseCsv(text);
+    setData(rows, file.name);
+  } catch (err) {
+    csvStatus.textContent = 'Fehler: ' + err.message;
+  }
+});
+
+['scaleMode','xMin','xMax','transferOpen','exhaustOpen','transferHeight','exhaustHeight'].forEach(id => {
+  el(id).addEventListener('change', () => {
+    if(!data.length) return;
+    stopPlayback();
+    applyGeometryFallbacks(data);
+    drawFrame(Number(slider.value));
+  });
+});
+
+generateDemo();
+</script>
+</body>
+</html>

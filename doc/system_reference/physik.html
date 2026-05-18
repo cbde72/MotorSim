@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thermo0D Physik</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="wrap">
+    
+    <div class="sidebar">
+      <section class="card">
+        <div class="badge">Thermo0D · Referenz</div>
+        <h1 style="margin-top:.7rem">System-Dokumentation</h1>
+        <p class="muted">Statische HTML-Referenz für aktuellen Projektstand: Physik, Numerik, Konfiguration, Generatoranbindung und Ausbaupfad.</p>
+      </section>
+      <section class="card">
+        <nav><a href="index.html">Start</a>
+<a href="physik.html" style="background:#0e1624">Physik</a>
+<a href="numerik.html">Numerik</a>
+<a href="konfiguration_klassisch.html">Konfiguration classic</a>
+<a href="konfiguration_free_piston.html">Konfiguration free_piston</a>
+<a href="generator_und_schwungmasse.html">Generator & Schwungmasse</a>
+<a href="verbesserungen_und_next_steps.html">Verbesserungen & Next Steps</a></nav>
+      </section>
+      <section class="card">
+        <div><strong>Pfad</strong></div>
+        <div class="muted"><code>doc/system_reference/index.html</code></div>
+      </section>
+    </div>
+    
+    <main>
+<section class="card">
+  <h2>Gemeinsamer physikalischer Kern</h2>
+  <p>Beide Architekturpfade lösen für jedes nicht-fixe Kontrollvolumen eine Massen- und Energiebilanz. Der Grundzustand pro Volumen besteht aus <code>m</code> und <code>U</code>. Druck und Temperatur werden aus idealem Gasgesetz und innerer Energie rekonstruiert.</p>
+  <pre>dm/dt = Σ mdot_in - Σ mdot_out
+dU/dt = Σ(mdot · h)_in - Σ(mdot · h)_out - p·dV/dt + Q̇_wall + Q̇_comb - Q̇_evap</pre>
+  <ul>
+    <li><strong>Massenstrom</strong>: De-St.-Venant/Wantzel, vorzeichenbehaftet und richtungsabhängig.</li>
+    <li><strong>Enthalpieströme</strong>: auf Basis von <code>h = cp · T_upstream</code>.</li>
+    <li><strong>p·dV-Arbeit</strong>: nur bei bewegten Zylindern bzw. Bounce-Volumina relevant.</li>
+    <li><strong>Wandwärme</strong>: Woschni-Varianten mit wählbarer Korrelation.</li>
+    <li><strong>Verbrennung</strong>: Vibe-Funktion entweder winkel- oder hubbasiert.</li>
+    <li><strong>Verdampfung</strong>: einfacher latenter Wärmesenken-Term.</li>
+  </ul>
+</section>
+<section class="card">
+  <h2>Connection-Physik</h2>
+  <h3>Valve</h3>
+  <p>Ventile verwenden Lift-Datei und <code>alpha_k</code>-Datei. Daraus wird aus Hub und Referenzfläche eine vorwärts- und rückwärtswirksame Strömungsfläche berechnet.</p>
+  <h3>Slot</h3>
+  <p>Schlitze werden aus Breite, Höhe, Anzahl und aktueller Uncover-Länge berechnet. Beim free_piston-Pfad ist aktuell nur <code>opening_mode = by_distance</code> zulässig.</p>
+  <h3>Orifice</h3>
+  <p>Einfacher fester Querschnitt mit getrennten C<sub>d</sub>-Werten für beide Richtungen.</p>
+  <h3>Check Valve</h3>
+  <p>Einwegverbindung mit Vorwärts-C<sub>d</sub> und <code>cracking_pressure_Pa</code>. Unterhalb der Öffnungsschwelle ist die wirksame Fläche null.</p>
+</section>
+<section class="card">
+  <h2>Konventioneller Pfad (<code>modeling.architecture: classic</code>)</h2>
+  <p>Der klassische Pfad nutzt eine vorgegebene crank-slider-Kinematik. Das heißt:</p>
+  <ul>
+    <li>Kolbenweg, Volumen und <code>dV/dt</code> werden aus <code>bore</code>, <code>stroke</code>, <code>conrod</code>, <code>compression_ratio</code>, <code>phase_deg</code> und <code>speed_rpm</code> direkt aus der Zeit berechnet.</li>
+    <li>Die Drehzahl ist im aktuellen Stand <strong>kein dynamischer Zustand</strong>, sondern eine Randvorgabe.</li>
+    <li>Mehrzylinder werden über mehrere Volumes mit je eigener Phase abgebildet.</li>
+  </ul>
+  <pre>θ(t) = wrap(phase_deg + 6 · rpm · t, cycle_deg)
+V(θ) = Vc + A_piston · x(θ)
+dV/dt = A_piston · dx/dθ · dθ/dt</pre>
+  <div class="callout warn">Damit können aktuelle Gaswechsel-, Druck- und Arbeitsverläufe berechnet werden, aber noch keine echte Kurbelwellendynamik, Lastwechsel über Trägheitsmoment oder Drehzahleinregelung aus dem Druckmoment heraus.</div>
+</section>
+<section class="card">
+  <h2>Freikolbenpfad (<code>modeling.architecture: free_piston</code>)</h2>
+  <p>Der freie Pfad erweitert den Zustandsvektor um translatorische Mechanik:</p>
+  <pre>ẋ = v
+v̇ = (F_gas + F_bounce + F_friction + F_load) / m_moving</pre>
+  <ul>
+    <li><strong>Zylinderkraft</strong>: <code>F_gas = p_cyl · A_piston</code></li>
+    <li><strong>Bouncekraft</strong>: entweder geschlossenes Gasfeder-Modell oder explizites <code>bounce_chamber</code>-Volumen mit Gaswechsel</li>
+    <li><strong>Reibung</strong>: Coulomb + viskos</li>
+    <li><strong>Last</strong>: none, viscous, electromagnetic_linear oder generator_controlled</li>
+  </ul>
+  <p>Im gas_exchange-Bounce-Modus kann die Bounce-Kammer selbst als Volumen in der Topologie erscheinen und per Orifice/Check Valve mit anderen Volumina verbunden sein.</p>
+  <h3>Lokaler Zykluswinkel beim Freikolben</h3>
+  <p>Für hubbasierte Ereignisse wie <code>start_mode: compression_hub</code> wird ein lokaler Zykluswinkel bzw. eine lokale Verdichtungshub-Referenz aus Position und Bewegungsrichtung rekonstruiert. Dadurch kann die Vibe-Wärmefreisetzung an die reale translatorische Bewegung gekoppelt werden.</p>
+</section>
+<section class="card">
+  <h2>Wandwärme, Verbrennung, Verdampfung</h2>
+  <h3>Wandwärme</h3>
+  <p>Woschni ist pro Volumen konfigurierbar. Variants: <code>legacy</code>, <code>promo</code>, <code>gt</code>, <code>classic</code>, <code>swirl</code>, <code>huber</code>. Zusätzlich gibt es Multiplikator, IMEP-Parameter, Referenzzustände und <code>dp_mode</code>.</p>
+  <h3>Verbrennung</h3>
+  <p>Aktuell Vibe. Wahlweise direkte Energie <code>added_energy_per_cycle_J</code> oder Brennstoffpaar <code>fuel_mass_per_cycle_kg + lhv_J_per_kg</code>. Im Freikolbenpfad kann die freigesetzte Energie optional über <code>stroke_ratio</code> an den realen Hub gekoppelt werden.</p>
+  <h3>Verdampfung</h3>
+  <p>Einfache lineare Wärmeentnahme über Start, Dauer, verdampfte Masse und latente Wärme. Noch kein Tröpfchenmodell und keine gekoppelte Einspritzdynamik.</p>
+</section>
+</main>
+  </div>
+</body>
+</html>

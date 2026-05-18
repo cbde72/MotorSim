@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Konfiguration free_piston</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="wrap">
+    
+    <div class="sidebar">
+      <section class="card">
+        <div class="badge">Thermo0D · Referenz</div>
+        <h1 style="margin-top:.7rem">System-Dokumentation</h1>
+        <p class="muted">Statische HTML-Referenz für aktuellen Projektstand: Physik, Numerik, Konfiguration, Generatoranbindung und Ausbaupfad.</p>
+      </section>
+      <section class="card">
+        <nav><a href="index.html">Start</a>
+<a href="physik.html">Physik</a>
+<a href="numerik.html">Numerik</a>
+<a href="konfiguration_klassisch.html">Konfiguration classic</a>
+<a href="konfiguration_free_piston.html" style="background:#0e1624">Konfiguration free_piston</a>
+<a href="generator_und_schwungmasse.html">Generator & Schwungmasse</a>
+<a href="verbesserungen_und_next_steps.html">Verbesserungen & Next Steps</a></nav>
+      </section>
+      <section class="card">
+        <div><strong>Pfad</strong></div>
+        <div class="muted"><code>doc/system_reference/index.html</code></div>
+      </section>
+    </div>
+    
+    <main><section class="card"><h2>Top-Level-Struktur</h2><table><thead><tr><th>Block</th><th>Pflicht/Option</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>versioning</code></td><td>optional</td><td>Paket-/Schema-Information, Migrationen.</td></tr><tr><td><code>test_description</code></td><td>optional</td><td>Freitext zur Variante.</td></tr><tr><td><code>modeling.architecture</code></td><td>Pflicht</td><td><code>classic</code> oder <code>free_piston</code>.</td></tr><tr><td><code>preprocessing</code></td><td>Pflicht</td><td>Gasdaten, Features, Engine, Volumes, Connections.</td></tr><tr><td><code>simulation</code></td><td>Pflicht</td><td>Integrator-Schritte, Zyklen, Solver.</td></tr><tr><td><code>postprocessing</code></td><td>Pflicht</td><td>CSV, Excel, Sampling, Checkreport, Plots, Konsole.</td></tr><tr><td><code>gasexchange</code></td><td>optional</td><td>UI-/Editor-Zusatzdaten.</td></tr><tr><td><code>free_piston</code></td><td>nur free_piston</td><td>Mechanik-/Last-/Initialzustände des Freikolbenpfads.</td></tr></tbody></table><table><thead><tr><th>Feld</th><th>Typ/Optionen</th><th>Hinweis</th></tr></thead><tbody><tr><td><code>preprocessing.gas_properties.cp_J_per_kgK</code></td><td>float > 0</td><td>Konstantes <code>cp</code>.</td></tr><tr><td><code>preprocessing.gas_properties.cv_J_per_kgK</code></td><td>float > 0</td><td>Konstantes <code>cv</code>; muss kleiner als <code>cp</code> sein.</td></tr><tr><td><code>preprocessing.gas_properties.R_J_per_kgK</code></td><td>float > 0</td><td>Gaskonstante.</td></tr><tr><td><code>preprocessing.features.mass_flow</code></td><td>bool</td><td>Schaltet alle Connection-Massenströme global.</td></tr><tr><td><code>preprocessing.features.wall_heat</code></td><td>bool</td><td>Schaltet Woschni global.</td></tr><tr><td><code>preprocessing.features.combustion</code></td><td>bool</td><td>Schaltet Vibe global.</td></tr><tr><td><code>preprocessing.features.evaporation</code></td><td>bool</td><td>Schaltet Verdampfungsmodell global.</td></tr><tr><td><code>preprocessing.features.pv_work</code></td><td>bool</td><td>Schaltet <code>p·dV</code> global.</td></tr><tr><td><code>preprocessing.engine.cycle_type</code></td><td><code>2t</code> | <code>4t</code></td><td>Legt 360°- oder 720°-Zyklus fest.</td></tr><tr><td><code>preprocessing.engine.speed_rpm</code></td><td>float > 0</td><td>Nur im classic-Pfad direkt kinematisch wirksam; im free_piston wichtig für globale Referenzen und Auswertungslogik.</td></tr></tbody></table><table><thead><tr><th>Feld</th><th>Typ/Optionen</th><th>Hinweis</th></tr></thead><tbody><tr><td><code>simulation.dt_s</code></td><td>float > 0</td><td>Fixes Integrations-/Ausgaberaster für Euler/RK4 und Basisraster für SciPy-Solver.</td></tr><tr><td><code>simulation.total_cycles</code></td><td>int > 0</td><td>Gesamtzyklen.</td></tr><tr><td><code>simulation.save_last_cycles</code></td><td>1..total_cycles</td><td>Wie viele letzte Zyklen für Nachauswertung erhalten bleiben.</td></tr><tr><td><code>simulation.simulationtime</code></td><td>optional float > 0</td><td>Insbesondere für free_piston als explizite Endzeit.</td></tr><tr><td><code>simulation.solver.kind</code></td><td><code>euler</code>, <code>rk4</code>, <code>scipy_rk45</code>, <code>scipy_bdf</code>, <code>scipy_radau</code></td><td>Solverwahl.</td></tr><tr><td><code>simulation.solver.rtol / atol</code></td><td>float</td><td>SciPy-Toleranzen.</td></tr><tr><td><code>postprocessing.csv_enabled / csv_path / csv_separator</code></td><td>bool / str / 1 Zeichen</td><td>CSV-Hauptausgabe.</td></tr><tr><td><code>postprocessing.excel_enabled / excel_path</code></td><td>bool / str</td><td>Excel-Ausgabe.</td></tr><tr><td><code>postprocessing.sampling.mode</code></td><td><code>time</code> | <code>crank_angle</code></td><td>Exportmodus.</td></tr><tr><td><code>postprocessing.sampling.step_s / step_deg</code></td><td>float > 0</td><td>Abtastschritt je Modus.</td></tr><tr><td><code>postprocessing.final_cycle_uniform_angle_export</code></td><td>enabled, step_deg</td><td>Zusätzlicher letzter Zyklus auf Winkelraster.</td></tr><tr><td><code>postprocessing.check_report</code></td><td>enabled, html_enabled</td><td>Automatische Plausibilitätsberichte.</td></tr><tr><td><code>postprocessing.plots</code></td><td>enabled, source, output_dir, layouts</td><td>Plot-Engine.</td></tr><tr><td><code>postprocessing.console.*</code></td><td>bool</td><td>Run-, Zyklus-, Checkreport- und Geometrieausgaben.</td></tr></tbody></table></section><section class="card"><h2>Zusatzblock <code>free_piston</code></h2><table><thead><tr><th>Feld</th><th>Typ/Optionen</th><th>Bedeutung</th></tr></thead><tbody><tr><td><code>initial_conditions.x0_m</code></td><td>float</td><td>Startposition innerhalb <code>x_min_m..x_max_m</code>.</td></tr><tr><td><code>initial_conditions.v0_m_per_s</code></td><td>float</td><td>Startgeschwindigkeit.</td></tr><tr><td><code>initial_conditions.cylinder.pressure_Pa</code></td><td>float > 0</td><td>Zylinderstartdruck; muss zum expliziten cylinder-Volume passen.</td></tr><tr><td><code>initial_conditions.cylinder.temperature_K</code></td><td>float > 0</td><td>Zylinderstarttemperatur.</td></tr><tr><td><code>initial_conditions.bounce</code></td><td>optional</td><td>Nur bei geschlossenem Bounce-Modell ohne explizites <code>bounce_chamber</code>.</td></tr><tr><td><code>initial_conditions.combustion_state.*</code></td><td>burned_fraction, released_energy_J, ignition_armed, injection_armed</td><td>Laufzeitstart des Verbrennungszustands.</td></tr><tr><td><code>mechanics.moving_mass_kg</code></td><td>float > 0</td><td>Translatorische Gesamtmasse.</td></tr><tr><td><code>mechanics.piston_diameter_m + compression_ratio</code></td><td>neuer Geometrieweg</td><td>Empfohlene Definition.</td></tr><tr><td><code>mechanics.piston_area_m2 + clearance_volume_m3</code></td><td>legacy Alternative</td><td>Nicht mit neuem Weg mischen.</td></tr><tr><td><code>mechanics.x_min_m / x_max_m</code></td><td>float</td><td>Mechanische Bewegungsgrenzen.</td></tr><tr><td><code>friction.model</code></td><td><code>coulomb_viscous</code></td><td>Aktuell einziges Reibmodell.</td></tr><tr><td><code>friction.fc_N / cv_Ns_per_m</code></td><td>float >= 0</td><td>Coulomb- und viskoser Reibanteil.</td></tr><tr><td><code>load.model</code></td><td><code>none</code> | <code>viscous</code> | <code>electromagnetic_linear</code> | <code>generator_controlled</code></td><td>Externe Last.</td></tr><tr><td><code>load.damping_Ns_per_m</code></td><td>float >= 0</td><td>Basisdämpfung.</td></tr><tr><td><code>load.max_damping_Ns_per_m</code></td><td>optional</td><td>Pflicht bei <code>generator_controlled</code>.</td></tr><tr><td><code>load.control_zone_m</code></td><td>optional</td><td>Pflicht bei <code>generator_controlled</code>; Bereich nahe Totpunkten.</td></tr><tr><td><code>bounce</code></td><td><code>gas_spring</code> oder explizites <code>bounce_chamber</code></td><td>Geschlossenes Bounce-Modell nur verwenden, wenn kein Bounce-Volume in <code>preprocessing.volumes</code> existiert.</td></tr></tbody></table></section><section class="card"><h2>Bounce als explizites Volume</h2><table><thead><tr><th>Feld</th><th>Typ/Optionen</th><th>Bedeutung</th></tr></thead><tbody><tr><td><code>type</code></td><td><code>bounce_chamber</code></td><td>Bounce-Volumentyp.</td></tr><tr><td><code>model</code></td><td><code>gas_spring</code> | <code>gas_exchange</code></td><td>Geschlossen oder topologisch angebunden.</td></tr><tr><td><code>initial_pressure_Pa</code>, <code>initial_temperature_K</code></td><td>float</td><td>Startzustand der Bounce.</td></tr><tr><td><code>chamber_diameter_m</code>, <code>chamber_length_m</code>, <code>compression_ratio</code></td><td>neuer Geometrieweg</td><td>Empfohlen.</td></tr><tr><td><code>chamber_volume0_m3</code></td><td>legacy</td><td>Alternative zur neuen Geometrie.</td></tr><tr><td><code>p0_Pa</code></td><td>optional</td><td>Referenzdruck für Gasfederansatz.</td></tr><tr><td><code>polytropic_exponent</code></td><td>float > 0</td><td>Polytropenexponent der Bounce-Gasfeder.</td></tr></tbody></table><div class="callout">Bei <code>model: gas_exchange</code> darf die Bounce-Kammer über <code>orifice</code> und <code>check_valve</code> topologisch angebunden werden. Bei <code>gas_spring</code> muss sie geschlossen bleiben.</div></section><section class="card"><h2>Connections im free_piston-Pfad</h2><ul><li><code>valve</code> ist aktuell nicht zulässig.</li><li><code>slot</code> ist zulässig, aber nur mit <code>opening_mode: by_distance</code>.</li><li>Bounce-Volumes dürfen aktuell nur über <code>orifice</code> oder <code>check_valve</code> angebunden werden, wenn <code>model: gas_exchange</code> gesetzt ist.</li></ul><table><thead><tr><th>Connection-Typ</th><th>Wesentliche Felder</th><th>Hinweis</th></tr></thead><tbody><tr><td><code>valve</code></td><td><code>opening_angle_deg</code>, <code>opening_reference</code>, <code>profile_angle_domain</code>, <code>lift_scale</code>, <code>lash_m</code>, <code>lift_file</code>, <code>alpha_k_file</code></td><td>Im free_piston-Pfad aktuell nicht erlaubt.</td></tr><tr><td><code>slot</code></td><td><code>opening_mode</code>, <code>distance_from_tdc_m</code> oder <code>opening_angle_deg</code>, <code>width_m</code>, <code>height_m</code>, <code>number_of_identical_holes</code>, <code>discharge_coefficients</code></td><td>Im free_piston-Pfad nur <code>by_distance</code>.</td></tr><tr><td><code>orifice</code></td><td><code>area_m2</code>, <code>forward_cd</code>, <code>reverse_cd</code></td><td>Einfacher Drosselpfad.</td></tr><tr><td><code>check_valve</code></td><td><code>area_m2</code>, <code>discharge_coefficient</code>, <code>cracking_pressure_Pa</code></td><td>Einwegventil.</td></tr></tbody></table></section><section class="card"><h2>Vollständiges Minimalbeispiel free_piston</h2><pre>modeling:
+  architecture: free_piston
+
+free_piston:
+  initial_conditions:
+    x0_m: 0.05
+    v0_m_per_s: 0.0
+    cylinder:
+      pressure_Pa: 120000.0
+      temperature_K: 300.0
+    combustion_state:
+      burned_fraction_0to1: 0.0
+      released_energy_J: 0.0
+      ignition_armed: false
+      injection_armed: false
+  mechanics:
+    moving_mass_kg: 0.7
+    piston_diameter_m: 0.0605
+    compression_ratio: 30.0
+    x_min_m: 0.0
+    x_max_m: 0.108
+  friction:
+    model: coulomb_viscous
+    fc_N: 40.0
+    cv_Ns_per_m: 0.0
+  load:
+    model: viscous
+    damping_Ns_per_m: 0.0
+
+preprocessing:
+  gas_properties:
+    cp_J_per_kgK: 1005.0
+    cv_J_per_kgK: 718.0
+    R_J_per_kgK: 287.0
+  features:
+    mass_flow: true
+    wall_heat: false
+    combustion: true
+    evaporation: false
+    pv_work: true
+  engine:
+    cycle_type: 2t
+    speed_rpm: 25.0
+  volumes:
+    - name: cylinder
+      type: cylinder
+      initial_pressure_Pa: 120000.0
+      initial_temperature_K: 300.0
+      kinematics:
+        type: crank_slider
+        bore_m: 0.0745
+        stroke_m: 0.08
+        conrod_m: 0.12
+        compression_ratio: 30.0
+        phase_deg: 0.0
+      wall_heat: {model: none}
+      combustion:
+        model: vibe
+        start_mode: compression_hub
+        start_hub_m: 0.05
+        duration_hub_m: 0.01
+        a: 6.9
+        m: 2.0
+        added_energy_per_cycle_J: 500.0
+        energy_coupling: none
+      evaporation: {model: none}
+    - name: bounce
+      type: bounce_chamber
+      model: gas_exchange
+      initial_pressure_Pa: 300000.0
+      initial_temperature_K: 300.0
+      chamber_diameter_m: 0.07
+      chamber_length_m: 0.108
+      compression_ratio: 16.0
+      polytropic_exponent: 1.3
+  connections: []
+
+simulation:
+  dt_s: 1e-5
+  total_cycles: 1
+  save_last_cycles: 1
+  simulationtime: 0.2
+  solver: {kind: rk4, rtol: 1e-6, atol: 1e-9}
+
+postprocessing:
+  csv_enabled: true
+  csv_path: results/free_piston.csv
+  csv_separator: ";"
+  excel_enabled: false
+  excel_path: results/free_piston.xlsx
+  sampling: {mode: time, step_s: 1e-4}</pre></section></main>
+  </div>
+</body>
+</html>

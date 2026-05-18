@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Free-Piston Konfigurationsdokumentation</title>
+  <style>
+    :root {
+      --bg:#0b1020; --panel:#111833; --panel2:#0f172a; --text:#e5ecf6; --muted:#9fb0c7;
+      --border:#2a3a5f; --accent:#57b5ff; --accent2:#7ef0c2; --warn:#ffcc66; --code:#0a1226;
+    }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; font-family:Segoe UI, Roboto, Arial, sans-serif; background:linear-gradient(180deg,#09101e,#0b1020 160px); color:var(--text); line-height:1.58; }
+    .page { max-width:1280px; margin:0 auto; padding:28px 22px 70px; }
+    .hero { background:linear-gradient(180deg, rgba(87,181,255,.12), rgba(126,240,194,.08)); border:1px solid var(--border); border-radius:22px; padding:24px 26px; box-shadow:0 10px 28px rgba(0,0,0,.25); }
+    h1,h2,h3 { line-height:1.18; }
+    h1 { margin:0 0 8px; font-size:2.25rem; }
+    h2 { margin-top:34px; padding-bottom:8px; border-bottom:1px solid var(--border); font-size:1.45rem; }
+    h3 { margin-top:22px; font-size:1.08rem; color:var(--accent2); }
+    p, li { font-size:1rem; }
+    .lead { color:var(--muted); max-width:1000px; }
+    .meta { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+    .pill { display:inline-block; border:1px solid var(--border); border-radius:999px; padding:6px 12px; background:rgba(255,255,255,.03); color:var(--text); font-size:.9rem; }
+    .layout { display:grid; grid-template-columns:280px minmax(0,1fr); gap:22px; margin-top:24px; }
+    .toc { position:sticky; top:16px; align-self:start; background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:18px; }
+    .toc h2 { margin:0 0 10px; border:none; padding:0; font-size:1.08rem; }
+    .toc ol { margin:0; padding-left:18px; }
+    .toc li { margin:.45rem 0; }
+    .toc a { color:var(--accent); text-decoration:none; }
+    .toc a:hover { text-decoration:underline; }
+    .content section, .card { background:linear-gradient(180deg, var(--panel), var(--panel2)); border:1px solid var(--border); border-radius:18px; padding:18px 18px 14px; box-shadow:0 8px 24px rgba(0,0,0,.18); }
+    .content section + section { margin-top:18px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
+    table { width:100%; border-collapse:collapse; table-layout:fixed; margin:14px 0 6px; }
+    th, td { border:1px solid var(--border); padding:10px 11px; vertical-align:top; word-wrap:break-word; overflow-wrap:anywhere; }
+    th { background:#0a1226; text-align:left; }
+    code, pre { font-family:Consolas, Menlo, Monaco, monospace; }
+    code { background:rgba(255,255,255,.05); padding:1px 5px; border-radius:6px; }
+    pre { background:var(--code); color:#dbe8ff; padding:16px; border-radius:14px; border:1px solid var(--border); overflow:auto; white-space:pre-wrap; word-break:break-word; }
+    .hint { color:var(--muted); margin-top:6px; font-size:.93rem; }
+    .warn { color:var(--warn); }
+    .small { font-size:.93rem; color:var(--muted); }
+    math { overflow-x:auto; }
+    .formula { padding:14px 16px; border:1px solid var(--border); border-radius:14px; background:rgba(255,255,255,.02); margin:12px 0; }
+    .kpi { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:12px; }
+    .kpi .box { border:1px solid var(--border); border-radius:14px; padding:12px 14px; background:rgba(255,255,255,.03); }
+    .kpi .label { color:var(--muted); font-size:.9rem; }
+    .kpi .value { font-size:1.08rem; font-weight:700; margin-top:4px; }
+    .footer { margin-top:26px; color:var(--muted); font-size:.92rem; }
+    @media (max-width: 980px) { .layout { grid-template-columns:1fr; } .toc { position:relative; top:auto; } }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="hero">
+      <h1>Free-Piston Konfigurationsdokumentation</h1>
+      <p class="lead">Diese HTML-Dokumentation beschreibt den aktuellen Free-Piston-Konfigurationspfad des Projekts vollständig vom Root-Block bis zur <code>free_piston</code>-Sektion. Enthalten sind Parameterbedeutung, praktische Verwendung, Implementierungsgrenzen und die im Code tatsächlich verwendeten Gleichungen. Als Beispielstand dient <code>examples/free_piston_phase_a2_time005.yaml</code>.</p>
+      <div class="meta">
+        <span class="pill">Projektstand: 7.1.82 / Schema 5</span>
+        <span class="pill">Architektur: free_piston</span>
+        <span class="pill">Fokus: Konfiguration + Formeln + Verwendung</span>
+      </div>
+      <div class="kpi">
+        <div class="box"><div class="label">Beispiel-Endzeit</div><div class="value">0.23 s</div></div>
+        <div class="box"><div class="label">Integrator</div><div class="value">rk4</div></div>
+        <div class="box"><div class="label">Sampling</div><div class="value">time / Δt = 0.05 s</div></div>
+        <div class="box"><div class="label">Plotlayout</div><div class="value">—</div></div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <nav class="toc">
+        <h2>Inhalt</h2>
+        <ol>
+          <li><a href="#scope">Geltungsbereich und Status</a></li>
+          <li><a href="#equations">Verwendete Gleichungen</a></li>
+          <li><a href="#params">Parameterreferenz</a></li>
+          <li><a href="#limits">Wichtige Grenzen im aktuellen Stand</a></li>
+          <li><a href="#usage">Praktische Verwendung</a></li>
+          <li><a href="#signals">Signale und Plotbezug</a></li>
+          <li><a href="#example">Beispielkonfiguration</a></li>
+          <li><a href="#sources">Verwendete Quelldateien</a></li>
+        </ol>
+      </nav>
+
+      <div class="content">
+        <section id="scope">
+          <h2>1. Geltungsbereich und Status</h2>
+          <p>Die Doku bezieht sich auf den aktuell implementierten Free-Piston-Pfad in:</p>
+          <ul>
+            <li><code>modeling.architecture: free_piston</code></li>
+            <li>eigener Builder- und Simulatorpfad</li>
+            <li>zusätzliche Zustände <code>x</code> und <code>v</code></li>
+            <li>zeitbasierter Export inklusive deterministischem <code>sampling.mode: time</code></li>
+          </ul>
+          <p class="small">Wichtig: Der derzeitige Minimalpfad bildet die gekoppelte Mechanik und ideale Gasthermodynamik ab. Klassischer Gaswechsel, Wandwärme, Verbrennung und Verdampfung sind im Free-Piston-RHS noch nicht aktiv angebunden. Entsprechende Parameter existieren teilweise schon in der Config, wirken aber noch nicht dynamisch.</p>
+        </section>
+
+        <section id="equations">
+          <h2>2. Verwendete Gleichungen</h2>
+          <p>Die folgenden Gleichungen entsprechen dem tatsächlich implementierten Codepfad in <code>builder.py</code>, <code>geometry.py</code>, <code>thermo.py</code>, <code>rhs.py</code>, <code>simulator.py</code> und <code>output/sampling.py</code>.</p>
+          <div class="formula"><h3>F1 – Synthetische Zykluslänge</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>cycleDeg</mi></msub><mo>=</mo>
+  <mrow><mo>{</mo>
+    <mtable>
+      <mtr><mtd><mn>360</mn></mtd><mtd><mtext>für 2T</mtext></mtd></mtr>
+      <mtr><mtd><mn>720</mn></mtd><mtd><mtext>für 4T</mtext></mtd></mtr>
+    </mtable>
+  </mrow>
+</math>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>cyclePeriod</mi><mi>s</mi></msub><mo>=</mo>
+  <mfrac><msub><mi>cycleDeg</mi></msub><mrow><mn>6</mn><mo>&#x2062;</mo><mi>speedRpm</mi></mrow></mfrac>
+</math>
+</div><div class="formula"><h3>F2 – Zylindervolumen aus Position</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>V</mi><mtext>cyl</mtext></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>=</mo>
+  <msub><mi>V</mi><mtext>clear</mtext></msub><mo>+</mo><mi>A</mi><mo stretchy="false">(</mo><msub><mi>x</mi><mtext>max</mtext></msub><mo>-</mo><mi>x</mi><mo stretchy="false">)</mo>
+</math>
+</div><div class="formula"><h3>F3 – Zylinder-Volumenänderungsrate</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <mfrac><mrow><mi>d</mi><msub><mi>V</mi><mtext>cyl</mtext></msub></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mo>-</mo><mi>A</mi><mo>&#x2062;</mo><mi>v</mi>
+</math>
+</div><div class="formula"><h3>F4 – Bounce-Volumen aus Position</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>V</mi><mtext>b</mtext></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>=</mo>
+  <msub><mi>V</mi><mn>0</mn></msub><mo>+</mo><mi>A</mi><mo stretchy="false">(</mo><mi>x</mi><mo>-</mo><msub><mi>x</mi><mtext>min</mtext></msub><mo stretchy="false">)</mo>
+</math>
+</div><div class="formula"><h3>F5 – Ideales Gas / Anfangsmasse</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <mi>m</mi><mo>=</mo><mfrac><mrow><mi>p</mi><mi>V</mi></mrow><mrow><mi>R</mi><mi>T</mi></mrow></mfrac>
+</math>
+</div><div class="formula"><h3>F6 – Innere Energie und Temperatur</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <mi>u</mi><mo>=</mo><msub><mi>c</mi><mi>v</mi></msub><mi>T</mi>
+</math>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <mi>U</mi><mo>=</mo><mi>m</mi><msub><mi>c</mi><mi>v</mi></msub><mi>T</mi>
+</math>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <mi>T</mi><mo>=</mo><mfrac><mi>U</mi><mrow><mi>m</mi><msub><mi>c</mi><mi>v</mi></msub></mrow></mfrac>
+</math>
+</div><div class="formula"><h3>F7 – Zylinderdruck aus Zustand</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <mi>p</mi><mo>=</mo><mfrac><mrow><mi>m</mi><mi>R</mi><mi>T</mi></mrow><mi>V</mi></mfrac>
+  <mo>=</mo>
+  <mfrac><mrow><mi>R</mi><mi>U</mi></mrow><mrow><msub><mi>c</mi><mi>v</mi></msub><mi>V</mi></mrow></mfrac>
+</math>
+</div><div class="formula"><h3>F8 – Bounce-Druck (polytrope Gasfeder)</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>p</mi><mtext>b</mtext></msub><mo>=</mo><msub><mi>p</mi><mn>0</mn></msub>
+  <msup><mrow><mo stretchy="false">(</mo><mfrac><msub><mi>V</mi><mn>0</mn></msub><msub><mi>V</mi><mtext>b</mtext></msub><mo stretchy="false">)</mo></mrow><mi>n</mi></msup>
+</math>
+</div><div class="formula"><h3>F9 – Kräfte</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>F</mi><mtext>gas</mtext></msub><mo>=</mo><mo>-</mo><msub><mi>p</mi><mtext>cyl</mtext></msub><mi>A</mi>
+</math>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>F</mi><mtext>bounce</mtext></msub><mo>=</mo><msub><mi>p</mi><mtext>b</mtext></msub><mi>A</mi>
+</math>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>F</mi><mtext>fric</mtext></msub><mo>=</mo><mo>-</mo><mo stretchy="false">(</mo><msub><mi>F</mi><mi>c</mi></msub><mi>sign</mi><mo stretchy="false">(</mo><mi>v</mi><mo stretchy="false">)</mo><mo>+</mo><msub><mi>c</mi><mi>v</mi></msub><mi>v</mi><mo stretchy="false">)</mo>
+</math>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>F</mi><mtext>load</mtext></msub><mo>=</mo><mo>-</mo><mi>d</mi><mi>v</mi>
+</math>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>F</mi><mtext>net</mtext></msub><mo>=</mo><msub><mi>F</mi><mtext>gas</mtext></msub><mo>+</mo><msub><mi>F</mi><mtext>bounce</mtext></msub><mo>+</mo><msub><mi>F</mi><mtext>fric</mtext></msub><mo>+</mo><msub><mi>F</mi><mtext>load</mtext></msub>
+</math>
+</div><div class="formula"><h3>F10 – ODE-System</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <mfrac><mrow><mi>d</mi><mi>m</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mn>0</mn>
+</math>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <mfrac><mrow><mi>d</mi><mi>U</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mo>-</mo><mi>p</mi><mfrac><mrow><mi>d</mi><mi>V</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+</math>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <mfrac><mrow><mi>d</mi><mi>x</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mi>v</mi>
+</math>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <mfrac><mrow><mi>d</mi><mi>v</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mfrac><msub><mi>F</mi><mtext>net</mtext></msub><msub><mi>m</mi><mtext>moving</mtext></msub></mfrac>
+</math>
+</div><div class="formula"><h3>F11 – Integrationsgitter</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>t</mi><mi>k</mi></msub><mo>=</mo><mi>k</mi><mo>&#x2062;</mo><mi>&#x0394;</mi><mi>t</mi>
+</math>
+<p>Bis zur exakten Endzeit <code>simulation.simulationtime</code>. Falls die Endzeit kein ganzzahliges Vielfaches von <code>dt_s</code> ist, wird der letzte Integrationspunkt explizit auf die Endzeit gesetzt.</p>
+</div><div class="formula"><h3>F12 – Zeitbasiertes Export-Sampling</h3>
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>t</mi><mtext>sample,k</mtext></msub><mo>=</mo><msub><mi>t</mi><mn>0</mn></msub><mo>+</mo><mi>k</mi><mo>&#x2062;</mo><mi>&#x0394;</mi><msub><mi>t</mi><mtext>export</mtext></msub>
+</math>
+<p>Mit <code>&#x0394;t_export = postprocessing.sampling.step_s</code>. Exportiert werden nur Rasterpunkte, die auf diesem Gitter liegen. Deshalb kann die Simulation bis 0.23 s laufen, während die CSV bei <code>step_s: 0.05</code> die Zeiten 0.00, 0.05, 0.10, 0.15, 0.20 enthält.</p>
+</div>
+        </section>
+
+        <section id="params">
+          <h2>3. Parameterreferenz</h2>
+          <p>Die Tabellen listen den für Free-Piston relevanten Konfigurationspfad vollständig auf. Die Spalte „Beispielwert“ stammt aus <code>examples/free_piston_phase_a2_time005.yaml</code>.</p>
+          <section class="card"><h3>Versionierung und Identifikation</h3><table><thead><tr><th style="width:22%">Pfad</th><th style="width:12%">Typ / Werte</th><th style="width:14%">Beispielwert</th><th style="width:28%">Verwendung</th><th style="width:24%">Wirkung / Hinweis</th></tr></thead><tbody>
+<tr><td><code>versioning.package_version</code></td><td>string</td><td><code>7.1.82</code></td><td>Paketversion, mit der die Beispiel-Config zuletzt gespeichert wurde.</td><td>Nur Metadaten für Nachvollziehbarkeit und Migration. Keine direkte Modellgleichung.<div class="hint">Soll zur laufenden Paketversion passen.</div></td></tr>
+<tr><td><code>versioning.config_schema_version</code></td><td>int</td><td><code>5</code></td><td>Aktuelle Schema-Version des Dokuments.</td><td>Steuert Config-Validierung/Migration.<div class="hint">Im aktuellen Stand: 5.</div></td></tr>
+<tr><td><code>versioning.loaded_config_schema_version</code></td><td>int</td><td><code>5</code></td><td>Schema-Version, aus der geladen wurde.</td><td>Hilft zu erkennen, ob eine Migration stattgefunden hat.<div class="hint">Normalerweise gleich config_schema_version.</div></td></tr>
+<tr><td><code>versioning.migration_applied</code></td><td>bool</td><td><code>false</code></td><td>Kennzeichnet, ob beim Laden eine Migration angewendet wurde.</td><td>Keine direkte Rechenwirkung.<div class="hint">Für reproduzierbare Stände dokumentieren.</div></td></tr>
+<tr><td><code>test_description</code></td><td>string</td><td><code>Free-piston architecture smoke config for Phase A.2 minimal runnable free-piston case</code></td><td>Freier Beschreibungstext für den Run/Beispielstand.</td><td>Nur Dokumentation/Traceability.<div class="hint">Optional, aber nützlich in Batchläufen.</div></td></tr>
+</tbody></table></section><section class="card"><h3>Architekturwahl</h3><table><thead><tr><th style="width:22%">Pfad</th><th style="width:12%">Typ / Werte</th><th style="width:14%">Beispielwert</th><th style="width:28%">Verwendung</th><th style="width:24%">Wirkung / Hinweis</th></tr></thead><tbody>
+<tr><td><code>modeling.architecture</code></td><td>choice: classic | free_piston</td><td><code>free_piston</code></td><td>Schaltet den Modellpfad um. Für den hier beschriebenen Pfad muss der Wert free_piston sein.</td><td>Aktiviert build_free_piston_bundle(...), simulate_free_piston(...), Free-Piston-RHS und die zusätzlichen Zustände x,v.<div class="hint">Für diese Doku zwingend free_piston.</div></td></tr>
+</tbody></table></section><section class="card"><h3>Preprocessing – Gas, Features und synthetische Zyklusdefinition</h3><table><thead><tr><th style="width:22%">Pfad</th><th style="width:12%">Typ / Werte</th><th style="width:14%">Beispielwert</th><th style="width:28%">Verwendung</th><th style="width:24%">Wirkung / Hinweis</th></tr></thead><tbody>
+<tr><td><code>preprocessing.gas_properties.cp_J_per_kgK</code></td><td>float &gt; 0</td><td><code>1005</code></td><td>Spezifische Wärmekapazität bei konstantem Druck.</td><td>Geht über κ = cp/cv in abgeleitete Thermodaten ein; im aktuellen Minimalpfad wird vor allem cv und R direkt genutzt.<div class="hint">Muss &gt; cv sein.</div></td></tr>
+<tr><td><code>preprocessing.gas_properties.cv_J_per_kgK</code></td><td>float &gt; 0</td><td><code>718</code></td><td>Spezifische Wärmekapazität bei konstantem Volumen.</td><td>Wird in u = cv·T, T = U/(m·cv) und p = m·R·T/V genutzt.<div class="hint">Muss &gt; 0 sein.</div></td></tr>
+<tr><td><code>preprocessing.gas_properties.R_J_per_kgK</code></td><td>float &gt; 0</td><td><code>287</code></td><td>Spezifische Gaskonstante.</td><td>Wird in p = m·R·T/V und m = p·V/(R·T) genutzt.<div class="hint">Muss &gt; 0 sein.</div></td></tr>
+<tr><td><code>preprocessing.features.mass_flow</code></td><td>bool</td><td><code>false</code></td><td>Schaltet klassischen Gaswechsel-Massenstrom an/aus.</td><td>Im aktuellen Free-Piston-Minimalpfad praktisch noch aus. RHS setzt dm/dt = 0.<div class="hint">Derzeit auf false lassen.</div></td></tr>
+<tr><td><code>preprocessing.features.wall_heat</code></td><td>bool</td><td><code>false</code></td><td>Schaltet Wandwärme-Modelle an/aus.</td><td>Im aktuellen Free-Piston-RHS noch nicht aktiv gekoppelt.<div class="hint">Derzeit auf false lassen.</div></td></tr>
+<tr><td><code>preprocessing.features.combustion</code></td><td>bool</td><td><code>false</code></td><td>Schaltet Verbrennungsmodell an/aus.</td><td>Im aktuellen Free-Piston-RHS noch nicht aktiv gekoppelt.<div class="hint">Derzeit auf false lassen.</div></td></tr>
+<tr><td><code>preprocessing.features.evaporation</code></td><td>bool</td><td><code>false</code></td><td>Schaltet Verdampfungsmodell an/aus.</td><td>Im aktuellen Free-Piston-RHS noch nicht aktiv gekoppelt.<div class="hint">Derzeit auf false lassen.</div></td></tr>
+<tr><td><code>preprocessing.features.pv_work</code></td><td>bool</td><td><code>false</code></td><td>Feature-Flag für klassische p·dV-Arbeitspfad-Logik.</td><td>Im Free-Piston-Minimalpfad wird dU/dt = -p·dV/dt direkt im RHS berechnet.<div class="hint">Kann false bleiben.</div></td></tr>
+<tr><td><code>preprocessing.engine.cycle_type</code></td><td>choice: 2t | 4t</td><td><code>2t</code></td><td>Definiert die synthetische Kurbelwinkel-Länge eines Zyklus.</td><td>cycle_deg = 360° (2T) oder 720° (4T); zusammen mit speed_rpm ergibt das cycle_period_s und damit cycle_index/theta-Achse in Export und Plots.<div class="hint">Auch im Free-Piston-Pfad relevant, obwohl keine reale Kurbelmechanik gerechnet wird.</div></td></tr>
+<tr><td><code>preprocessing.engine.speed_rpm</code></td><td>float &gt; 0</td><td><code>25</code></td><td>Referenzdrehzahl für die synthetische Zeit→Kurbelwinkel-Abbildung.</td><td>cycle_period_s = cycle_deg / (6·speed_rpm).<div class="hint">Wird für cycle_index, theta_deg und last-cycle-Logik genutzt.</div></td></tr>
+<tr><td><code>preprocessing.volumes</code></td><td>list</td><td><code>[]</code></td><td>Im Free-Piston-Pfad leer oder optional genau ein Zylinder-Placeholder.</td><td>Wenn leer, wird intern ein synthetischer Zylinder erzeugt. Wenn ein Placeholder genutzt wird, dient er vor allem Editor-/Metadatenzwecken.<div class="hint">Keine weiteren Volumentypen zulässig; höchstens ein CylinderVolumeConfig.</div></td></tr>
+<tr><td><code>preprocessing.connections</code></td><td>list</td><td><code>[]</code></td><td>Verbindungsdefinitionen des klassischen Gaswechsels.</td><td>Im aktuellen Free-Piston-Pfad nicht unterstützt.<div class="hint">Muss leer bleiben.</div></td></tr>
+</tbody></table></section><section class="card"><h3>Simulation</h3><table><thead><tr><th style="width:22%">Pfad</th><th style="width:12%">Typ / Werte</th><th style="width:14%">Beispielwert</th><th style="width:28%">Verwendung</th><th style="width:24%">Wirkung / Hinweis</th></tr></thead><tbody>
+<tr><td><code>simulation.dt_s</code></td><td>float &gt; 0</td><td><code>0.0001</code></td><td>Integrationsschrittweite bzw. Zeitraster für den Solver-Aufruf.</td><td>Zeitgitter: t = 0, dt, 2·dt, … bis exakt simulationtime bzw. total_cycles·cycle_period.<div class="hint">Für stabile Ergebnisse klein genug wählen.</div></td></tr>
+<tr><td><code>simulation.total_cycles</code></td><td>int &gt; 0</td><td><code>1</code></td><td>Nominale Anzahl synthetischer Zyklen.</td><td>Wird für cycle_index und Fallback-Endzeit genutzt.<div class="hint">Wenn simulationtime gesetzt ist, wird die effektive Zyklenzahl intern mindestens so groß gewählt, dass die Zeitspanne abgedeckt wird.</div></td></tr>
+<tr><td><code>simulation.save_last_cycles</code></td><td>int &gt; 0</td><td><code>1</code></td><td>Wie viele der letzten Zyklen im Postprocessing behalten werden.</td><td>Wirkt auf das Zuschneiden der Rohdaten vor Sampling/Export.<div class="hint">Muss &lt;= total_cycles sein.</div></td></tr>
+<tr><td><code>simulation.simulationtime</code></td><td>float &gt; 0 | null</td><td><code>0.23</code></td><td>Optionale absolute Simulationsdauer in Sekunden.</td><td>Überschreibt die aus total_cycles abgeleitete Endzeit für den tatsächlichen Simulationslauf.<div class="hint">Für Free-Piston meist die wichtigste Endbedingung.</div></td></tr>
+<tr><td><code>simulation.solver.kind</code></td><td>choice</td><td><code>rk4</code></td><td>Numerischer Solver, z. B. rk4.</td><td>Wird in SolverFactory.create(...) aufgelöst.<div class="hint">Im Beispiel: rk4.</div></td></tr>
+<tr><td><code>simulation.solver.rtol</code></td><td>float</td><td><code>1e-06</code></td><td>Relative Toleranz für adaptive Solver.</td><td>Bei festen Step-Solvern wie rk4 ohne große praktische Wirkung, wird aber mitgeführt.<div class="hint">Für SciPy-Solver relevant.</div></td></tr>
+<tr><td><code>simulation.solver.atol</code></td><td>float</td><td><code>1e-09</code></td><td>Absolute Toleranz für adaptive Solver.</td><td>Wie rtol.<div class="hint">Für SciPy-Solver relevant.</div></td></tr>
+</tbody></table></section><section class="card"><h3>Postprocessing</h3><table><thead><tr><th style="width:22%">Pfad</th><th style="width:12%">Typ / Werte</th><th style="width:14%">Beispielwert</th><th style="width:28%">Verwendung</th><th style="width:24%">Wirkung / Hinweis</th></tr></thead><tbody>
+<tr><td><code>postprocessing.csv_enabled</code></td><td>bool</td><td><code>true</code></td><td>Haupt-CSV schreiben.</td><td>Aktiviert den CSV-Export der resampleten Exportdaten.<div class="hint">true für Auswertung/Plots.</div></td></tr>
+<tr><td><code>postprocessing.csv_path</code></td><td>string</td><td><code>results/free_piston_phase_a2_time005.csv</code></td><td>Pfad der Haupt-CSV relativ zum Projekt/Outputdir.</td><td>Bestimmt die Datei des resampleten Haupt-Exports.<div class="hint">Wird über PathManager in das Ergebnisverzeichnis aufgelöst.</div></td></tr>
+<tr><td><code>postprocessing.csv_separator</code></td><td>single char</td><td><code>;</code></td><td>Trennzeichen der CSV-Datei.</td><td>Wird direkt an CsvExporter übergeben.<div class="hint">Muss genau ein Zeichen sein.</div></td></tr>
+<tr><td><code>postprocessing.excel_enabled</code></td><td>bool</td><td><code>false</code></td><td>Zusätzliche XLSX-Datei schreiben.</td><td>Exportiert dieselben resampleten Daten nach Excel.<div class="hint">Optional.</div></td></tr>
+<tr><td><code>postprocessing.excel_path</code></td><td>string</td><td><code>results/free_piston_phase_a2.xlsx</code></td><td>Pfad der Excel-Datei.</td><td>Bestimmt Zieldatei für ExcelExporter.<div class="hint">Nur wirksam, wenn excel_enabled = true.</div></td></tr>
+<tr><td><code>postprocessing.sampling.mode</code></td><td>choice: time | crank_angle</td><td><code>time</code></td><td>Art des Export-Rasters.</td><td>Im Free-Piston-Fall meist time.<div class="hint">Für reine Zeitauswertung time verwenden.</div></td></tr>
+<tr><td><code>postprocessing.sampling.step_s</code></td><td>float &gt; 0</td><td><code>0.05</code></td><td>Ausgabeschrittweite für mode: time.</td><td>Exportzeiten t_k = t_start + k·step_s, solange t_k ≤ t_end. Das Raster wird exakt eingehalten; ein nicht auf dem Raster liegendes t_end erzeugt keinen zusätzlichen krummen Exportzeitpunkt.<div class="hint">Validator erzwingt step_s ≥ simulation.dt_s.</div></td></tr>
+<tr><td><code>postprocessing.final_cycle_uniform_angle_export.enabled</code></td><td>bool</td><td><code>false</code></td><td>Zusätzlichen letzten Zyklus auf festem Winkelraster exportieren.</td><td>Nur Zusatzexport; hat keinen Einfluss auf die Haupt-CSV.<div class="hint">Für Free-Piston-Zeitläufe oft deaktiviert.</div></td></tr>
+<tr><td><code>postprocessing.final_cycle_uniform_angle_export.step_deg</code></td><td>float &gt; 0</td><td><code>1</code></td><td>Winkelraster für den Zusatzexport.</td><td>Wirkt nur wenn final_cycle_uniform_angle_export.enabled = true.<div class="hint">Standard 1°.</div></td></tr>
+<tr><td><code>postprocessing.check_report.enabled</code></td><td>bool</td><td><code>false</code></td><td>Automatischen Checkreport erzeugen.</td><td>Bewertet Kennwerte des letzten Zyklus.<div class="hint">Kann im Minimalfall deaktiviert werden.</div></td></tr>
+<tr><td><code>postprocessing.check_report.html_enabled</code></td><td>bool</td><td><code>false</code></td><td>Checkreport zusätzlich als HTML schreiben.</td><td>Erzeugt eine HTML-Zusammenfassung des Checkreports.<div class="hint">Nur relevant, wenn Checkreport aktiv ist.</div></td></tr>
+<tr><td><code>postprocessing.plots.enabled</code></td><td>bool</td><td><code>true</code></td><td>Globale Plot-Erzeugung aktivieren.</td><td>Schaltet das Rendern externer Plot-Layouts ein.<div class="hint">true, wenn plot_fp.yaml gerendert werden soll.</div></td></tr>
+<tr><td><code>postprocessing.plots.source</code></td><td>choice: export_rows | last_cycle_uniform</td><td><code>export_rows</code></td><td>Datenquelle für Plotlayouts.</td><td>Für Free-Piston-Zeitplots typischerweise export_rows.<div class="hint">Für Zeitplots export_rows verwenden.</div></td></tr>
+<tr><td><code>postprocessing.plots.output_dir</code></td><td>string | null</td><td><code>results/plots</code></td><td>Zielordner für gerenderte Plots.</td><td>Legt Plot-Ausgabeordner fest.<div class="hint">z. B. results/plots.</div></td></tr>
+<tr><td><code>postprocessing.plots.layouts.auto_create_defaults</code></td><td>bool</td><td><code>false</code></td><td>Erzeugt Standardlayouts automatisch, wenn keine Einträge gesetzt sind.</td><td>Wenn false, werden nur explizit genannte Layoutdateien genutzt.<div class="hint">Für dedizierte Free-Piston-Plots meist false.</div></td></tr>
+<tr><td><code>postprocessing.plots.layouts.entries[].enabled</code></td><td>bool</td><td><code>—</code></td><td>Aktiviert/deaktiviert einen Layout-Eintrag.</td><td>Nur aktivierte Layouts werden gerendert.<div class="hint">Pro Eintrag separat.</div></td></tr>
+<tr><td><code>postprocessing.plots.layouts.entries[].path</code></td><td>string</td><td><code>—</code></td><td>Pfad zur Plotlayout-Datei, z. B. plot_fp.yaml.</td><td>Wird vom Plotservice geladen.<div class="hint">Relativ zum Config-/Outputkontext auflösbar.</div></td></tr>
+<tr><td><code>postprocessing.plots.layouts.entries[].prefix</code></td><td>string</td><td><code>—</code></td><td>Präfix für erzeugte Plot-Dateinamen.</td><td>Hilft mehrere Layouts auseinanderzuhalten.<div class="hint">Im Beispiel: plot_fp.</div></td></tr>
+<tr><td><code>postprocessing.console.run_summary.enabled</code></td><td>bool</td><td><code>true</code></td><td>Run-Zusammenfassung in der Konsole.</td><td>Nur Console-Output.<div class="hint">Optional.</div></td></tr>
+<tr><td><code>postprocessing.console.cycle_summary.enabled</code></td><td>bool</td><td><code>false</code></td><td>Zykluszusammenfassung in der Konsole.</td><td>Nur Console-Output.<div class="hint">Im Minimalbeispiel oft false.</div></td></tr>
+<tr><td><code>postprocessing.console.check_report.enabled</code></td><td>bool</td><td><code>false</code></td><td>Checkreport-Kurzfassung in der Konsole.</td><td>Nur Console-Output.<div class="hint">Optional.</div></td></tr>
+<tr><td><code>postprocessing.console.geometry.enabled</code></td><td>bool</td><td><code>false</code></td><td>Geometrie-/Topologieinfos in der Konsole.</td><td>Nur Console-Output.<div class="hint">Optional.</div></td></tr>
+</tbody></table></section><section class="card"><h3>Free-Piston – Initialbedingungen</h3><table><thead><tr><th style="width:22%">Pfad</th><th style="width:12%">Typ / Werte</th><th style="width:14%">Beispielwert</th><th style="width:28%">Verwendung</th><th style="width:24%">Wirkung / Hinweis</th></tr></thead><tbody>
+<tr><td><code>free_piston.initial_conditions.x0_m</code></td><td>float</td><td><code>-0.008</code></td><td>Startposition des freien Kolbens.</td><td>Setzt y_init[x] und geht in V_cyl(x0), V_bounce(x0) sowie die Anfangskräfte ein.<div class="hint">Muss innerhalb x_min_m … x_max_m liegen.</div></td></tr>
+<tr><td><code>free_piston.initial_conditions.v0_m_per_s</code></td><td>float</td><td><code>0.4</code></td><td>Startgeschwindigkeit des Kolbens.</td><td>Setzt y_init[v] und bestimmt anfängliche Reib-/Lastkraft sowie dV/dt.<div class="hint">Vorzeichen definiert Bewegungsrichtung.</div></td></tr>
+<tr><td><code>free_piston.initial_conditions.cylinder.pressure_Pa</code></td><td>float &gt; 0</td><td><code>101325</code></td><td>Anfangsdruck des Zylindergases.</td><td>Wird zusammen mit T0 und V_cyl(x0) in die Anfangsmasse m0 = p0·V0/(R·T0) umgerechnet.<div class="hint">Wenn ein klassischer Zylinder-Placeholder vorhanden ist, muss dessen initial_pressure_Pa identisch sein.</div></td></tr>
+<tr><td><code>free_piston.initial_conditions.cylinder.temperature_K</code></td><td>float &gt; 0</td><td><code>300</code></td><td>Anfangstemperatur des Zylindergases.</td><td>Wird in m0 = p0·V0/(R·T0) und U0 = m0·cv·T0 genutzt.<div class="hint">Wenn ein Zylinder-Placeholder vorhanden ist, muss dessen initial_temperature_K identisch sein.</div></td></tr>
+<tr><td><code>free_piston.initial_conditions.bounce.pressure_Pa</code></td><td>float &gt; 0</td><td><code>140000</code></td><td>Dokumentierter Anfangsdruck des Bounce-Raums.</td><td>Wird aktuell als Metadatum gespeichert; die laufende Bounce-Druckgleichung verwendet p0_Pa aus free_piston.bounce.<div class="hint">Soll konsistent zu p0_Pa gewählt werden.</div></td></tr>
+<tr><td><code>free_piston.initial_conditions.bounce.temperature_K</code></td><td>float &gt; 0</td><td><code>300</code></td><td>Dokumentierte Anfangstemperatur des Bounce-Raums.</td><td>Aktuell Metadatum ohne direkte RHS-Kopplung.<div class="hint">Für spätere Erweiterungen sinnvoll pflegen.</div></td></tr>
+<tr><td><code>free_piston.initial_conditions.combustion_state.burned_fraction_0to1</code></td><td>0…1</td><td><code>0</code></td><td>Initialer verbrannter Massenanteil.</td><td>Aktuell reserviert; im Minimal-RHS noch ohne direkte Wirkung.<div class="hint">Muss zwischen 0 und 1 liegen.</div></td></tr>
+<tr><td><code>free_piston.initial_conditions.combustion_state.released_energy_J</code></td><td>float</td><td><code>0</code></td><td>Bereits freigesetzte Verbrennungsenergie zu t=0.</td><td>Aktuell reserviert; im Minimal-RHS noch ohne direkte Wirkung.<div class="hint">Für spätere Erweiterung vorgesehen.</div></td></tr>
+<tr><td><code>free_piston.initial_conditions.combustion_state.ignition_armed</code></td><td>bool</td><td><code>false</code></td><td>Merker für bewaffnete Zündung.</td><td>Aktuell reserviert.<div class="hint">Noch keine direkte Wirkung.</div></td></tr>
+<tr><td><code>free_piston.initial_conditions.combustion_state.injection_armed</code></td><td>bool</td><td><code>false</code></td><td>Merker für bewaffnete Einspritzung.</td><td>Aktuell reserviert.<div class="hint">Noch keine direkte Wirkung.</div></td></tr>
+</tbody></table></section><section class="card"><h3>Free-Piston – Mechanik</h3><table><thead><tr><th style="width:22%">Pfad</th><th style="width:12%">Typ / Werte</th><th style="width:14%">Beispielwert</th><th style="width:28%">Verwendung</th><th style="width:24%">Wirkung / Hinweis</th></tr></thead><tbody>
+<tr><td><code>free_piston.mechanics.moving_mass_kg</code></td><td>float &gt; 0</td><td><code>2</code></td><td>Bewegte Gesamtmasse des freien Kolbens/Assemblies.</td><td>Wirkt in dv/dt = F_net / moving_mass_kg.<div class="hint">Größere Masse → geringere Beschleunigung.</div></td></tr>
+<tr><td><code>free_piston.mechanics.piston_area_m2</code></td><td>float &gt; 0</td><td><code>0.00436</code></td><td>Wirksame Kolbenfläche.</td><td>Geht in V(x), dV/dt, F_gas = -p·A und F_bounce = p_b·A ein.<div class="hint">Zentraler Geometrieparameter.</div></td></tr>
+<tr><td><code>free_piston.mechanics.clearance_volume_m3</code></td><td>float &gt; 0</td><td><code>2.5e-05</code></td><td>Restvolumen am oberen Anschlag x = x_max.</td><td>Geht in V_cyl(x) = clearance_volume + A·(x_max - x) ein.<div class="hint">Muss so gewählt werden, dass V_cyl stets &gt; 0 bleibt.</div></td></tr>
+<tr><td><code>free_piston.mechanics.x_min_m</code></td><td>float</td><td><code>-0.04</code></td><td>Untere Positionsgrenze.</td><td>Geht in V_bounce(x) = V0 + A·(x - x_min) ein und begrenzt den zulässigen Zustandsraum.<div class="hint">Muss kleiner als x_max_m sein.</div></td></tr>
+<tr><td><code>free_piston.mechanics.x_max_m</code></td><td>float</td><td><code>0.04</code></td><td>Obere Positionsgrenze.</td><td>Geht in V_cyl(x) = clearance_volume + A·(x_max - x) ein und begrenzt den zulässigen Zustandsraum.<div class="hint">Muss größer als x_min_m sein.</div></td></tr>
+</tbody></table></section><section class="card"><h3>Free-Piston – Reibung, Last und Bounce-Raum</h3><table><thead><tr><th style="width:22%">Pfad</th><th style="width:12%">Typ / Werte</th><th style="width:14%">Beispielwert</th><th style="width:28%">Verwendung</th><th style="width:24%">Wirkung / Hinweis</th></tr></thead><tbody>
+<tr><td><code>free_piston.friction.model</code></td><td>choice: coulomb_viscous</td><td><code>coulomb_viscous</code></td><td>Auswahl des aktuell unterstützten Reibmodells.</td><td>Aktuell F_fric = -(F_c·sign(v) + c_v·v), mit Sonderfall F_fric = 0 bei |v| &lt; 1e-15.<div class="hint">Derzeit nur coulomb_viscous unterstützt.</div></td></tr>
+<tr><td><code>free_piston.friction.fc_N</code></td><td>float ≥ 0</td><td><code>20</code></td><td>Coulomb-Anteil der Reibung.</td><td>Bestimmt den geschwindigkeitsunabhängigen Reibkraftbetrag.<div class="hint">fc_N = 0 ergibt rein viskose Reibung.</div></td></tr>
+<tr><td><code>free_piston.friction.cv_Ns_per_m</code></td><td>float ≥ 0</td><td><code>10</code></td><td>Viskoser Reibkoeffizient.</td><td>Bestimmt den linearen Reibanteil c_v·v.<div class="hint">Höherer Wert dämpft stärker bei hoher Geschwindigkeit.</div></td></tr>
+<tr><td><code>free_piston.load.model</code></td><td>choice: viscous</td><td><code>viscous</code></td><td>Auswahl des Lastmodells.</td><td>Aktuell F_load = -damping·v.<div class="hint">Derzeit nur viscous unterstützt.</div></td></tr>
+<tr><td><code>free_piston.load.damping_Ns_per_m</code></td><td>float ≥ 0</td><td><code>120</code></td><td>Viskoser Last-/Generator-/Dämpfungskoeffizient.</td><td>Geht linear in F_load ein.<div class="hint">Erhöht dissipative Last proportional zur Geschwindigkeit.</div></td></tr>
+<tr><td><code>free_piston.bounce.model</code></td><td>choice: gas_spring</td><td><code>gas_spring</code></td><td>Auswahl des Bounce-/Gasspring-Modells.</td><td>Aktuell polytrope Gasfeder im Bounce-Raum.<div class="hint">Derzeit nur gas_spring unterstützt.</div></td></tr>
+<tr><td><code>free_piston.bounce.chamber_volume0_m3</code></td><td>float &gt; 0</td><td><code>0.0003</code></td><td>Referenzvolumen des Bounce-Raums bei x = x_min.</td><td>Geht in V_bounce(x) = V0 + A·(x - x_min) ein.<div class="hint">Muss &gt; 0 sein.</div></td></tr>
+<tr><td><code>free_piston.bounce.p0_Pa</code></td><td>float &gt; 0</td><td><code>150000</code></td><td>Referenzdruck der Bounce-Gasfeder.</td><td>Geht in p_b = p0·(V0/V_b)^n ein.<div class="hint">Ist der tatsächlich im RHS genutzte Druckparameter.</div></td></tr>
+<tr><td><code>free_piston.bounce.polytropic_exponent</code></td><td>float &gt; 0</td><td><code>1.3</code></td><td>Polytropenexponent der Bounce-Gasfeder.</td><td>Bestimmt die Steilheit der p(V)-Beziehung des Bounce-Raums.<div class="hint">Typisch zwischen isotherm (~1) und adiabatisch (~κ).</div></td></tr>
+</tbody></table></section>
+        </section>
+
+        <section id="limits">
+          <h2>4. Wichtige Grenzen im aktuellen Stand</h2>
+          <div class="grid">
+            <div class="card">
+              <h3>Topologie</h3>
+              <ul>
+                <li><code>preprocessing.connections</code> muss leer bleiben.</li>
+                <li><code>preprocessing.volumes</code> darf leer sein oder genau einen optionalen Zylinder-Placeholder enthalten.</li>
+                <li>Falls ein Zylinder-Placeholder vorhanden ist, müssen dessen Initialwerte zu <code>free_piston.initial_conditions.cylinder</code> konsistent sein.</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Physik</h3>
+              <ul>
+                <li>Aktuell gilt <code>dm/dt = 0</code>; kein aktiver Gaswechsel im RHS.</li>
+                <li>Wandwärme, Verbrennung und Verdampfung sind im Free-Piston-Minimalpfad noch nicht eingekoppelt.</li>
+                <li><code>combustion_state</code> ist derzeit vorbereitet, aber noch nicht dynamisch wirksam.</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Sampling und Zeit</h3>
+              <ul>
+                <li><code>simulation.simulationtime</code> bestimmt die reale Endzeit des Simulationslaufs.</li>
+                <li>Der Export bei <code>sampling.mode: time</code> folgt strikt dem Raster <code>step_s</code>.</li>
+                <li class="warn">Ein Endzeitpunkt, der nicht auf dem Exportraster liegt, wird nicht als zusätzlicher Samplingpunkt in die Haupt-CSV geschrieben.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="usage">
+          <h2>5. Praktische Verwendung</h2>
+          <div class="grid">
+            <div class="card">
+              <h3>Minimal lauffähige Wahl</h3>
+              <ul>
+                <li><code>modeling.architecture: free_piston</code></li>
+                <li>Features im aktuellen Stand auf <code>false</code> lassen</li>
+                <li><code>simulation.simulationtime</code> explizit setzen</li>
+                <li><code>postprocessing.sampling.mode: time</code> verwenden</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Wenn du eine feste Zeitauflösung in der CSV willst</h3>
+              <p>Setze:</p>
+              <pre>postprocessing:
+  sampling:
+    mode: time
+    step_s: 0.05</pre>
+              <p class="small">Dann liegen die Exportzeiten auf <code>0.00, 0.05, 0.10, …</code>. Die Simulation selbst kann trotzdem bis z. B. <code>0.23 s</code> laufen.</p>
+            </div>
+            <div class="card">
+              <h3>Wenn du Zeitplots rendern willst</h3>
+              <p>Empfohlen ist:</p>
+              <pre>postprocessing:
+  plots:
+    enabled: true
+    source: export_rows
+    layouts:
+      auto_create_defaults: false
+      entries:
+        - enabled: true
+          path: plot_fp.yaml
+          prefix: plot_fp</pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="signals">
+          <h2>6. Signale und Plotbezug</h2>
+          <p>Die aktuelle <code>plot_fp.yaml</code> nutzt insbesondere diese rekonstruierten Signale:</p>
+          <ul>
+            <li><code>t_s</code></li>
+            <li><code>cylinder_p_Pa</code>, <code>cylinder_V_m3</code></li>
+            <li><code>free_piston_x_m</code>, <code>free_piston_v_m_per_s</code>, <code>free_piston_a_m_per_s2</code></li>
+            <li><code>free_piston_F_gas_N</code>, <code>free_piston_F_bounce_N</code>, <code>free_piston_F_friction_N</code>, <code>free_piston_F_load_N</code>, <code>free_piston_F_net_N</code></li>
+            <li><code>bounce_pressure_Pa</code>, <code>bounce_volume_m3</code></li>
+          </ul>
+          <p class="small">Die Signalableitung erfolgt im Standard-Reconstruction-Pfad; damit sind CSV/XLSX/Plots konsistent an dieselben Zustände und Gleichungen gekoppelt.</p>
+        </section>
+
+        <section id="example">
+          <h2>7. Beispielkonfiguration</h2>
+          <p>Referenz: <code>examples/free_piston_phase_a2_time005.yaml</code></p>
+          <pre>versioning:
+  package_version: 7.1.82
+  config_schema_version: 5
+  loaded_config_schema_version: 5
+  migration_applied: false
+test_description: Free-piston architecture smoke config for Phase A.2 minimal runnable
+  free-piston case
+modeling:
+  architecture: free_piston
+preprocessing:
+  gas_properties:
+    cp_J_per_kgK: 1005.0
+    cv_J_per_kgK: 718.0
+    R_J_per_kgK: 287.0
+  features:
+    mass_flow: false
+    wall_heat: false
+    combustion: false
+    evaporation: false
+    pv_work: false
+  engine:
+    cycle_type: 2t
+    speed_rpm: 25.0
+  volumes: []
+  connections: []
+simulation:
+  dt_s: 0.0001
+  total_cycles: 1
+  save_last_cycles: 1
+  simulationtime: 0.23
+  solver:
+    kind: rk4
+    rtol: 1.0e-06
+    atol: 1.0e-09
+postprocessing:
+  csv_enabled: true
+  csv_path: results/free_piston_phase_a2_time005.csv
+  csv_separator: ;
+  excel_enabled: false
+  excel_path: results/free_piston_phase_a2.xlsx
+  sampling:
+    mode: time
+    step_s: 0.05
+  final_cycle_uniform_angle_export:
+    enabled: false
+    step_deg: 1.0
+  check_report:
+    enabled: false
+    html_enabled: false
+  plots:
+    enabled: true
+    source: export_rows
+    output_dir: results/plots
+    layouts:
+      auto_create_defaults: false
+      entries:
+      - enabled: true
+        path: plot_fp.yaml
+        prefix: plot_fp
+  console:
+    run_summary:
+      enabled: true
+    cycle_summary:
+      enabled: false
+    check_report:
+      enabled: false
+    geometry:
+      enabled: false
+free_piston:
+  initial_conditions:
+    x0_m: -0.008
+    v0_m_per_s: 0.4
+    cylinder:
+      pressure_Pa: 101325.0
+      temperature_K: 300.0
+    bounce:
+      pressure_Pa: 140000.0
+      temperature_K: 300.0
+    combustion_state:
+      burned_fraction_0to1: 0.0
+      released_energy_J: 0.0
+      ignition_armed: false
+      injection_armed: false
+  mechanics:
+    moving_mass_kg: 2.0
+    piston_area_m2: 0.00436
+    clearance_volume_m3: 2.5e-05
+    x_min_m: -0.04
+    x_max_m: 0.04
+  friction:
+    model: coulomb_viscous
+    fc_N: 20.0
+    cv_Ns_per_m: 10.0
+  load:
+    model: viscous
+    damping_Ns_per_m: 120.0
+  bounce:
+    model: gas_spring
+    chamber_volume0_m3: 0.0003
+    p0_Pa: 150000.0
+    polytropic_exponent: 1.3
+</pre>
+        </section>
+
+        <section id="sources">
+          <h2>8. Verwendete Quelldateien</h2>
+          <ul>
+            <li><code>src/thermo0d/config/models.py</code></li><li><code>src/thermo0d/config/schema_meta.py</code></li><li><code>src/thermo0d/model/free_piston/builder.py</code></li><li><code>src/thermo0d/model/free_piston/geometry.py</code></li><li><code>src/thermo0d/model/free_piston/thermo.py</code></li><li><code>src/thermo0d/model/free_piston/rhs.py</code></li><li><code>src/thermo0d/model/free_piston/simulator.py</code></li><li><code>src/thermo0d/output/sampling.py</code></li><li><code>src/thermo0d/output/reconstruction.py</code></li><li><code>examples/free_piston_phase_a2.yaml</code></li><li><code>examples/free_piston_phase_a2_time005.yaml</code></li><li><code>examples/plot_fp.yaml</code></li>
+          </ul>
+          <div class="footer">Erstellt aus dem aktuellen Patchstand des hochgeladenen Projekts. Die Beschreibung folgt dem tatsächlichen Codepfad; sie ist keine generische Free-Piston-Theorie-Doku, sondern eine projektspezifische Implementierungsdokumentation.</div>
+        </section>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
