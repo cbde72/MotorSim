@@ -168,6 +168,11 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
 
     x_idx = int(fp.x_state_index)
     v_idx = int(fp.v_state_index)
+    mechanical_dofs = int(getattr(fp, 'mechanical_dofs', 1) or 1)
+    mechanical_x_indices = getattr(fp, 'mechanical_x_state_indices', np.array([x_idx], dtype=np.int64))
+    mechanical_v_indices = getattr(fp, 'mechanical_v_state_indices', np.array([v_idx], dtype=np.int64))
+    volume_mechanical_dof = getattr(fp, 'volume_mechanical_dof', np.full(int(bundle.vol_matrix.shape[0]), -1, dtype=np.int64))
+    volume_mechanical_sign = getattr(fp, 'volume_mechanical_sign', np.zeros(int(bundle.vol_matrix.shape[0]), dtype=np.float64))
     x_min_m = fp.x_min_m
     x_max_m = fp.x_max_m
     moving_mass_kg = fp.moving_mass_kg
@@ -274,10 +279,20 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
         air_mass = _air_mass_from_state(bundle.state_layout, y, i)
         burned_mass = _burned_mass_from_state(bundle.state_layout, y, i)
         fuel_vapor_mass = _fuel_vapor_mass_from_state(bundle.state_layout, y, i)
+        mech_dof = int(volume_mechanical_dof[i]) if i < int(len(volume_mechanical_dof)) else -1
+        mech_sign = float(volume_mechanical_sign[i]) if i < int(len(volume_mechanical_sign)) else 0.0
+        if mech_dof >= 0:
+            q_m = float(y[int(mechanical_x_indices[mech_dof])])
+            q_v_m_per_s = float(y[int(mechanical_v_indices[mech_dof])])
+            x_eff_m = q_m if mech_sign >= 0.0 else float(x_min_m + x_max_m - q_m)
+            v_eff_m_per_s = q_v_m_per_s if mech_sign >= 0.0 else -q_v_m_per_s
+        else:
+            x_eff_m = x_m
+            v_eff_m_per_s = v_m_per_s
 
         if vol_type == VolumeType.CYLINDER:
-            volume = cylinder_volume_from_position(clearance_volume_m3, piston_area_m2, x_m, x_min_m, x_max_m)
-            dvdt = cylinder_dvdt_from_velocity(piston_area_m2, v_m_per_s)
+            volume = cylinder_volume_from_position(clearance_volume_m3, piston_area_m2, x_eff_m, x_min_m, x_max_m)
+            dvdt = cylinder_dvdt_from_velocity(piston_area_m2, v_eff_m_per_s)
             afr_stoich = float(bundle.combustion_afr_stoich_by_vol[i]) if getattr(bundle, 'combustion_afr_stoich_by_vol', None) is not None and i < int(bundle.combustion_afr_stoich_by_vol.shape[0]) else 14.5
             if use_promo_thermo:
                 lambda_value = lambda_from_air_and_fuel_mass(air_mass, fuel_vapor_mass, afr_stoich)
@@ -291,14 +306,14 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             else:
                 temp = safe_temperature_from_state(mass, energy, cv_default)
                 press = safe_pressure_from_ideal_gas(mass, temp, gas_constant_default, volume)
-            piston_x[i] = cylinder_distance_from_tdc_m
-            theta_local_deg_by_vol[i] = theta_local_free_piston_deg
+            piston_x[i] = cylinder_distance_from_tdc(x_eff_m, x_min_m, x_max_m)
+            theta_local_deg_by_vol[i] = free_piston_local_cycle_angle_deg(x_eff_m, v_eff_m_per_s, fp.x_min_m, fp.x_max_m, cycle_deg)
             theta_global_deg_by_vol[i] = theta_progress_deg
-            dtheta_local_dt_by_vol[i] = dtheta_local_free_piston_dt_deg_s
+            dtheta_local_dt_by_vol[i] = free_piston_local_cycle_angle_rate_deg_s(v_eff_m_per_s, fp.x_min_m, fp.x_max_m, cycle_deg)
             cycle_deg_by_vol[i] = cycle_deg
         elif vol_type == VolumeType.BOUNCE_CHAMBER:
-            volume = bounce_volume_from_position(bounce_chamber_volume0_m3, bounce_area_m2, x_m, x_min_m, x_max_m)
-            dvdt = -cylinder_dvdt_from_velocity(bounce_area_m2, v_m_per_s)
+            volume = bounce_volume_from_position(bounce_chamber_volume0_m3, bounce_area_m2, x_eff_m, x_min_m, x_max_m)
+            dvdt = -cylinder_dvdt_from_velocity(bounce_area_m2, v_eff_m_per_s)
             afr_stoich = float(bundle.combustion_afr_stoich_by_vol[i]) if getattr(bundle, 'combustion_afr_stoich_by_vol', None) is not None and i < int(bundle.combustion_afr_stoich_by_vol.shape[0]) else 14.5
             if use_promo_thermo:
                 lambda_value = lambda_from_air_and_fuel_mass(air_mass, fuel_vapor_mass, afr_stoich)
@@ -654,36 +669,45 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                     qdot_comb = 0.0
                     dy_dt[energy_indices[i]] = dy_dt[energy_indices[i]] - pdv_power + qdot_wall - qdot_evap
 
-    cylinder_pressure_Pa = pressures[cylinder_idx]
-    if bounce_idx >= 0:
-        bounce_pressure_Pa = pressures[bounce_idx]
-    else:
-        bounce_pressure_Pa = _bounce_pressure_Pa(x_m, fp)
-    force_gas_N = cylinder_pressure_Pa * piston_area_m2
-    force_bounce_N = -bounce_pressure_Pa * bounce_area_m2
-    force_friction_N = -_coulomb_viscous_force(friction_fc_N, friction_cv_Ns_per_m, v_m_per_s)
-    load_info = compute_load_info(
-        fp.load_model,
-        fp.load_damping_Ns_per_m,
-        v_m_per_s,
-        x_m=x_m,
-        x_min_m=x_min_m,
-        x_max_m=x_max_m,
-        max_damping_Ns_per_m=fp.load_max_damping_Ns_per_m,
-        control_zone_m=fp.load_control_zone_m,
-        power_target_W=fp.load_power_target_W,
-        efficiency_0to1=fp.load_efficiency_0to1,
-        min_velocity_m_per_s=fp.load_min_velocity_m_per_s,
-        target_margin_m=fp.load_target_margin_m,
-        hard_margin_m=fp.load_hard_margin_m,
-        stop_kp=fp.load_stop_kp,
-        moving_mass_kg=fp.moving_mass_kg,
-        max_force_N=fp.load_max_force_N,
-    )
-    force_load_signed_N = float(load_info.force_signed_N)
-    force_load_N = -force_load_signed_N
-    force_net_N = force_gas_N + force_bounce_N + force_friction_N + force_load_N
-
-    dy_dt[x_idx] = v_m_per_s
-    dy_dt[v_idx] = float(force_net_N / moving_mass_kg)
+    for dof in range(mechanical_dofs):
+        q_idx = int(mechanical_x_indices[dof])
+        qv_idx = int(mechanical_v_indices[dof])
+        q_m = float(y[q_idx])
+        q_v_m_per_s = float(y[qv_idx])
+        force_gas_N = 0.0
+        force_bounce_N = 0.0
+        for i in range(n_vol):
+            if int(volume_mechanical_dof[i]) != dof:
+                continue
+            sign_i = float(volume_mechanical_sign[i])
+            vol_type_i = int(bundle.vol_matrix[i, VolumeCol.TYPE])
+            if vol_type_i == int(VolumeType.CYLINDER):
+                force_gas_N += sign_i * float(pressures[i]) * piston_area_m2
+            elif vol_type_i == int(VolumeType.BOUNCE_CHAMBER):
+                force_bounce_N += -sign_i * float(pressures[i]) * bounce_area_m2
+        force_friction_N = -_coulomb_viscous_force(friction_fc_N, friction_cv_Ns_per_m, q_v_m_per_s)
+        load_info = compute_load_info(
+            fp.load_model,
+            fp.load_damping_Ns_per_m,
+            q_v_m_per_s,
+            x_m=q_m,
+            x_min_m=x_min_m,
+            x_max_m=x_max_m,
+            max_damping_Ns_per_m=fp.load_max_damping_Ns_per_m,
+            control_zone_m=fp.load_control_zone_m,
+            power_target_W=fp.load_power_target_W,
+            efficiency_0to1=fp.load_efficiency_0to1,
+            min_velocity_m_per_s=fp.load_min_velocity_m_per_s,
+            assist_velocity_threshold_m_per_s=fp.load_assist_velocity_threshold_m_per_s,
+            assist_force_N=fp.load_assist_force_N,
+            target_margin_m=fp.load_target_margin_m,
+            hard_margin_m=fp.load_hard_margin_m,
+            stop_kp=fp.load_stop_kp,
+            moving_mass_kg=fp.moving_mass_kg,
+            max_force_N=fp.load_max_force_N,
+        )
+        force_load_N = -float(load_info.force_signed_N)
+        force_net_N = force_gas_N + force_bounce_N + force_friction_N + force_load_N
+        dy_dt[q_idx] = q_v_m_per_s
+        dy_dt[qv_idx] = float(force_net_N / moving_mass_kg)
     return dy_dt

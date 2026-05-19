@@ -47,6 +47,8 @@ class FreePistonModelData:
     load_power_target_W: float
     load_efficiency_0to1: float
     load_min_velocity_m_per_s: float
+    load_assist_velocity_threshold_m_per_s: float
+    load_assist_force_N: float
     load_target_margin_m: float
     load_hard_margin_m: float
     load_stop_kp: float
@@ -72,6 +74,11 @@ class FreePistonModelData:
     bounce_polytropic_exponent: float
     x_state_index: int
     v_state_index: int
+    mechanical_dofs: int = 1
+    mechanical_x_state_indices: np.ndarray = field(default_factory=lambda: np.zeros(1, dtype=np.int64))
+    mechanical_v_state_indices: np.ndarray = field(default_factory=lambda: np.zeros(1, dtype=np.int64))
+    volume_mechanical_dof: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    volume_mechanical_sign: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     combustion_fueling_mode: str = 'fixed_energy'
     combustion_lambda_target: float = 0.0
     combustion_afr_stoich_kg_air_per_kg_fuel: float = 14.5

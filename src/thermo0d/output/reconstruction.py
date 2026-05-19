@@ -492,6 +492,8 @@ class SignalReconstructionService:
                             power_target_W=fp.load_power_target_W,
                             efficiency_0to1=fp.load_efficiency_0to1,
                             min_velocity_m_per_s=fp.load_min_velocity_m_per_s,
+                            assist_velocity_threshold_m_per_s=fp.load_assist_velocity_threshold_m_per_s,
+                            assist_force_N=fp.load_assist_force_N,
                             target_margin_m=fp.load_target_margin_m,
                             hard_margin_m=fp.load_hard_margin_m,
                             stop_kp=fp.load_stop_kp,

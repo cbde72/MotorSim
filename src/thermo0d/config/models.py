@@ -1006,6 +1006,8 @@ class FreePistonLoadConfig(StrictBaseModel):
     power_target_W: StrictFloat | None = None
     efficiency_0to1: StrictFloat | None = None
     min_velocity_m_per_s: StrictFloat | None = None
+    assist_velocity_threshold_m_per_s: StrictFloat | None = None
+    assist_force_N: StrictFloat | None = None
     target_margin_m: StrictFloat | None = None
     hard_margin_m: StrictFloat | None = None
     stop_kp: StrictFloat | None = None
@@ -1025,6 +1027,10 @@ class FreePistonLoadConfig(StrictBaseModel):
             raise ValueError("efficiency_0to1 must be > 0 and <= 1")
         if self.min_velocity_m_per_s is not None and self.min_velocity_m_per_s <= 0.0:
             raise ValueError("min_velocity_m_per_s must be > 0")
+        if self.assist_velocity_threshold_m_per_s is not None and self.assist_velocity_threshold_m_per_s <= 0.0:
+            raise ValueError("assist_velocity_threshold_m_per_s must be > 0")
+        if self.assist_force_N is not None and self.assist_force_N < 0.0:
+            raise ValueError("assist_force_N must be >= 0")
         if self.target_margin_m is not None and self.target_margin_m < 0.0:
             raise ValueError("target_margin_m must be >= 0")
         if self.hard_margin_m is not None and self.hard_margin_m < 0.0:
@@ -1209,10 +1215,10 @@ class RootConfig(StrictBaseModel):
                 raise ValueError("free_piston section is required when modeling.architecture = free_piston")
             cylinder_volumes = [vol for vol in self.preprocessing.volumes if isinstance(vol, CylinderVolumeConfig)]
             bounce_volumes = [vol for vol in self.preprocessing.volumes if isinstance(vol, BounceChamberVolumeConfig)]
-            if len(cylinder_volumes) > 1:
-                raise ValueError("free_piston architecture supports at most one cylinder volume in preprocessing.volumes")
-            if len(bounce_volumes) > 1:
-                raise ValueError("free_piston architecture supports at most one bounce_chamber volume in preprocessing.volumes")
+            if len(cylinder_volumes) > 2:
+                raise ValueError("free_piston architecture supports at most two cylinder volumes in preprocessing.volumes")
+            if len(bounce_volumes) > 2:
+                raise ValueError("free_piston architecture supports at most two bounce_chamber volumes in preprocessing.volumes")
             if self.preprocessing.connections and not cylinder_volumes:
                 raise ValueError("free_piston architecture requires one explicit cylinder volume when preprocessing.connections are used")
             bounce_names = {vol.name for vol in bounce_volumes}

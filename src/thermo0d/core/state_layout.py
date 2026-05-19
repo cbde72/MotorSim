@@ -10,6 +10,7 @@ class StateLayout:
     total_size: int
     x_index: int | None = None
     v_index: int | None = None
+    mechanical_dofs: int = 0
 
     STATES_PER_VOLUME: ClassVar[int] = 6
 
@@ -22,7 +23,16 @@ class StateLayout:
     def free_piston(cls, n_volumes: int) -> "StateLayout":
         n = int(n_volumes)
         base = cls.STATES_PER_VOLUME * n
-        return cls(n_volumes=n, total_size=base + 2, x_index=base, v_index=base + 1)
+        return cls(n_volumes=n, total_size=base + 2, x_index=base, v_index=base + 1, mechanical_dofs=1)
+
+    @classmethod
+    def free_piston_multi(cls, n_volumes: int, mechanical_dofs: int) -> "StateLayout":
+        n = int(n_volumes)
+        dofs = int(mechanical_dofs)
+        if dofs <= 0:
+            raise ValueError("mechanical_dofs must be > 0")
+        base = cls.STATES_PER_VOLUME * n
+        return cls(n_volumes=n, total_size=base + 2 * dofs, x_index=base, v_index=base + dofs, mechanical_dofs=dofs)
 
     def _base_index(self, volume_index: int) -> int:
         idx = int(volume_index)
@@ -109,6 +119,14 @@ class StateLayout:
             raise ValueError("This state layout has no free-piston states")
         return int(self.x_index), int(self.v_index)
 
+    def free_piston_indices_for_dof(self, dof_index: int) -> tuple[int, int]:
+        if self.x_index is None or self.v_index is None:
+            raise ValueError("This state layout has no free-piston states")
+        dof = int(dof_index)
+        if dof < 0 or dof >= max(int(self.mechanical_dofs), 1):
+            raise IndexError(f"mechanical dof index out of range: {dof_index}")
+        return int(self.x_index) + dof, int(self.v_index) + dof
+
     def index_of(self, name: str, volume_names: list[str] | tuple[str, ...] | None = None) -> int:
         labels = self.state_labels(volume_names=volume_names)
         try:
@@ -127,6 +145,15 @@ class StateLayout:
             labels.append(f"{base}_m_residual_kg")
             labels.append(f"{base}_m_fuel_liquid_kg")
         if self.has_free_piston_states:
-            labels.append("free_piston_x_m")
-            labels.append("free_piston_v_m_per_s")
+            dofs = max(int(self.mechanical_dofs), 1)
+            if dofs == 1:
+                labels.append("free_piston_x_m")
+                labels.append("free_piston_v_m_per_s")
+            else:
+                labels.append("free_piston_x_m")
+                for dof in range(1, dofs):
+                    labels.append(f"free_piston_q{dof}_x_m")
+                labels.append("free_piston_v_m_per_s")
+                for dof in range(1, dofs):
+                    labels.append(f"free_piston_q{dof}_v_m_per_s")
         return labels

@@ -120,9 +120,11 @@ preprocessing:
       initial_burned_mass_percent: 27.0444
     - name: bounce
       type: bounce_chamber
-      model: gas_spring
-      initial_pressure_Pa: 1557059.2
-      initial_temperature_K: 1911.3894729610456
+      model: gas_exchange
+      initial_pressure_Pa: 119850.0
+      initial_temperature_K: 300.0
+      initial_burned_fraction_0to1: 0.0
+      initial_burned_mass_percent: 0.0
       chamber_diameter_m: 0.07
       chamber_length_m: 0.10807
       compression_ratio: 16
@@ -165,17 +167,17 @@ preprocessing:
     - name: bounce_in_cv
       type: check_valve
       from_volume: ambient_in
-      to_volume: receiver
+      to_volume: bounce
       diameter_mm: 55
       discharge_coefficient: 0.92
       cracking_pressure_Pa: 0.0
-    # - name: bounce_out_cv
-    #   type: check_valve
-    #   from_volume: bounce
-    #   to_volume: receiver
-    #   diameter_mm: 55.3
-    #   discharge_coefficient: 0.82
-    #   cracking_pressure_Pa: 100.0
+    - name: bounce_out_cv
+      type: check_valve
+      from_volume: bounce
+      to_volume: receiver
+      diameter_mm: 55.3
+      discharge_coefficient: 0.82
+      cracking_pressure_Pa: 150000.0
     - name: transfer_slot
       type: slot
       from_volume: receiver
@@ -225,7 +227,7 @@ simulation:
   dt_s: 1.0e-05
   total_cycles: 1
   save_last_cycles: 1
-  simulationtime: 0.2
+  simulationtime: 1.0
   solver:
     kind: rk4
     rtol: 1.0e-05

@@ -85,3 +85,44 @@ def test_compute_load_force_supports_generator_controlled_model():
         control_zone_m=0.01,
     )
     assert abs(near_left) > abs(mid)
+
+
+def test_generator_controlled_can_assist_when_velocity_is_low():
+    assist_forward = compute_load_force(
+        "generator_controlled",
+        0.0,
+        0.5,
+        x_m=0.0,
+        x_min_m=-0.04,
+        x_max_m=0.04,
+        max_damping_Ns_per_m=40.0,
+        control_zone_m=0.01,
+        assist_velocity_threshold_m_per_s=1.0,
+        assist_force_N=20.0,
+    )
+    assist_backward = compute_load_force(
+        "generator_controlled",
+        0.0,
+        -0.5,
+        x_m=0.0,
+        x_min_m=-0.04,
+        x_max_m=0.04,
+        max_damping_Ns_per_m=40.0,
+        control_zone_m=0.01,
+        assist_velocity_threshold_m_per_s=1.0,
+        assist_force_N=20.0,
+    )
+    assert assist_forward < 0.0
+    assert assist_backward > 0.0
+
+
+def test_free_piston_load_model_generator_assist_fields_are_allowed():
+    cfg_dict = _base_cfg("generator_controlled", 0.0)
+    cfg_dict["free_piston"]["load"]["assist_velocity_threshold_m_per_s"] = 1.5
+    cfg_dict["free_piston"]["load"]["assist_force_N"] = 350.0
+
+    cfg = RootConfig.model_validate(cfg_dict)
+
+    assert cfg.free_piston is not None
+    assert cfg.free_piston.load.assist_velocity_threshold_m_per_s == 1.5
+    assert cfg.free_piston.load.assist_force_N == 350.0

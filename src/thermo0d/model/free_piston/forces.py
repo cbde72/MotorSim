@@ -57,6 +57,21 @@ def _generator_controlled_damping(
     return float(base_damping_Ns_per_m + (max_damping_Ns_per_m - base_damping_Ns_per_m) * proximity)
 
 
+def _velocity_assist_force_signed_N(
+    *,
+    v_m_per_s: float,
+    assist_velocity_threshold_m_per_s: float,
+    assist_force_N: float,
+) -> float:
+    threshold = max(float(assist_velocity_threshold_m_per_s), 0.0)
+    max_force = max(float(assist_force_N), 0.0)
+    v_abs = abs(float(v_m_per_s))
+    if threshold <= 0.0 or max_force <= 0.0 or v_abs < 1.0e-15 or v_abs >= threshold:
+        return 0.0
+    assist = max_force * (1.0 - v_abs / threshold)
+    return float(-math.copysign(assist, float(v_m_per_s)))
+
+
 def _linear_generator_midstroke_weight(x_m: float, x_min_m: float, x_max_m: float) -> float:
     stroke = max(float(x_max_m) - float(x_min_m), 1.0e-12)
     s = _clamp((float(x_m) - float(x_min_m)) / stroke, 0.0, 1.0)
@@ -149,6 +164,8 @@ def compute_load_info(
     power_target_W: float | None = None,
     efficiency_0to1: float | None = None,
     min_velocity_m_per_s: float | None = None,
+    assist_velocity_threshold_m_per_s: float | None = None,
+    assist_force_N: float | None = None,
     target_margin_m: float | None = None,
     hard_margin_m: float | None = None,
     stop_kp: float | None = None,
@@ -180,12 +197,19 @@ def compute_load_info(
             v_m_per_s=float(v_m_per_s),
         )
         force = float(c_eff * v_m_per_s)
+        assist_force_signed = _velocity_assist_force_signed_N(
+            v_m_per_s=float(v_m_per_s),
+            assist_velocity_threshold_m_per_s=float(assist_velocity_threshold_m_per_s or 0.0),
+            assist_force_N=float(assist_force_N or 0.0),
+        )
+        force = float(force + assist_force_signed)
         return LoadModelInfo(
             force_signed_N=force,
-            effective_damping_Ns_per_m=float(c_eff),
+            effective_damping_Ns_per_m=float(force / v_m_per_s) if abs(float(v_m_per_s)) > 1.0e-15 else float(c_eff),
             mechanical_power_W=float(max(force * v_m_per_s, 0.0)),
             electrical_power_W=float(max(force * v_m_per_s, 0.0)),
-            base_force_N=float(abs(force)),
+            base_force_N=float(abs(c_eff * v_m_per_s)),
+            power_force_N=float(abs(assist_force_signed)),
             distance_to_stop_m=_linear_generator_distance_to_stop(float(x_m), float(x_min_m), float(x_max_m), float(v_m_per_s)),
             midstroke_weight_0to1=_linear_generator_midstroke_weight(float(x_m), float(x_min_m), float(x_max_m)),
         )
@@ -227,6 +251,8 @@ def compute_load_force(
     power_target_W: float | None = None,
     efficiency_0to1: float | None = None,
     min_velocity_m_per_s: float | None = None,
+    assist_velocity_threshold_m_per_s: float | None = None,
+    assist_force_N: float | None = None,
     target_margin_m: float | None = None,
     hard_margin_m: float | None = None,
     stop_kp: float | None = None,
@@ -245,6 +271,8 @@ def compute_load_force(
         power_target_W=power_target_W,
         efficiency_0to1=efficiency_0to1,
         min_velocity_m_per_s=min_velocity_m_per_s,
+        assist_velocity_threshold_m_per_s=assist_velocity_threshold_m_per_s,
+        assist_force_N=assist_force_N,
         target_margin_m=target_margin_m,
         hard_margin_m=hard_margin_m,
         stop_kp=stop_kp,

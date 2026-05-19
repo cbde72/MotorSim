@@ -444,6 +444,9 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         volumes_for_build = build_input_volumes
         volume_names_input = [vol.name for vol in build_input_volumes]
     n_vol = len(volumes_for_build)
+    explicit_cylinders = [vol for vol in volumes_for_build if isinstance(vol, CylinderVolumeConfig)]
+    explicit_bounces = [vol for vol in volumes_for_build if isinstance(vol, BounceChamberVolumeConfig)]
+    mechanical_dofs = 2 if len(explicit_cylinders) > 1 or len(explicit_bounces) > 1 else 1
     cycle_type = builder._cycle_enum(config.engine.cycle_type)
     cycle_deg = 360.0 if cycle_type == CycleType.TWO_STROKE else 720.0
     cycle_period_s = cycle_deg / (6.0 * config.engine.speed_rpm)
@@ -460,8 +463,10 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         )
 
     vol_matrix = np.full((n_vol, len(VolumeCol)), -1.0, dtype=np.float64)
-    state_layout = build_free_piston_state_layout(n_vol)
+    state_layout = build_free_piston_state_layout(n_vol, mechanical_dofs=mechanical_dofs)
     y_init = np.zeros(state_layout.total_size, dtype=np.float64)
+    volume_mechanical_dof = np.full(n_vol, -1, dtype=np.int64)
+    volume_mechanical_sign = np.zeros(n_vol, dtype=np.float64)
     volume_names: list[str] = []
     name_to_index: dict[str, int] = {}
     cylinder_indices: list[int] = []
@@ -473,6 +478,8 @@ def build_free_piston_bundle(builder) -> ModelBundle:
 
     cylinder_cfg_for_submodels: CylinderVolumeConfig | None = None
     cyl_idx: int | None = None
+    cylinder_count = 0
+    bounce_count = 0
     initial_cylinder_pressure_Pa: float | None = None
     initial_cylinder_temperature_K: float | None = None
     initial_cylinder_volume_m3: float | None = None
@@ -491,6 +498,8 @@ def build_free_piston_bundle(builder) -> ModelBundle:
                 raise ValueError('free_piston architecture currently supports exactly one cylinder volume')
             cyl_idx = i
             cylinder_indices.append(i)
+            volume_mechanical_dof[i] = 0
+            volume_mechanical_sign[i] = 1.0
             vol_matrix[i, VolumeCol.TYPE] = float(VolumeType.CYLINDER)
             vol_matrix[i, VolumeCol.KIN_ROW] = -1.0
             vol_matrix[i, VolumeCol.FIXED_VOLUME] = -1.0
@@ -518,18 +527,22 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             y_init[state_layout.residual_mass_index(i)] = initial_burned_mass_kg
             cylinder_cfg_for_submodels = placeholder_cylinders[0] if placeholder_cylinders else None
         elif isinstance(vol, CylinderVolumeConfig):
-            if cyl_idx is not None:
-                raise ValueError('free_piston architecture currently supports exactly one cylinder volume')
-            cyl_idx = i
+            if cyl_idx is None:
+                cyl_idx = i
             cylinder_indices.append(i)
+            cylinder_count += 1
+            motion_sign = 1.0 if cylinder_count == 1 else -1.0
+            volume_mechanical_dof[i] = 0
+            volume_mechanical_sign[i] = motion_sign
             vol_matrix[i, VolumeCol.TYPE] = float(VolumeType.CYLINDER)
             vol_matrix[i, VolumeCol.KIN_ROW] = -1.0
             vol_matrix[i, VolumeCol.FIXED_VOLUME] = -1.0
+            x_init_i = float(fp.initial_conditions.x0_m) if motion_sign > 0.0 else float(fp.mechanics.x_min_m) + float(fp.mechanics.x_max_m) - float(fp.initial_conditions.x0_m)
 
             initial_cylinder_volume_m3 = cylinder_volume_from_position(
                 clearance_volume_m3=_fp_clearance_volume_m3(fp),
                 piston_area_m2=_fp_piston_area_m2(fp),
-                x_m=float(fp.initial_conditions.x0_m),
+                x_m=x_init_i,
                 x_min_m=float(fp.mechanics.x_min_m),
                 x_max_m=float(fp.mechanics.x_max_m),
             )
@@ -547,7 +560,8 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             initial_burned_mass_kg = initial_cylinder_mass_kg * _initial_cylinder_burned_fraction_0to1(fp, vol)
             y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
             y_init[state_layout.residual_mass_index(i)] = initial_burned_mass_kg
-            cylinder_cfg_for_submodels = vol
+            if cylinder_cfg_for_submodels is None:
+                cylinder_cfg_for_submodels = vol
         elif isinstance(vol, PlenumVolumeConfig):
             vol_matrix[i, VolumeCol.TYPE] = float(VolumeType.PLENUM)
             vol_matrix[i, VolumeCol.KIN_ROW] = -1.0
@@ -565,13 +579,18 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
             y_init[state_layout.residual_mass_index(i)] = initial_burned_mass_kg
         elif isinstance(vol, BounceChamberVolumeConfig):
+            bounce_count += 1
+            motion_sign = 1.0 if bounce_count == 1 else -1.0
+            volume_mechanical_dof[i] = 1 if mechanical_dofs > 1 else 0
+            volume_mechanical_sign[i] = motion_sign
             vol_matrix[i, VolumeCol.TYPE] = float(VolumeType.BOUNCE_CHAMBER)
             vol_matrix[i, VolumeCol.KIN_ROW] = -1.0
             vol_matrix[i, VolumeCol.FIXED_VOLUME] = -1.0
+            x_init_i = float(fp.initial_conditions.x0_m) if motion_sign > 0.0 else float(fp.mechanics.x_min_m) + float(fp.mechanics.x_max_m) - float(fp.initial_conditions.x0_m)
             initial_bounce_volume_m3 = bounce_volume_from_position(
                 bounce_geom.chamber_volume0_m3,
                 bounce_geom.area_m2,
-                float(fp.initial_conditions.x0_m),
+                x_init_i,
                 float(fp.mechanics.x_min_m),
                 float(fp.mechanics.x_max_m),
             )
@@ -619,11 +638,14 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         or initial_cylinder_mass_kg is None
         or initial_cylinder_internal_energy_J is None
     ):
-        raise ValueError('free_piston architecture requires exactly one cylinder volume')
+        raise ValueError('free_piston architecture requires at least one cylinder volume')
 
     x_idx, v_idx = state_layout.free_piston_indices()
-    y_init[x_idx] = float(fp.initial_conditions.x0_m)
-    y_init[v_idx] = float(fp.initial_conditions.v0_m_per_s)
+    mechanical_x_indices = np.array([state_layout.free_piston_indices_for_dof(i)[0] for i in range(mechanical_dofs)], dtype=np.int64)
+    mechanical_v_indices = np.array([state_layout.free_piston_indices_for_dof(i)[1] for i in range(mechanical_dofs)], dtype=np.int64)
+    for dof in range(mechanical_dofs):
+        y_init[int(mechanical_x_indices[dof])] = float(fp.initial_conditions.x0_m)
+        y_init[int(mechanical_v_indices[dof])] = float(fp.initial_conditions.v0_m_per_s)
 
     kin_matrix = np.zeros((0, 8), dtype=np.float64)
     wall_matrix, wall_ref_matrix, wall_ref_matrix_safe, wall_idx = _build_free_piston_wall_matrices(
@@ -698,7 +720,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     feature_flags = build_feature_flags(config)
     simulation = build_simulation_options(config, cycle_period_s)
     postprocessing = build_postprocessing_options(config)
-    jac_sparsity = build_rhs_jacobian_sparsity(n_vol, conn_matrix, feature_flags, extra_state_count=2, dense_extra_coupling=True)
+    jac_sparsity = build_rhs_jacobian_sparsity(n_vol, conn_matrix, feature_flags, extra_state_count=2 * mechanical_dofs, dense_extra_coupling=True)
     jac_color_groups = greedy_color_columns(jac_sparsity)
 
     wall_bore_by_vol = np.zeros(n_vol, dtype=np.float64)
@@ -780,6 +802,8 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         load_power_target_W=float(fp.load.power_target_W if getattr(fp.load, 'power_target_W', None) is not None else 0.0),
         load_efficiency_0to1=float(fp.load.efficiency_0to1 if getattr(fp.load, 'efficiency_0to1', None) is not None else 1.0),
         load_min_velocity_m_per_s=float(fp.load.min_velocity_m_per_s if getattr(fp.load, 'min_velocity_m_per_s', None) is not None else 0.1),
+        load_assist_velocity_threshold_m_per_s=float(fp.load.assist_velocity_threshold_m_per_s if getattr(fp.load, 'assist_velocity_threshold_m_per_s', None) is not None else 0.0),
+        load_assist_force_N=float(fp.load.assist_force_N if getattr(fp.load, 'assist_force_N', None) is not None else 0.0),
         load_target_margin_m=float(fp.load.target_margin_m if getattr(fp.load, 'target_margin_m', None) is not None else 0.0),
         load_hard_margin_m=float(fp.load.hard_margin_m if getattr(fp.load, 'hard_margin_m', None) is not None else 0.0),
         load_stop_kp=float(fp.load.stop_kp if getattr(fp.load, 'stop_kp', None) is not None else 1.0),
@@ -805,6 +829,11 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         bounce_polytropic_exponent=float(bounce_geom.polytropic_exponent),
         x_state_index=int(x_idx),
         v_state_index=int(v_idx),
+        mechanical_dofs=int(mechanical_dofs),
+        mechanical_x_state_indices=mechanical_x_indices,
+        mechanical_v_state_indices=mechanical_v_indices,
+        volume_mechanical_dof=volume_mechanical_dof,
+        volume_mechanical_sign=volume_mechanical_sign,
         combustion_fueling_mode=str(getattr(combustion_cfg, 'fueling_mode', 'fixed_energy') or 'fixed_energy'),
         combustion_lambda_target=float(getattr(combustion_cfg, 'lambda_target', 0.0) or 0.0),
         combustion_afr_stoich_kg_air_per_kg_fuel=float(getattr(combustion_cfg, 'afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5),
