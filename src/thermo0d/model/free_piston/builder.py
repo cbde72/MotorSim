@@ -446,7 +446,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     n_vol = len(volumes_for_build)
     explicit_cylinders = [vol for vol in volumes_for_build if isinstance(vol, CylinderVolumeConfig)]
     explicit_bounces = [vol for vol in volumes_for_build if isinstance(vol, BounceChamberVolumeConfig)]
-    mechanical_dofs = 2 if len(explicit_cylinders) > 1 or len(explicit_bounces) > 1 else 1
+    mechanical_dofs = 1
     cycle_type = builder._cycle_enum(config.engine.cycle_type)
     cycle_deg = 360.0 if cycle_type == CycleType.TWO_STROKE else 720.0
     cycle_period_s = cycle_deg / (6.0 * config.engine.speed_rpm)
@@ -477,6 +477,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     combustion_lhv_by_vol = np.zeros(n_vol, dtype=np.float64)
 
     cylinder_cfg_for_submodels: CylinderVolumeConfig | None = None
+    cylinder_cfg_by_index: dict[int, CylinderVolumeConfig] = {}
     cyl_idx: int | None = None
     cylinder_count = 0
     bounce_count = 0
@@ -562,6 +563,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             y_init[state_layout.residual_mass_index(i)] = initial_burned_mass_kg
             if cylinder_cfg_for_submodels is None:
                 cylinder_cfg_for_submodels = vol
+            cylinder_cfg_by_index[i] = vol
         elif isinstance(vol, PlenumVolumeConfig):
             vol_matrix[i, VolumeCol.TYPE] = float(VolumeType.PLENUM)
             vol_matrix[i, VolumeCol.KIN_ROW] = -1.0
@@ -581,7 +583,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         elif isinstance(vol, BounceChamberVolumeConfig):
             bounce_count += 1
             motion_sign = 1.0 if bounce_count == 1 else -1.0
-            volume_mechanical_dof[i] = 1 if mechanical_dofs > 1 else 0
+            volume_mechanical_dof[i] = 0
             volume_mechanical_sign[i] = motion_sign
             vol_matrix[i, VolumeCol.TYPE] = float(VolumeType.BOUNCE_CHAMBER)
             vol_matrix[i, VolumeCol.KIN_ROW] = -1.0
@@ -648,19 +650,32 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         y_init[int(mechanical_v_indices[dof])] = float(fp.initial_conditions.v0_m_per_s)
 
     kin_matrix = np.zeros((0, 8), dtype=np.float64)
-    wall_matrix, wall_ref_matrix, wall_ref_matrix_safe, wall_idx = _build_free_piston_wall_matrices(
-        builder,
-        cylinder_cfg_for_submodels,
-        fp,
-    )
-    if wall_idx >= 0:
-        vol_matrix[cyl_idx, VolumeCol.WALL_ROW] = float(wall_idx)
+    wall_rows: list[np.ndarray] = []
+    wall_ref_rows: list[np.ndarray] = []
+    wall_ref_safe_rows: list[np.ndarray] = []
+    for cyl_i in cylinder_indices:
+        cyl_cfg_i = cylinder_cfg_by_index.get(int(cyl_i), cylinder_cfg_for_submodels)
+        wall_matrix_i, wall_ref_matrix_i, wall_ref_matrix_safe_i, wall_idx_i = _build_free_piston_wall_matrices(
+            builder,
+            cyl_cfg_i,
+            fp,
+        )
+        if wall_idx_i >= 0 and wall_matrix_i.shape[0] > 0:
+            vol_matrix[int(cyl_i), VolumeCol.WALL_ROW] = float(len(wall_rows))
+            wall_rows.append(np.asarray(wall_matrix_i[wall_idx_i], dtype=np.float64))
+            wall_ref_rows.append(np.asarray(wall_ref_matrix_i[0], dtype=np.float64))
+            wall_ref_safe_rows.append(np.asarray(wall_ref_matrix_safe_i[0], dtype=np.float64))
+    wall_matrix = np.asarray(wall_rows, dtype=np.float64) if wall_rows else np.zeros((0, len(WallCol)), dtype=np.float64)
+    wall_ref_matrix = np.asarray(wall_ref_rows, dtype=np.float64) if wall_ref_rows else np.zeros((0, len(WallRefCol)), dtype=np.float64)
+    wall_ref_matrix_safe = np.asarray(wall_ref_safe_rows, dtype=np.float64) if wall_ref_safe_rows else np.zeros((1, len(WallRefCol)), dtype=np.float64)
     comb_matrix = np.zeros((0, len(CombCol)), dtype=np.float64)
-    if isinstance(cylinder_cfg_for_submodels, VibeCombustionConfig):
-        raise TypeError('internal error: cylinder_cfg_for_submodels must reference a cylinder volume, not the combustion config directly')
-    if cylinder_cfg_for_submodels is not None and isinstance(cylinder_cfg_for_submodels.combustion, VibeCombustionConfig):
-        nominal_stroke_m = float(fp.mechanics.x_max_m) - float(fp.mechanics.x_min_m)
-        combustion_cfg_local = cylinder_cfg_for_submodels.combustion
+    comb_rows: list[np.ndarray] = []
+    nominal_stroke_m = float(fp.mechanics.x_max_m) - float(fp.mechanics.x_min_m)
+    for cyl_i in cylinder_indices:
+        cyl_cfg_i = cylinder_cfg_by_index.get(int(cyl_i), cylinder_cfg_for_submodels)
+        if cyl_cfg_i is None or not isinstance(cyl_cfg_i.combustion, VibeCombustionConfig):
+            continue
+        combustion_cfg_local = cyl_cfg_i.combustion
         if str(getattr(combustion_cfg_local, 'fueling_mode', 'fixed_energy')) in ('lambda_from_cylinder_mass_at_slot_close', 'lambda_from_cylinder_air_at_slot_close_vapor_injector'):
             q_total_J = 0.0
             comb_fuel_mass = 0.0
@@ -675,10 +690,10 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             else:
                 comb_fuel_mass = 0.0
                 comb_lhv = 1.0
-        combustion_fuel_mass_by_vol[cyl_idx] = comb_fuel_mass
-        combustion_afr_stoich_by_vol[cyl_idx] = float(getattr(combustion_cfg_local, 'afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5)
-        combustion_efficiency_by_vol[cyl_idx] = float(getattr(combustion_cfg_local, 'combustion_efficiency_0to1', 1.0) or 1.0)
-        combustion_lhv_by_vol[cyl_idx] = float(getattr(combustion_cfg_local, 'lhv_J_per_kg', 0.0) or 0.0)
+        combustion_fuel_mass_by_vol[int(cyl_i)] = comb_fuel_mass
+        combustion_afr_stoich_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5)
+        combustion_efficiency_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'combustion_efficiency_0to1', 1.0) or 1.0)
+        combustion_lhv_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'lhv_J_per_kg', 0.0) or 0.0)
         start_deg, duration_value, ref_type, start_mode_enum, duration_mode_enum = _resolve_combustion_timing_for_free_piston(
             combustion_cfg_local,
             nominal_stroke_m,
@@ -702,8 +717,10 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             float(start_mode_enum),
             float(duration_mode_enum),
         ], dtype=np.float64)
-        comb_matrix = comb_row.reshape(1, -1)
-        vol_matrix[cyl_idx, VolumeCol.COMB_ROW] = 0.0
+        vol_matrix[int(cyl_i), VolumeCol.COMB_ROW] = float(len(comb_rows))
+        comb_rows.append(comb_row)
+    if comb_rows:
+        comb_matrix = np.asarray(comb_rows, dtype=np.float64)
     evap_matrix = np.zeros((0, len(EvapCol)), dtype=np.float64)
     conn_matrix, lift_table, alpha_table, cd_table, connection_names = build_connection_tables(
         builder,
@@ -725,13 +742,16 @@ def build_free_piston_bundle(builder) -> ModelBundle:
 
     wall_bore_by_vol = np.zeros(n_vol, dtype=np.float64)
     wall_ups_by_vol = np.zeros(n_vol, dtype=np.float64)
-    if placeholder_cylinders:
+    if synthetic_cylinder is not None and placeholder_cylinders:
         cyl_placeholder = placeholder_cylinders[0]
         wall_bore_by_vol[cyl_idx] = float(cyl_placeholder.kinematics.bore_m)
         wall_ups_by_vol[cyl_idx] = 2.0 * float(cyl_placeholder.kinematics.stroke_m) * float(config.engine.speed_rpm) / 60.0
     else:
-        wall_bore_by_vol[cyl_idx] = float(_fp_piston_diameter_m(fp))
-        wall_ups_by_vol[cyl_idx] = 2.0 * max(float(fp.mechanics.x_max_m) - float(fp.mechanics.x_min_m), 0.0) * float(config.engine.speed_rpm) / 60.0
+        for cyl_i in cylinder_indices:
+            cyl_cfg_i = cylinder_cfg_by_index.get(int(cyl_i))
+            wall_bore_by_vol[int(cyl_i)] = float(cyl_cfg_i.kinematics.bore_m) if cyl_cfg_i is not None else float(_fp_piston_diameter_m(fp))
+            stroke_m = float(cyl_cfg_i.kinematics.stroke_m) if cyl_cfg_i is not None else max(float(fp.mechanics.x_max_m) - float(fp.mechanics.x_min_m), 0.0)
+            wall_ups_by_vol[int(cyl_i)] = 2.0 * stroke_m * float(config.engine.speed_rpm) / 60.0
 
     for i in range(n_vol):
         if int(environment_is_fixed[i]) == 1 or int(vol_matrix[i, VolumeCol.TYPE]) == VolumeType.ENVIRONMENT:
@@ -770,10 +790,11 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             y_init[u_idx_i] = mass_i * max(cv_i, cv_fallback) * temp_i
 
     combustion_cfg = cylinder_cfg_for_submodels.combustion if cylinder_cfg_for_submodels is not None else None
+    cylinder_index_set = {int(idx) for idx in cylinder_indices}
     cylinder_slot_conn_indices = np.array([
         i for i in range(int(conn_matrix.shape[0]))
         if int(conn_matrix[i, ConnCol.TYPE]) == int(ConnectionType.SLOT)
-        and (int(conn_matrix[i, ConnCol.FROM_VOL]) == int(cyl_idx) or int(conn_matrix[i, ConnCol.TO_VOL]) == int(cyl_idx))
+        and (int(conn_matrix[i, ConnCol.FROM_VOL]) in cylinder_index_set or int(conn_matrix[i, ConnCol.TO_VOL]) in cylinder_index_set)
     ], dtype=np.int64)
     meta = FreePistonModelData(
         x0_m=float(fp.initial_conditions.x0_m),

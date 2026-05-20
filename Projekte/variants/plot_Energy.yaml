@@ -143,167 +143,169 @@ figures:
       line_width: 0.8
       scale_factor: 1.0
       unit_preset: raw
-- title: cp_t
-  rows: 1
-  cols: 1
-  subplots:
-  - title: cp über Zeit
-    plot_type: line
-    x_signal: t_s
-    x_title: Zeit [s]
-    x_unit_preset: raw
-    y_axes:
-    - id: ax_cp
-      title: cp [J/(kg K)]
-      side: left
-      color: '#111111'
-    series:
-    - signal_key: cylinder_cp_J_per_kgK
-      label: Zylinder cp
-      axis_id: ax_cp
-      color: '#b42318'
-      line_style: '-'
-    - signal_key: bounce_cp_J_per_kgK
-      label: Bounce cp
-      axis_id: ax_cp
-      color: '#175cd3'
-      line_style: --
-- title: cv_t
-  rows: 1
-  cols: 1
-  subplots:
-  - title: cv über Zeit
-    plot_type: line
-    x_signal: t_s
-    x_title: Zeit [s]
-    x_unit_preset: raw
-    y_axes:
-    - id: ax_cv
-      title: cv [J/(kg K)]
-      side: left
-      color: '#111111'
-    series:
-    - signal_key: cylinder_cv_J_per_kgK
-      label: Zylinder cv
-      axis_id: ax_cv
-      color: '#b42318'
-      line_style: '-'
-    - signal_key: bounce_cv_J_per_kgK
-      label: Bounce cv
-      axis_id: ax_cv
-      color: '#175cd3'
-      line_style: --
-- title: kappa_t
-  rows: 1
-  cols: 1
-  subplots:
-  - title: kappa über Zeit
-    plot_type: line
-    x_signal: t_s
-    x_title: Zeit [s]
-    x_unit_preset: raw
-    y_axes:
-    - id: ax_kappa
-      title: kappa [-]
-      side: left
-      color: '#111111'
-    series:
-    - signal_key: cylinder_kappa
-      label: Zylinder kappa
-      axis_id: ax_kappa
-      color: '#b42318'
-      line_style: '-'
-    - signal_key: bounce_kappa
-      label: Bounce kappa
-      axis_id: ax_kappa
-      color: '#175cd3'
-      line_style: --
-- title: R_t
-  rows: 1
-  cols: 1
-  subplots:
-  - title: R über Zeit
-    plot_type: line
-    x_signal: t_s
-    x_title: Zeit [s]
-    x_unit_preset: raw
-    y_axes:
-    - id: ax_R
-      title: R [J/(kg K)]
-      side: left
-      color: '#111111'
-    series:
-    - signal_key: cylinder_R_J_per_kgK
-      label: Zylinder R
-      axis_id: ax_R
-      color: '#b42318'
-      line_style: '-'
-    - signal_key: bounce_R_J_per_kgK
-      label: Bounce R
-      axis_id: ax_R
-      color: '#175cd3'
-      line_style: --
-- title: Free-Piston Temperaturverläufe aller Volumes
-  rows: 1
-  cols: 1
-  subplots:
-  - title: Temperaturen über Zeit
-    plot_type: line
-    x_signal: t_s
-    x_title: Zeit [s]
-    x_unit_preset: raw
-    x_limit_mode: auto
-    y_axes:
-    - id: ax_p
-      title: Temperature [K]
-      side: left
-      color: '#111111'
-      limit_mode: auto
-      y_min: -1.0
-      y_max: 11.0
-    series:
-    - signal_key: cylinder_T_K
-      label: cylinder
-      axis_id: ax_p
-      color: '#b42318'
-      line_style: '-'
-      scale_factor: 1
-      unit_preset: raw
-    - signal_key: bounce_T_K
-      label: bounce
-      axis_id: ax_p
-      color: '#175cd3'
-      line_style: '-'
-      scale_factor: 1
-      unit_preset: raw
-    - signal_key: receiver_T_K
-      label: receiver
-      axis_id: ax_p
-      color: '#027a48'
-      line_style: '-'
-      scale_factor: 1
-      unit_preset: raw
-    - signal_key: exhaust_plenum_T_K
-      label: exhaust_plenum
-      axis_id: ax_p
-      color: '#7a5af8'
-      line_style: '-'
-      scale_factor: 1
-      unit_preset: raw
-    - signal_key: ambient_in_T_K
-      label: ambient_in
-      axis_id: ax_p
-      color: '#f79009'
-      line_style: --
-      scale_factor: 1
-      unit_preset: raw
-    - signal_key: ambient_out_T_K
-      label: ambient_out
-      axis_id: ax_p
-      color: '#667085'
-      line_style: --
-      scale_factor: 1
-      unit_preset: raw
+
+# - title: cp_t
+#   rows: 1
+#   cols: 1
+#   subplots:
+#   - title: cp über Zeit
+#     plot_type: line
+#     x_signal: t_s
+#     x_title: Zeit [s]
+#     x_unit_preset: raw
+#     y_axes:
+#     - id: ax_cp
+#       title: cp [J/(kg K)]
+#       side: left
+#       color: '#111111'
+#     series:
+#     - signal_key: cylinder_cp_J_per_kgK
+#       label: Zylinder cp
+#       axis_id: ax_cp
+#       color: '#b42318'
+#       line_style: '-'
+#     - signal_key: bounce_cp_J_per_kgK
+#       label: Bounce cp
+#       axis_id: ax_cp
+#       color: '#175cd3'
+#       line_style: --
+# - title: cv_t
+#   rows: 1
+#   cols: 1
+#   subplots:
+#   - title: cv über Zeit
+#     plot_type: line
+#     x_signal: t_s
+#     x_title: Zeit [s]
+#     x_unit_preset: raw
+#     y_axes:
+#     - id: ax_cv
+#       title: cv [J/(kg K)]
+#       side: left
+#       color: '#111111'
+#     series:
+#     - signal_key: cylinder_cv_J_per_kgK
+#       label: Zylinder cv
+#       axis_id: ax_cv
+#       color: '#b42318'
+#       line_style: '-'
+#     - signal_key: bounce_cv_J_per_kgK
+#       label: Bounce cv
+#       axis_id: ax_cv
+#       color: '#175cd3'
+#       line_style: --
+# - title: kappa_t
+#   rows: 1
+#   cols: 1
+#   subplots:
+#   - title: kappa über Zeit
+#     plot_type: line
+#     x_signal: t_s
+#     x_title: Zeit [s]
+#     x_unit_preset: raw
+#     y_axes:
+#     - id: ax_kappa
+#       title: kappa [-]
+#       side: left
+#       color: '#111111'
+#     series:
+#     - signal_key: cylinder_kappa
+#       label: Zylinder kappa
+#       axis_id: ax_kappa
+#       color: '#b42318'
+#       line_style: '-'
+#     - signal_key: bounce_kappa
+#       label: Bounce kappa
+#       axis_id: ax_kappa
+#       color: '#175cd3'
+#       line_style: --
+# - title: R_t
+#   rows: 1
+#   cols: 1
+#   subplots:
+#   - title: R über Zeit
+#     plot_type: line
+#     x_signal: t_s
+#     x_title: Zeit [s]
+#     x_unit_preset: raw
+#     y_axes:
+#     - id: ax_R
+#       title: R [J/(kg K)]
+#       side: left
+#       color: '#111111'
+#     series:
+#     - signal_key: cylinder_R_J_per_kgK
+#       label: Zylinder R
+#       axis_id: ax_R
+#       color: '#b42318'
+#       line_style: '-'
+#     - signal_key: bounce_R_J_per_kgK
+#       label: Bounce R
+#       axis_id: ax_R
+#       color: '#175cd3'
+#       line_style: --
+# - title: Free-Piston Temperaturverläufe aller Volumes
+#   rows: 1
+#   cols: 1
+#   subplots:
+#   - title: Temperaturen über Zeit
+#     plot_type: line
+#     x_signal: t_s
+#     x_title: Zeit [s]
+#     x_unit_preset: raw
+#     x_limit_mode: auto
+#     y_axes:
+#     - id: ax_p
+#       title: Temperature [K]
+#       side: left
+#       color: '#111111'
+#       limit_mode: auto
+#       y_min: -1.0
+#       y_max: 11.0
+#     series:
+#     - signal_key: cylinder_T_K
+#       label: cylinder
+#       axis_id: ax_p
+#       color: '#b42318'
+#       line_style: '-'
+#       scale_factor: 1
+#       unit_preset: raw
+#     - signal_key: bounce_T_K
+#       label: bounce
+#       axis_id: ax_p
+#       color: '#175cd3'
+#       line_style: '-'
+#       scale_factor: 1
+#       unit_preset: raw
+#     - signal_key: receiver_T_K
+#       label: receiver
+#       axis_id: ax_p
+#       color: '#027a48'
+#       line_style: '-'
+#       scale_factor: 1
+#       unit_preset: raw
+#     - signal_key: exhaust_plenum_T_K
+#       label: exhaust_plenum
+#       axis_id: ax_p
+#       color: '#7a5af8'
+#       line_style: '-'
+#       scale_factor: 1
+#       unit_preset: raw
+#     - signal_key: ambient_in_T_K
+#       label: ambient_in
+#       axis_id: ax_p
+#       color: '#f79009'
+#       line_style: --
+#       scale_factor: 1
+#       unit_preset: raw
+#     - signal_key: ambient_out_T_K
+#       label: ambient_out
+#       axis_id: ax_p
+#       color: '#667085'
+#       line_style: --
+#       scale_factor: 1
+#       unit_preset: raw
+
 style:
   preset_name: Light Engineering
   font_family: DejaVu Sans

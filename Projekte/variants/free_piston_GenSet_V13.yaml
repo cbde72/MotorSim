@@ -11,7 +11,8 @@ modeling:
 free_piston:
   initial_conditions:
     x0_m: 0.054
-    v0_m_per_s: -12.0
+    # previous_auto_initial_state_from_last_compression_at_x0_m: v0_m_per_s: -12.0
+    v0_m_per_s: -9.117254712261118
     combustion_state:
       burned_fraction_0to1: 0.0
       released_energy_J: 0.0
@@ -19,20 +20,20 @@ free_piston:
       injection_armed: false
       burned_mass_percent: 0.0
   mechanics:
-    moving_mass_kg: 0.7
+    moving_mass_kg: 6.0
     piston_diameter_m: 0.0605
     compression_ratio: 50
     x_min_m: 0.0
     x_max_m: 0.10807
   friction:
     model: coulomb_viscous
-    fc_N: 40.0
+    fc_N: 80.0 # 2 x40
     cv_Ns_per_m: 0
   load:
     model: generator_controlled
     damping_Ns_per_m: 0.0
-    max_damping_Ns_per_m: 3000.0
-    control_zone_m: 0.006
+    max_damping_Ns_per_m: 10000 #2 x 3000.0
+    control_zone_m: 0.010 #0.006 6 mm um beide Seiten O
     #assist_velocity_threshold_m_per_s: 1.5
     #assist_force_N: 350.0
   scavenging:
@@ -64,8 +65,10 @@ preprocessing:
   volumes:
     - name: cylinder_1
       type: cylinder
-      initial_pressure_Pa: 121325.0
-      initial_temperature_K: 306.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 121325.0
+      initial_pressure_Pa: 257686.2578843034
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 306.0
+      initial_temperature_K: 487.1451361449823
       kinematics:
         type: crank_slider
         bore_m: 1.0745
@@ -86,9 +89,9 @@ preprocessing:
         #start_mode: compression_hub
         #start_hub_m: 0.08737 #0.0552
         start_mode: hign_position #abstand von OT
-        hign_mm: 20.0
+        hign_mm: 10.0
         duration_mode: time
-        duration_ms: 3.0
+        duration_ms: 6.0
         #duration_hub_m: 0.0142
         a: 6.9
         m: 2.0
@@ -118,12 +121,16 @@ preprocessing:
         #hign_mm: 15.0
       evaporation:
         model: none
-      initial_burned_fraction_0to1: 0.0
-      initial_burned_mass_percent: 0.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
+      initial_burned_fraction_0to1: 0.26880184209044594
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
+      initial_burned_mass_percent: 26.880184209044593
     - name: cylinder_2
       type: cylinder
-      initial_pressure_Pa: 121325.0
-      initial_temperature_K: 306.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 121325.0
+      initial_pressure_Pa: 542041.7401361301
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 306.0
+      initial_temperature_K: 1010.9070106970368
       kinematics:
         type: crank_slider
         bore_m: 1.0745
@@ -159,13 +166,17 @@ preprocessing:
         compression_velocity_threshold_m_per_s: 0.02
       evaporation:
         model: none
-      initial_burned_fraction_0to1: 0.0
-      initial_burned_mass_percent: 0.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
+      initial_burned_fraction_0to1: 0.8712299779910716
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
+      initial_burned_mass_percent: 87.12299779910715
     - name: compressor_1
       type: bounce_chamber
       model: gas_exchange
-      initial_pressure_Pa: 241325.0
-      initial_temperature_K: 300.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 241325.0
+      initial_pressure_Pa: 101134.76663730493
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
+      initial_temperature_K: 299.424290135677
       initial_burned_fraction_0to1: 0.0
       initial_burned_mass_percent: 0.0
       chamber_diameter_m: 0.07
@@ -175,8 +186,10 @@ preprocessing:
     - name: compressor_2
       type: bounce_chamber
       model: gas_exchange
-      initial_pressure_Pa: 241325.0
-      initial_temperature_K: 300.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 241325.0
+      initial_pressure_Pa: 198464.6892500843
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
+      initial_temperature_K: 361.45685718326035
       initial_burned_fraction_0to1: 0.0
       initial_burned_mass_percent: 0.0
       chamber_diameter_m: 0.07
@@ -185,8 +198,10 @@ preprocessing:
       polytropic_exponent: 1.3
     - name: receiver_1
       type: plenum
-      initial_pressure_Pa: 201325.0
-      initial_temperature_K: 300.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 201325.0
+      initial_pressure_Pa: 134002.76562248185
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
+      initial_temperature_K: 345.65556573570336
       fixed_volume_m3: 0.00048
       wall_heat:
         model: none
@@ -194,12 +209,16 @@ preprocessing:
         model: none
       evaporation:
         model: none
-      initial_burned_fraction_0to1: 0.0
-      initial_burned_mass_percent: 0.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
+      initial_burned_fraction_0to1: 0.013388033957062654
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
+      initial_burned_mass_percent: 1.3388033957062653
     - name: receiver_2
       type: plenum
-      initial_pressure_Pa: 201325.0
-      initial_temperature_K: 300.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 201325.0
+      initial_pressure_Pa: 149846.55096679396
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
+      initial_temperature_K: 366.9824892796944
       fixed_volume_m3: 0.00048
       wall_heat:
         model: none
@@ -207,12 +226,16 @@ preprocessing:
         model: none
       evaporation:
         model: none
-      initial_burned_fraction_0to1: 0.0
-      initial_burned_mass_percent: 0.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
+      initial_burned_fraction_0to1: 0.023555537179546386
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
+      initial_burned_mass_percent: 2.3555537179546384
     - name: exhaust_plenum_1
       type: plenum
-      initial_pressure_Pa: 110000.0
-      initial_temperature_K: 300.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 110000.0
+      initial_pressure_Pa: 123188.4645178203
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
+      initial_temperature_K: 499.4320592240638
       fixed_volume_m3: 0.00260279
       wall_heat:
         model: none
@@ -220,12 +243,16 @@ preprocessing:
         model: none
       evaporation:
         model: none
-      initial_burned_fraction_0to1: 0.0
-      initial_burned_mass_percent: 0.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
+      initial_burned_fraction_0to1: 0.30316959683064754
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
+      initial_burned_mass_percent: 30.316959683064752
     - name: exhaust_plenum_2
       type: plenum
-      initial_pressure_Pa: 110000.0
-      initial_temperature_K: 300.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 110000.0
+      initial_pressure_Pa: 105762.06635913745
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
+      initial_temperature_K: 497.89529443664713
       fixed_volume_m3: 0.00260279
       wall_heat:
         model: none
@@ -233,8 +260,10 @@ preprocessing:
         model: none
       evaporation:
         model: none
-      initial_burned_fraction_0to1: 0.0
-      initial_burned_mass_percent: 0.0
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
+      initial_burned_fraction_0to1: 0.31810838102263905
+      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
+      initial_burned_mass_percent: 31.810838102263904
     - name: ambient_in
       type: environment
       pressure_Pa: 101325.0
@@ -366,7 +395,7 @@ simulation:
   dt_s: 1.0e-05
   total_cycles: 3
   save_last_cycles: 2
-  simulationtime: 0.1
+  simulationtime: 0.2
   solver:
     kind: rk4
     rtol: 1.0e-05
@@ -374,10 +403,10 @@ simulation:
 postprocessing:
   auto_update_initial_conditions: false
   csv_enabled: true
-  csv_path: results/free_piston_GenSet_V11.csv
+  csv_path: results/free_piston_GenSet_V13.csv
   csv_separator: ;
-  excel_enabled: true
-  excel_path: results/free_piston_GenSet_V11.xlsx
+  excel_enabled: false
+  excel_path: results/free_piston_GenSet_V13.xlsx
   sampling:
     mode: time
     step_s: 0.0001
@@ -402,7 +431,7 @@ postprocessing:
           path: plot-v11_hub.yaml
           prefix: plot_v11_hub
 
-        - enabled: true
+        - enabled: false
           path: plot-v11_Energy.yaml
           prefix: plot_fp_energy
         
@@ -410,7 +439,7 @@ postprocessing:
           path: plot-v11_fp4.yaml
           prefix: plot_fp4
 
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_pressure.yaml
           prefix: plot_fp_pressure
 
@@ -418,23 +447,23 @@ postprocessing:
           path: plot-v11-fp_mass.yaml
           prefix: plot_fp_mass
         
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_flow.yaml
           prefix: plot_fp_mass        
 
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_scavenging_check.yaml
           prefix: plot_fp_scavenging_check
 
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_scavenging_lastcycle_zoom.yaml
           prefix: plot_fp_scavenging_lastcycle
 
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_species_tracking_check.yaml
           prefix: plot_fp_species_check
 
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_species_transport_detail.yaml
           prefix: plot_fp_species_transport
 

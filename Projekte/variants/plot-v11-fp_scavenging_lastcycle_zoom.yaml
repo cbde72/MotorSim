@@ -1,0 +1,241 @@
+name: Free-Piston Scavenging Last-Cycle Zoom
+style:
+  preset_name: Light Engineering
+  font_family: DejaVu Sans
+  font_size: 6
+  axis_label_size: 6
+  tick_label_size: 6
+  title_size: 6
+  figure_title_size: 6
+  subplot_title_visible: true
+  figure_title_visible: false
+  grid_visible: true
+  grid_alpha: 0.3
+  legend_visible: true
+  legend_position: best
+  tight_layout: true
+  default_line_width: 0.9
+  default_marker_size: 3.5
+figures:
+- title: Last-Cycle Zoom - Overlap und Modellantwort
+  rows: 2
+  cols: 1
+  subplots:
+  - title: Slot-Overlap im letzten Fenster
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.88
+    x_max: 1.00
+    y_axes:
+    - id: ax_flow
+      title: Massenstrom [g/s]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_area
+      title: A_eff [mm2]
+      side: right
+      color: '#667085'
+      limit_mode: auto
+    series:
+    - signal_key: transfer_slot_1_mdot_kg_per_s
+      label: transfer mdot
+      axis_id: ax_flow
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_1_mdot_kg_per_s
+      label: exhaust mdot
+      axis_id: ax_flow
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: transfer_slot_1_A_eff_forward_mm2
+      label: transfer A_eff
+      axis_id: ax_area
+      color: '#98a2b3'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_1_A_eff_forward_mm2
+      label: exhaust A_eff
+      axis_id: ax_area
+      color: '#7a5af8'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+
+  - title: Spuelkorrektur im letzten Fenster
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.88
+    x_max: 1.00
+    y_axes:
+    - id: ax_rate
+      title: Rate [g/s]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_frac
+      title: Anteil / Eta [-]
+      side: right
+      color: '#667085'
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 1.05
+    series:
+    - signal_key: cylinder_1_scavenging_burned_correction_kg_per_s
+      label: burned_correction
+      axis_id: ax_rate
+      color: '#027a48'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: cylinder_1_scavenging_transfer_in_kg_per_s
+      label: transfer_in
+      axis_id: ax_rate
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: cylinder_1_scavenging_exhaust_out_kg_per_s
+      label: exhaust_out
+      axis_id: ax_rate
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: cylinder_1_scavenging_short_circuit_fraction
+      label: short_circuit
+      axis_id: ax_frac
+      color: '#f79009'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_1_scavenging_efficiency_0to1
+      label: eta_scav
+      axis_id: ax_frac
+      color: '#7a5af8'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+
+- title: Last-Cycle Zoom - Zusammensetzung und Peak
+  rows: 2
+  cols: 1
+  subplots:
+  - title: Luft, Restgas und gelatchte Luftmasse
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.88
+    x_max: 1.00
+    y_axes:
+    - id: ax_mass
+      title: Masse [mg]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_frac
+      title: Anteil [-]
+      side: right
+      color: '#667085'
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 1.05
+    series:
+    - signal_key: cylinder_1_m_air_kg
+      label: m_air
+      axis_id: ax_mass
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: cylinder_1_m_burned_kg
+      label: m_burned
+      axis_id: ax_mass
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: free_piston_combustion_mass_latched_kg
+      label: latched air
+      axis_id: ax_mass
+      color: '#027a48'
+      line_style: '--'
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: cylinder_1_share_air_0to1
+      label: share_air
+      axis_id: ax_frac
+      color: '#12b76a'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_1_share_burned_0to1
+      label: share_burned
+      axis_id: ax_frac
+      color: '#7a5af8'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+
+  - title: Druckpeak und Kolbenhub
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.88
+    x_max: 1.00
+    y_axes:
+    - id: ax_p
+      title: Druck [bar]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_hub
+      title: Hub [mm]
+      side: right
+      color: '#667085'
+      limit_mode: auto
+    series:
+    - signal_key: cylinder_1_p_bar
+      label: cylinder p
+      axis_id: ax_p
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: receiver_1_p_bar
+      label: receiver p
+      axis_id: ax_p
+      color: '#175cd3'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: exhaust_plenum_1_p_bar
+      label: exhaust plenum p
+      axis_id: ax_p
+      color: '#7a5af8'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: free_piston_distance_from_tdc_mm
+      label: dist to TDC
+      axis_id: ax_hub
+      color: '#027a48'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+

@@ -195,6 +195,15 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     runtime_slotclose_charge_time_s = fp.runtime_slotclose_charge_time_s if hasattr(fp, 'runtime_slotclose_charge_time_s') else 0.0
     runtime_slotclose_charge_end_time_s = fp.runtime_slotclose_charge_end_time_s if hasattr(fp, 'runtime_slotclose_charge_end_time_s') else 0.0
     runtime_slotclose_charge_rate_kg_per_s = fp.runtime_slotclose_charge_rate_kg_per_s if hasattr(fp, 'runtime_slotclose_charge_rate_kg_per_s') else 0.0
+    runtime_latch_valid_by_vol = getattr(fp, 'runtime_latch_valid_by_vol', np.zeros(0, dtype=np.int64))
+    runtime_latched_energy_by_vol_J = getattr(fp, 'runtime_latched_energy_by_vol_J', np.zeros(0, dtype=np.float64))
+    runtime_soc_active_by_vol = getattr(fp, 'runtime_soc_active_by_vol', np.zeros(0, dtype=np.int64))
+    runtime_soc_time_by_vol_s = getattr(fp, 'runtime_soc_time_by_vol_s', np.zeros(0, dtype=np.float64))
+    runtime_soc_energy_by_vol_J = getattr(fp, 'runtime_soc_energy_by_vol_J', np.zeros(0, dtype=np.float64))
+    runtime_slotclose_charge_active_by_vol = getattr(fp, 'runtime_slotclose_charge_active_by_vol', np.zeros(0, dtype=np.int64))
+    runtime_slotclose_charge_time_by_vol_s = getattr(fp, 'runtime_slotclose_charge_time_by_vol_s', np.zeros(0, dtype=np.float64))
+    runtime_slotclose_charge_end_time_by_vol_s = getattr(fp, 'runtime_slotclose_charge_end_time_by_vol_s', np.zeros(0, dtype=np.float64))
+    runtime_slotclose_charge_rate_by_vol_kg_per_s = getattr(fp, 'runtime_slotclose_charge_rate_by_vol_kg_per_s', np.zeros(0, dtype=np.float64))
     if hasattr(fp, 'runtime_combustion_fuel_burn_rate_kg_per_s'):
         fp.runtime_combustion_fuel_burn_rate_kg_per_s = 0.0
         fp.runtime_combustion_air_consumption_rate_kg_per_s = 0.0
@@ -490,20 +499,39 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
         dy_dt[mass_indices[cylinder_idx]] += float(runtime_injector_rate_kg_per_s)
         mdot_in_by_vol[cylinder_idx] += float(runtime_injector_rate_kg_per_s)
 
-    if (
-        free_piston_uses_slot_closure_lambda(bundle)
-        and bool(runtime_slotclose_charge_active)
-        and float(runtime_slotclose_charge_rate_kg_per_s) > 0.0
-        and float(t_s) >= float(runtime_slotclose_charge_time_s) - 1.0e-15
-        and float(t_s) < float(runtime_slotclose_charge_end_time_s) - 1.0e-15
-    ):
-        slotclose_charge_rate = float(runtime_slotclose_charge_rate_kg_per_s)
-        dy_dt[mass_indices[cylinder_idx]] += slotclose_charge_rate
-        cylinder_mass_kg = float(bundle.state_layout.gas_mass_from_state(y, cylinder_idx))
-        cylinder_energy_J = float(y[energy_indices[cylinder_idx]])
-        if cylinder_mass_kg > 1.0e-18:
-            dy_dt[energy_indices[cylinder_idx]] += slotclose_charge_rate * max(cylinder_energy_J / cylinder_mass_kg, 0.0)
-        mdot_in_by_vol[cylinder_idx] += slotclose_charge_rate
+    if free_piston_uses_slot_closure_lambda(bundle):
+        used_by_vol_charge = False
+        if int(getattr(runtime_slotclose_charge_active_by_vol, 'shape', (0,))[0]) >= n_vol:
+            used_by_vol_charge = True
+            for cyl_i in bundle.cylinder_indices:
+                cyl = int(cyl_i)
+                slotclose_charge_rate = float(runtime_slotclose_charge_rate_by_vol_kg_per_s[cyl])
+                if (
+                    bool(runtime_slotclose_charge_active_by_vol[cyl])
+                    and slotclose_charge_rate > 0.0
+                    and float(t_s) >= float(runtime_slotclose_charge_time_by_vol_s[cyl]) - 1.0e-15
+                    and float(t_s) < float(runtime_slotclose_charge_end_time_by_vol_s[cyl]) - 1.0e-15
+                ):
+                    dy_dt[mass_indices[cyl]] += slotclose_charge_rate
+                    cylinder_mass_kg = float(bundle.state_layout.gas_mass_from_state(y, cyl))
+                    cylinder_energy_J = float(y[energy_indices[cyl]])
+                    if cylinder_mass_kg > 1.0e-18:
+                        dy_dt[energy_indices[cyl]] += slotclose_charge_rate * max(cylinder_energy_J / cylinder_mass_kg, 0.0)
+                    mdot_in_by_vol[cyl] += slotclose_charge_rate
+        if (
+            not used_by_vol_charge
+            and bool(runtime_slotclose_charge_active)
+            and float(runtime_slotclose_charge_rate_kg_per_s) > 0.0
+            and float(t_s) >= float(runtime_slotclose_charge_time_s) - 1.0e-15
+            and float(t_s) < float(runtime_slotclose_charge_end_time_s) - 1.0e-15
+        ):
+            slotclose_charge_rate = float(runtime_slotclose_charge_rate_kg_per_s)
+            dy_dt[mass_indices[cylinder_idx]] += slotclose_charge_rate
+            cylinder_mass_kg = float(bundle.state_layout.gas_mass_from_state(y, cylinder_idx))
+            cylinder_energy_J = float(y[energy_indices[cylinder_idx]])
+            if cylinder_mass_kg > 1.0e-18:
+                dy_dt[energy_indices[cylinder_idx]] += slotclose_charge_rate * max(cylinder_energy_J / cylinder_mass_kg, 0.0)
+            mdot_in_by_vol[cylinder_idx] += slotclose_charge_rate
 
     for i in range(n_vol):
         vol_row = bundle.vol_matrix[i]
@@ -532,13 +560,11 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             and comb_enabled == 1
             and comb_idx >= 0
             and free_piston_uses_slot_closure_lambda(bundle)
-            and i == cylinder_idx
         )
         use_time_vibe = (
             vol_type == VolumeType.CYLINDER
             and comb_enabled == 1
             and comb_idx >= 0
-            and i == cylinder_idx
             and duration_mode == int(CombDurationMode.TIME)
         )
         pdv_power, qdot_wall, _htc_wall, _wall_velocity, qdot_comb, qdot_evap = volume_energy_source_terms(
@@ -569,10 +595,15 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
         )
         if use_time_vibe:
             comb_row = bundle.comb_matrix[comb_idx]
-            q_total_active_J = float(runtime_soc_energy_J) if bool(runtime_soc_active) else 0.0
+            if int(getattr(runtime_soc_active_by_vol, 'shape', (0,))[0]) > i:
+                q_total_active_J = float(runtime_soc_energy_by_vol_J[i]) if bool(runtime_soc_active_by_vol[i]) else 0.0
+                soc_time_s = float(runtime_soc_time_by_vol_s[i])
+            else:
+                q_total_active_J = float(runtime_soc_energy_J) if bool(runtime_soc_active) else 0.0
+                soc_time_s = float(runtime_soc_time_s)
             qdot_comb = vibe_time_heat_release_rate_with_total_energy(
                 t_s,
-                float(runtime_soc_time_s),
+                soc_time_s,
                 float(comb_row[CombCol.DURATION_DEG]),
                 float(comb_row[CombCol.A]),
                 float(comb_row[CombCol.M]),
@@ -580,7 +611,10 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             )
         elif use_slot_closure_lambda:
             comb_row = bundle.comb_matrix[comb_idx]
-            q_total_latched_J = float(runtime_latched_energy_J) if bool(runtime_latch_valid) else 0.0
+            if int(getattr(runtime_latch_valid_by_vol, 'shape', (0,))[0]) > i:
+                q_total_latched_J = float(runtime_latched_energy_by_vol_J[i]) if bool(runtime_latch_valid_by_vol[i]) else 0.0
+            else:
+                q_total_latched_J = float(runtime_latched_energy_J) if bool(runtime_latch_valid) else 0.0
             qdot_comb = vibe_heat_release_rate_with_total_energy(
                 theta_local_deg_by_vol[i],
                 theta_global_deg_by_vol[i],

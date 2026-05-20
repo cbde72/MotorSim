@@ -56,6 +56,92 @@ def _stateful_bounce_index(bundle) -> int:
     return -1
 
 
+def _free_piston_local_kinematics(bundle, vol_idx: int, y_arr: np.ndarray, sample_idx: int) -> tuple[float, float]:
+    fp = getattr(bundle, 'free_piston', None)
+    if fp is None:
+        return 0.0, 0.0
+
+    dof = -1
+    if getattr(fp, 'volume_mechanical_dof', None) is not None and vol_idx < int(fp.volume_mechanical_dof.shape[0]):
+        dof = int(fp.volume_mechanical_dof[vol_idx])
+
+    if dof >= 0 and getattr(fp, 'mechanical_x_state_indices', None) is not None and dof < int(fp.mechanical_x_state_indices.shape[0]):
+        x_idx = int(fp.mechanical_x_state_indices[dof])
+        v_idx = int(fp.mechanical_v_state_indices[dof])
+    else:
+        x_idx = int(fp.x_state_index)
+        v_idx = int(fp.v_state_index)
+
+    sign = 1.0
+    if getattr(fp, 'volume_mechanical_sign', None) is not None and vol_idx < int(fp.volume_mechanical_sign.shape[0]):
+        sign = float(fp.volume_mechanical_sign[vol_idx])
+
+    q_m = float(y_arr[x_idx, sample_idx])
+    q_v_m_per_s = float(y_arr[v_idx, sample_idx])
+    if sign >= 0.0:
+        return q_m, q_v_m_per_s
+    return float(fp.x_min_m + fp.x_max_m - q_m), -q_v_m_per_s
+
+
+def _prefix_without_trailing_index(name: str) -> str | None:
+    head, sep, tail = str(name).rpartition('_')
+    if sep and tail.isdigit() and head:
+        return head
+    return None
+
+
+def _add_column_prefix_alias(columns: dict[str, np.ndarray], source_prefix: str, alias_prefix: str) -> None:
+    source = str(source_prefix)
+    alias = str(alias_prefix)
+    if not source or not alias or source == alias:
+        return
+    needle = f'{source}_'
+    for key, arr in list(columns.items()):
+        if not str(key).startswith(needle):
+            continue
+        alias_key = f'{alias}_{str(key)[len(needle):]}'
+        if alias_key not in columns:
+            columns[alias_key] = arr
+
+
+def _add_single_instance_compat_aliases(columns: dict[str, np.ndarray], bundle) -> None:
+    """Temporarily expose legacy singular signal names for one-instance layouts."""
+    vol_matrix = getattr(bundle, 'vol_matrix', None)
+    volume_names = list(getattr(bundle, 'volume_names', []) or [])
+    connection_names = list(getattr(bundle, 'connection_names', []) or [])
+
+    prefix_counts: dict[str, int] = {}
+    for name in volume_names + connection_names:
+        base = _prefix_without_trailing_index(str(name))
+        if base is not None:
+            prefix_counts[base] = prefix_counts.get(base, 0) + 1
+    for name in volume_names + connection_names:
+        base = _prefix_without_trailing_index(str(name))
+        if base is not None and prefix_counts.get(base) == 1:
+            _add_column_prefix_alias(columns, str(name), base)
+
+    if vol_matrix is None:
+        return
+    typed_names: dict[int, list[str]] = {}
+    for idx, name in enumerate(volume_names):
+        if idx >= int(vol_matrix.shape[0]):
+            continue
+        vol_type = int(vol_matrix[idx, VolumeCol.TYPE])
+        typed_names.setdefault(vol_type, []).append(str(name))
+
+    cylinders = typed_names.get(int(VolumeType.CYLINDER), [])
+    if len(cylinders) == 1:
+        _add_column_prefix_alias(columns, cylinders[0], 'cylinder')
+
+    bounces = typed_names.get(int(VolumeType.BOUNCE_CHAMBER), [])
+    if len(bounces) == 1:
+        _add_column_prefix_alias(columns, bounces[0], 'bounce')
+        source = f'{bounces[0]}_'
+        for conn_name in connection_names:
+            if str(conn_name).startswith(source):
+                _add_column_prefix_alias(columns, str(conn_name), f'bounce_{str(conn_name)[len(source):]}')
+
+
 def _replay_free_piston_combustion_history(bundle, y_arr: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     n_samples = int(y_arr.shape[1]) if y_arr.ndim == 2 else 0
     zeros = np.zeros(n_samples, dtype=np.float64)
@@ -70,6 +156,47 @@ def _replay_free_piston_combustion_history(bundle, y_arr: np.ndarray) -> tuple[n
         np.asarray(fuel_hist, dtype=np.float64),
         np.asarray(energy_hist, dtype=np.float64),
         np.asarray(slot_area_hist, dtype=np.float64),
+    )
+
+
+def _replay_free_piston_combustion_history_for_cylinder(bundle, y_arr: np.ndarray, cylinder_idx: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    n_samples = int(y_arr.shape[1]) if y_arr.ndim == 2 else 0
+    zeros = np.zeros(n_samples, dtype=np.float64)
+    if replay_free_piston_combustion_latch_series is None:
+        return zeros.copy(), zeros.copy(), zeros.copy(), zeros.copy()
+    try:
+        mass_hist, fuel_hist, energy_hist, slot_area_hist = replay_free_piston_combustion_latch_series(bundle, y_arr, int(cylinder_idx))
+    except TypeError:
+        if int(cylinder_idx) != int(bundle.cylinder_indices[0]):
+            return zeros.copy(), zeros.copy(), zeros.copy(), zeros.copy()
+        return _replay_free_piston_combustion_history(bundle, y_arr)
+    except Exception:
+        return zeros.copy(), zeros.copy(), zeros.copy(), zeros.copy()
+    return (
+        np.asarray(mass_hist, dtype=np.float64),
+        np.asarray(fuel_hist, dtype=np.float64),
+        np.asarray(energy_hist, dtype=np.float64),
+        np.asarray(slot_area_hist, dtype=np.float64),
+    )
+
+
+def _replay_free_piston_time_combustion_for_cylinder(bundle, t_arr: np.ndarray, y_arr: np.ndarray, latched_energy_hist: np.ndarray | None, cylinder_idx: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    n_samples = int(t_arr.shape[0]) if t_arr.ndim == 1 else 0
+    zeros = np.zeros(n_samples, dtype=np.float64)
+    if replay_free_piston_time_combustion_series is None:
+        return zeros.copy(), zeros.copy(), zeros.copy()
+    try:
+        soc_time_hist, soc_energy_hist, soc_active_hist = replay_free_piston_time_combustion_series(bundle, t_arr, y_arr, latched_energy_hist, int(cylinder_idx))
+    except TypeError:
+        if int(cylinder_idx) != int(bundle.cylinder_indices[0]):
+            return zeros.copy(), zeros.copy(), zeros.copy()
+        soc_time_hist, soc_energy_hist, soc_active_hist = replay_free_piston_time_combustion_series(bundle, t_arr, y_arr, latched_energy_hist)
+    except Exception:
+        return zeros.copy(), zeros.copy(), zeros.copy()
+    return (
+        np.asarray(soc_time_hist, dtype=np.float64),
+        np.asarray(soc_energy_hist, dtype=np.float64),
+        np.asarray(soc_active_hist, dtype=np.float64),
     )
 
 
@@ -321,6 +448,14 @@ class SignalReconstructionService:
             soc_time_hist = np.zeros(n_samples, dtype=np.float64)
             soc_energy_hist = np.zeros(n_samples, dtype=np.float64)
             soc_active_hist = np.zeros(n_samples, dtype=np.float64)
+        cylinder_latch_histories: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
+        cylinder_soc_histories: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
+        if use_fp_slot_lambda:
+            for cyl_idx in getattr(bundle, 'cylinder_indices', []) or []:
+                cyl = int(cyl_idx)
+                latch_hist = _replay_free_piston_combustion_history_for_cylinder(bundle, y_arr, cyl)
+                cylinder_latch_histories[cyl] = latch_hist
+                cylinder_soc_histories[cyl] = _replay_free_piston_time_combustion_for_cylinder(bundle, t_arr, y_arr, latch_hist[2], cyl)
         environment_is_fixed = getattr(bundle, 'environment_is_fixed', None)
         environment_pressures_pa = getattr(bundle, 'environment_pressures_pa', None)
         environment_temperatures_K = getattr(bundle, 'environment_temperatures_K', None)
@@ -428,17 +563,18 @@ class SignalReconstructionService:
                         v_idx = int(fp.v_state_index)
                         piston_x = float(y_arr[x_idx, k])
                         piston_v = float(y_arr[v_idx, k])
-                        piston_distance_from_tdc = cylinder_distance_from_tdc(piston_x, fp.x_min_m, fp.x_max_m)
-                        volume = cylinder_volume_from_position(fp.clearance_volume_m3, fp.piston_area_m2, piston_x, fp.x_min_m, fp.x_max_m)
-                        dvdt = cylinder_dvdt_from_velocity(fp.piston_area_m2, piston_v)
+                        local_piston_x, local_piston_v = _free_piston_local_kinematics(bundle, i, y_arr, k)
+                        piston_distance_from_tdc = cylinder_distance_from_tdc(local_piston_x, fp.x_min_m, fp.x_max_m)
+                        volume = cylinder_volume_from_position(fp.clearance_volume_m3, fp.piston_area_m2, local_piston_x, fp.x_min_m, fp.x_max_m)
+                        dvdt = cylinder_dvdt_from_velocity(fp.piston_area_m2, local_piston_v)
                         cycle_deg = float(bundle.cycle_deg)
                         dtheta_global_dt = float(bundle.cycle_deg / bundle.cycle_period_s) if float(bundle.cycle_period_s) > 0.0 else 0.0
                         theta_global_deg = cls._normalize_cycle_endpoint_theta((float(tk) / float(bundle.cycle_period_s)) * float(bundle.cycle_deg), float(tk), float(dtheta_global_dt), float(bundle.cycle_deg))
-                        theta_deg = free_piston_local_cycle_angle_deg(piston_x, piston_v, fp.x_min_m, fp.x_max_m, cycle_deg)
-                        dtheta_dt = free_piston_local_cycle_angle_rate_deg_s(piston_v, fp.x_min_m, fp.x_max_m, cycle_deg)
-                        compression_active_by_vol[i] = 1 if free_piston_is_compression_stroke(piston_v, piston_x, fp.x_min_m, fp.x_max_m) else 0
-                        if use_fp_slot_lambda and i == primary_cyl_idx and float(latched_fuel_hist[k]) > 0.0:
-                            fuel_mass_eff = float(latched_fuel_hist[k])
+                        theta_deg = free_piston_local_cycle_angle_deg(local_piston_x, local_piston_v, fp.x_min_m, fp.x_max_m, cycle_deg)
+                        dtheta_dt = free_piston_local_cycle_angle_rate_deg_s(local_piston_v, fp.x_min_m, fp.x_max_m, cycle_deg)
+                        compression_active_by_vol[i] = 1 if free_piston_is_compression_stroke(local_piston_v, local_piston_x, fp.x_min_m, fp.x_max_m) else 0
+                        if use_fp_slot_lambda and i in cylinder_latch_histories and float(cylinder_latch_histories[i][1][k]) > 0.0:
+                            fuel_mass_eff = float(cylinder_latch_histories[i][1][k])
                             afr_eff = float(getattr(fp, "combustion_afr_stoich_kg_air_per_kg_fuel", 14.5) or 14.5)
                         else:
                             fuel_mass_eff = float(bundle.combustion_fuel_mass_by_vol[i]) if getattr(bundle, "combustion_fuel_mass_by_vol", None) is not None and i < int(bundle.combustion_fuel_mass_by_vol.shape[0]) else 0.0
@@ -504,7 +640,7 @@ class SignalReconstructionService:
                         load_force = -load_force_signed
                         force_net = force_gas + force_bounce + friction_force + load_force
                         cls._ensure_float_column(columns, 'free_piston_x_m', n_samples)[k] = piston_x
-                        cls._ensure_float_column(columns, 'free_piston_distance_from_tdc_m', n_samples)[k] = piston_distance_from_tdc
+                        cls._ensure_float_column(columns, 'free_piston_distance_from_tdc_m', n_samples)[k] = cylinder_distance_from_tdc(piston_x, fp.x_min_m, fp.x_max_m)
                         cls._ensure_float_column(columns, 'free_piston_v_m_per_s', n_samples)[k] = piston_v
                         cls._ensure_float_column(columns, 'free_piston_a_m_per_s2', n_samples)[k] = force_net / max(float(fp.moving_mass_kg), 1.0e-30)
                         cls._ensure_float_column(columns, 'bounce_volume_m3', n_samples)[k] = bounce_volume
@@ -557,8 +693,7 @@ class SignalReconstructionService:
                     cycle_deg_by_vol[i] = cycle_deg
                 elif vol_type == VolumeType.BOUNCE_CHAMBER and getattr(bundle, 'architecture', 'classic') == 'free_piston' and getattr(bundle, 'free_piston', None) is not None:
                     fp = bundle.free_piston
-                    piston_x = float(y_arr[int(fp.x_state_index), k])
-                    piston_v = float(y_arr[int(fp.v_state_index), k])
+                    piston_x, piston_v = _free_piston_local_kinematics(bundle, i, y_arr, k)
                     volume = bounce_volume_from_position(fp.bounce_chamber_volume0_m3, fp.bounce_area_m2, piston_x, fp.x_min_m, fp.x_max_m)
                     dvdt = -cylinder_dvdt_from_velocity(fp.bounce_area_m2, piston_v)
                     theta_deg = 0.0
@@ -652,6 +787,12 @@ class SignalReconstructionService:
                 cls._ensure_float_column(columns, f'{name}_V_m3', n_samples)[k] = volume
                 cls._ensure_float_column(columns, f'{name}_dVdt_m3_per_s', n_samples)[k] = dvdt
                 cls._ensure_float_column(columns, f'{name}_theta_deg', n_samples)[k] = theta_deg
+                if getattr(bundle, 'architecture', 'classic') == 'free_piston' and getattr(bundle, 'free_piston', None) is not None and vol_type in (VolumeType.CYLINDER, VolumeType.BOUNCE_CHAMBER):
+                    fp = bundle.free_piston
+                    local_piston_x, local_piston_v = _free_piston_local_kinematics(bundle, i, y_arr, k)
+                    cls._ensure_float_column(columns, f'{name}_piston_x_m', n_samples)[k] = local_piston_x
+                    cls._ensure_float_column(columns, f'{name}_piston_distance_from_tdc_m', n_samples)[k] = cylinder_distance_from_tdc(local_piston_x, fp.x_min_m, fp.x_max_m)
+                    cls._ensure_float_column(columns, f'{name}_piston_v_m_per_s', n_samples)[k] = local_piston_v
                 if i == primary_cyl_idx:
                     theta_local[k] = float(theta_deg)
                     theta_global[k] = float(theta_deg)
@@ -815,20 +956,25 @@ class SignalReconstructionService:
                     cycle_deg_by_vol[i],
                 )
                 comb_idx = int(vol_matrix[i, VolumeCol.COMB_ROW])
-                if i == primary_cyl_idx and comb_idx >= 0:
+                if i in cylinder_latch_histories and comb_idx >= 0:
+                    cyl_latched_energy_hist = cylinder_latch_histories[i][2]
+                    cyl_soc_time_hist, cyl_soc_energy_hist, _cyl_soc_active_hist = cylinder_soc_histories.get(
+                        i,
+                        (soc_time_hist, soc_energy_hist, soc_active_hist),
+                    )
                     comb_row = comb_matrix[comb_idx]
                     duration_mode = int(combustion_duration_mode_from_row(comb_row))
                     if duration_mode == int(CombDurationMode.TIME):
                         added_energy_w = vibe_time_heat_release_rate_with_total_energy(
                             t_arr[k],
-                            float(soc_time_hist[k]),
+                            float(cyl_soc_time_hist[k]),
                             float(comb_row[CombCol.DURATION_DEG]),
                             float(comb_row[CombCol.A]),
                             float(comb_row[CombCol.M]),
-                            float(soc_energy_hist[k]),
+                            float(cyl_soc_energy_hist[k]),
                         )
                     elif use_fp_slot_lambda:
-                        if free_piston_reference_is_active(int(comb_row[CombCol.REF_TYPE]), float(y_arr[int(fp.x_state_index), k]), float(y_arr[int(fp.v_state_index), k]), fp.x_min_m, fp.x_max_m):
+                        if free_piston_reference_is_active(int(comb_row[CombCol.REF_TYPE]), float(piston_x_by_vol[i]), float(piston_v_by_vol[i]), fp.x_min_m, fp.x_max_m):
                             added_energy_w = vibe_heat_release_rate_with_total_energy(
                                 theta_deg_by_vol[i],
                                 theta_global_deg_by_vol[i],
@@ -838,7 +984,7 @@ class SignalReconstructionService:
                                 float(comb_row[CombCol.DURATION_DEG]),
                                 float(comb_row[CombCol.A]),
                                 float(comb_row[CombCol.M]),
-                                float(latched_energy_hist[k]),
+                                float(cyl_latched_energy_hist[k]),
                                 int(comb_row[CombCol.REF_TYPE]),
                                 cycle_deg_by_vol[i],
                             )
@@ -875,22 +1021,26 @@ class SignalReconstructionService:
                     cls._ensure_float_column(columns, f'{name}_scavenging_burned_correction_kg_per_s', n_samples)[k] = burned_correction
                     cls._ensure_float_column(columns, f'{name}_scavenging_short_circuit_fraction', n_samples)[k] = short_fraction
                     cls._ensure_float_column(columns, f'{name}_scavenging_efficiency_0to1', n_samples)[k] = eta_scav
-                if use_fp_slot_lambda and i == primary_cyl_idx:
-                    air_mass_kg = float(latched_air_hist[k])
-                    fuel_mass_kg = float(latched_fuel_hist[k])
-                    energy_latched_J = float(latched_energy_hist[k])
+                if use_fp_slot_lambda and i in cylinder_latch_histories:
+                    cyl_latched_air_hist, cyl_latched_fuel_hist, cyl_latched_energy_hist, cyl_slot_area_hist = cylinder_latch_histories[i]
+                    air_mass_kg = float(cyl_latched_air_hist[k])
+                    fuel_mass_kg = float(cyl_latched_fuel_hist[k])
+                    energy_latched_J = float(cyl_latched_energy_hist[k])
                     lambda_value = _lambda_from_air_and_fuel(air_mass_kg, fuel_mass_kg, getattr(fp, 'combustion_afr_stoich_kg_air_per_kg_fuel', 0.0))
                     cls._ensure_float_column(columns, f'{name}_combustion_air_mass_latched_kg', n_samples)[k] = air_mass_kg
                     cls._ensure_float_column(columns, f'{name}_combustion_fuel_mass_latched_kg', n_samples)[k] = fuel_mass_kg
                     cls._ensure_float_column(columns, f'{name}_combustion_energy_latched_J', n_samples)[k] = energy_latched_J
                     cls._ensure_float_column(columns, f'{name}_lambda', n_samples)[k] = lambda_value
-                    cls._ensure_float_column(columns, 'free_piston_slot_area_sum_m2', n_samples)[k] = float(slot_area_hist[k])
-                    cls._ensure_float_column(columns, 'free_piston_combustion_mass_latched_kg', n_samples)[k] = air_mass_kg
-                    cls._ensure_float_column(columns, 'free_piston_combustion_fuel_mass_latched_kg', n_samples)[k] = fuel_mass_kg
-                    cls._ensure_float_column(columns, 'free_piston_combustion_energy_latched_J', n_samples)[k] = energy_latched_J
-                    cls._ensure_float_column(columns, 'free_piston_combustion_lambda', n_samples)[k] = lambda_value
+                    cls._ensure_float_column(columns, f'{name}_slot_area_sum_m2', n_samples)[k] = float(cyl_slot_area_hist[k])
+                    if i == primary_cyl_idx:
+                        cls._ensure_float_column(columns, 'free_piston_slot_area_sum_m2', n_samples)[k] = float(cyl_slot_area_hist[k])
+                        cls._ensure_float_column(columns, 'free_piston_combustion_mass_latched_kg', n_samples)[k] = air_mass_kg
+                        cls._ensure_float_column(columns, 'free_piston_combustion_fuel_mass_latched_kg', n_samples)[k] = fuel_mass_kg
+                        cls._ensure_float_column(columns, 'free_piston_combustion_energy_latched_J', n_samples)[k] = energy_latched_J
+                        cls._ensure_float_column(columns, 'free_piston_combustion_lambda', n_samples)[k] = lambda_value
 
         cls._add_burn_window_energy_columns(columns, t_arr, list(volume_names))
+        _add_single_instance_compat_aliases(columns, bundle)
 
         columns['t_s'] = np.asarray(t_arr, dtype=np.float64)
         columns['cycle_index'] = np.asarray(cycle_idx_arr, dtype=np.int64)

@@ -51,6 +51,7 @@ _CYLINDER_EXTRA_SPECS: list[tuple[str, str, str, str, str]] = [
     ("enthalpy_out_cycle_J", "J", "H_out", "cycle_integral", "Enthalpie aus"),
     ("evaporation_sink_cycle_J", "J", "Q_evap", "cycle_integral", "Verdampfungsenthalpie-Senke"),
     ("piston_work_cycle_J", "J", "W_pV", "cycle_integral", "Kolbenarbeit"),
+    ("indicated_power_W", "W", "P_i", "cycle_integral", "Innere Leistung"),
 ]
 
 _CONNECTION_SPECS: list[tuple[str, str, str, str, str]] = [
@@ -298,7 +299,7 @@ def _build_groups(entries: dict[str, dict[str, str]]) -> dict[str, list[str]]:
             groups["mass_flow"].append(key)
         if key.endswith(("_wall_heat_W", "_heat_transfer_power_W", "_htc_W_per_m2K", "_wall_heat_cycle_J", "_added_energy_W", "_added_energy_cycle_J", "_evaporation_sink_W", "_evaporation_sink_cycle_J")):
             groups["thermal"].append(key)
-        if key.endswith(("_enthalpy_in_W", "_enthalpy_out_W", "_enthalpy_in_cycle_J", "_enthalpy_out_cycle_J", "_piston_work_W", "_piston_work_cycle_J", "_U_J")):
+        if key.endswith(("_enthalpy_in_W", "_enthalpy_out_W", "_enthalpy_in_cycle_J", "_enthalpy_out_cycle_J", "_piston_work_W", "_piston_work_cycle_J", "_indicated_power_W", "_U_J")):
             groups["energy"].append(key)
     if any(key.startswith('free_piston_') or key.startswith('bounce_') for key in entries):
         groups.setdefault('free_piston', [])

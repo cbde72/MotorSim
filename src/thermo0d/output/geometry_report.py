@@ -437,6 +437,25 @@ def build_last_cycle_entries(bundle, rows: list[dict[str, float | int]] | None) 
         LastCycleEntry("friction_work_J", friction_work_J, "J"),
     ]
 
+    indicated_power_total_W = 0.0
+    indicated_power_count = 0
+    last_row = cycle_rows[-1]
+    cylinder_power_prefixes = sorted(
+        {
+            key[:-len("_piston_work_W")]
+            for key in last_row
+            if key.endswith("_piston_work_W") and key[:-len("_piston_work_W")].startswith("cylinder_")
+        }
+    )
+    for cyl_prefix in cylinder_power_prefixes:
+        cyl_work_J = _integrate_window(cycle_rows, f"{cyl_prefix}_piston_work_W")
+        cyl_power_W = cyl_work_J / duration_s if duration_s > 1.0e-15 else 0.0
+        entries.append(LastCycleEntry(f"{cyl_prefix}_indicated_power_W", cyl_power_W, "W"))
+        indicated_power_total_W += cyl_power_W
+        indicated_power_count += 1
+    if indicated_power_count > 1:
+        entries.append(LastCycleEntry("indicated_power_total_W", indicated_power_total_W, "W"))
+
     cycle_start_row = cycle_rows[0]
     slots_closed_row = _first_slots_closed_row(bundle, cycle_rows) if getattr(bundle, "architecture", "classic") == "free_piston" else None
     combustion_start_row = _first_combustion_start_row(bundle, cycle_rows, prefix)
@@ -937,6 +956,97 @@ def _build_free_piston_scavenging_markdown(bundle) -> str:
     return "\n".join(lines)
 
 
+def _build_free_piston_results_signal_markdown(bundle) -> str:
+    if getattr(bundle, 'architecture', 'classic') != 'free_piston':
+        return ""
+    lines = [
+        "# Free-Piston Ergebnis-Auswertung",
+        "",
+        "Die Arbeitszylinder-Signale werden zylinderweise ausgegeben. In Free-Piston-Varianten wie V11/V12/V13 sind die Praefixe normalerweise:",
+        "",
+        "- `cylinder_1_...` fuer Arbeitszylinder 1",
+        "- `cylinder_2_...` fuer Arbeitszylinder 2",
+        "",
+        "## Zugefuehrte Energie",
+        "",
+        "| Signal Arbeitszylinder 1 | Signal Arbeitszylinder 2 | Bedeutung |",
+        "|---|---|---|",
+        "| `cylinder_1_added_energy_W` | `cylinder_2_added_energy_W` | Momentane zugefuehrte Leistung durch Verbrennung. Das ist ein Leistungswert in W, kein Zyklusintegral. |",
+        "| `cylinder_1_added_energy_cycle_J` | `cylinder_2_added_energy_cycle_J` | Ueber den Zyklus integrierte zugefuehrte Energie. Dieses Signal ist fuer den direkten Energievergleich besser geeignet. |",
+        "| `cylinder_1_indicated_power_W` | `cylinder_2_indicated_power_W` | Innere/indizierte Leistung aus kumulierter pV-Arbeit und bisheriger Zykluszeit. Am Zyklusende entspricht sie der mittleren inneren Leistung des Arbeitsspiels. |",
+        "| `cylinder_1_combustion_air_mass_latched_kg` | `cylinder_2_combustion_air_mass_latched_kg` | Beim Schlitzschluss gelatchte Luftmasse. Bei `fueling_mode: lambda_from_cylinder_mass_at_slot_close` bestimmt sie die Kraftstoffmasse. |",
+        "| `cylinder_1_combustion_fuel_mass_latched_kg` | `cylinder_2_combustion_fuel_mass_latched_kg` | Aus gelatchter Luftmasse und Ziel-Lambda berechnete Kraftstoffmasse. |",
+        "| `cylinder_1_combustion_energy_latched_J` | `cylinder_2_combustion_energy_latched_J` | Aus gelatchter Kraftstoffmasse, Heizwert und Verbrennungswirkungsgrad berechnete Energie pro Arbeitsspiel. |",
+        "| `cylinder_1_lambda` | `cylinder_2_lambda` | Lambda bezogen auf die gelatchte Luft- und Kraftstoffmasse. |",
+        "| `cylinder_1_slot_area_sum_m2` | `cylinder_2_slot_area_sum_m2` | Summe der fuer diesen Zylinder betrachteten Schlitzflaechen beim Latch-Replay. |",
+        "",
+        "Bei Slot-Close-Lambda gilt naeherungsweise:",
+        "",
+        "```text",
+        "m_fuel = m_air_latched / (lambda_target * AFR_stoich)",
+        "Q_zu   = m_fuel * LHV * eta_comb",
+        "```",
+        "",
+        "Grosse Unterschiede in `cylinder_1_added_energy_W` und `cylinder_2_added_energy_W` koennen zwei Ursachen haben: unterschiedliche gelatchte Energie (`*_combustion_energy_latched_J`) oder aehnliche gelatchte Energie mit unterschiedlicher zeitlicher Waermefreisetzung.",
+        "",
+        "## Brennbeginn",
+        "",
+        "Die wichtigsten Werte bei Brennbeginn werden aus den bestehenden Zeitreihen an der ersten Zeile mit aktiver Verbrennung bestimmt. Bevorzugt wird `*_combustion_active_0to1 > 0`, alternativ der erste positive Wert von `*_added_energy_W`.",
+        "",
+        "| Auswertung Arbeitszylinder 1 | Auswertung Arbeitszylinder 2 | Quelle |",
+        "|---|---|---|",
+        "| Druck bei Brennbeginn | Druck bei Brennbeginn | `cylinder_1_p_Pa` bzw. `cylinder_2_p_Pa` an der Brennbeginn-Zeile. Fuer Anzeige in bar: Wert durch `1.0e5` teilen. |",
+        "| Temperatur bei Brennbeginn | Temperatur bei Brennbeginn | `cylinder_1_T_K` bzw. `cylinder_2_T_K` an der Brennbeginn-Zeile. |",
+        "| Zeitpunkt Brennbeginn | Zeitpunkt Brennbeginn | `t_s` an der Brennbeginn-Zeile. |",
+        "| Kolbenweg bei Brennbeginn | Kolbenweg bei Brennbeginn | `cylinder_1_piston_distance_from_tdc_m` bzw. `cylinder_2_piston_distance_from_tdc_m` an der Brennbeginn-Zeile. |",
+        "",
+        "## Innere Leistung",
+        "",
+        "Die innere Leistung wird aus der pV-Arbeit berechnet:",
+        "",
+        "```text",
+        "P_i,1 = cylinder_1_piston_work_cycle_J / (t_s - t_cycle_start_s)",
+        "P_i,2 = cylinder_2_piston_work_cycle_J / (t_s - t_cycle_start_s)",
+        "P_i,total = P_i,1 + P_i,2",
+        "```",
+        "",
+        "| Signal Arbeitszylinder 1 | Signal Arbeitszylinder 2 | Bedeutung |",
+        "|---|---|---|",
+        "| `cylinder_1_indicated_power_W` | `cylinder_2_indicated_power_W` | Mittlere innere Leistung innerhalb des laufenden Zyklus. Fuer einen stabilen Vergleich den Wert am Ende eines vollstaendigen Zyklus verwenden. |",
+        "| `cylinder_1_piston_work_cycle_J` | `cylinder_2_piston_work_cycle_J` | Kumulierte pV-Arbeit des laufenden Zyklus. |",
+        "",
+        "## Weitere Arbeitszylinder-Signale",
+        "",
+        "| Muster fuer Arbeitszylinder 1/2 | Bedeutung |",
+        "|---|---|",
+        "| `cylinder_1_m_kg`, `cylinder_2_m_kg` | Gasmasse im Arbeitszylinder. |",
+        "| `cylinder_1_U_J`, `cylinder_2_U_J` | Innere Energie. |",
+        "| `cylinder_1_m_air_kg`, `cylinder_2_m_air_kg` | Luftmasse. |",
+        "| `cylinder_1_m_fuel_liquid_kg`, `cylinder_2_m_fuel_liquid_kg` | Fluessige Kraftstoffmasse. |",
+        "| `cylinder_1_m_fuel_vapor_kg`, `cylinder_2_m_fuel_vapor_kg` | Kraftstoffdampfmasse. |",
+        "| `cylinder_1_m_fuel_total_kg`, `cylinder_2_m_fuel_total_kg` | Summe aus fluessigem Kraftstoff und Kraftstoffdampf. |",
+        "| `cylinder_1_m_burned_kg`, `cylinder_2_m_burned_kg` | Verbrannte Masse. |",
+        "| `cylinder_1_m_residual_kg`, `cylinder_2_m_residual_kg` | Restgasmasse. |",
+        "| `cylinder_1_m_unburned_kg`, `cylinder_2_m_unburned_kg` | Unverbrannte Masse. |",
+        "| `cylinder_1_burned_fraction_0to1`, `cylinder_2_burned_fraction_0to1` | Verbrannter Anteil. |",
+        "| `cylinder_1_p_Pa`, `cylinder_2_p_Pa` | Druck. |",
+        "| `cylinder_1_T_K`, `cylinder_2_T_K` | Temperatur. |",
+        "| `cylinder_1_V_m3`, `cylinder_2_V_m3` | Volumen. |",
+        "| `cylinder_1_piston_distance_from_tdc_m`, `cylinder_2_piston_distance_from_tdc_m` | Abstand vom lokalen OT. |",
+        "| `cylinder_1_piston_v_m_per_s`, `cylinder_2_piston_v_m_per_s` | Lokale Kolbengeschwindigkeit. |",
+        "| `cylinder_1_mdot_in_kg_per_s`, `cylinder_2_mdot_in_kg_per_s` | Einlaufender Massenstrom. |",
+        "| `cylinder_1_mdot_out_kg_per_s`, `cylinder_2_mdot_out_kg_per_s` | Auslaufender Massenstrom. |",
+        "| `cylinder_1_wall_heat_W`, `cylinder_2_wall_heat_W` | Wandwaermestrom. |",
+        "| `cylinder_1_piston_work_W`, `cylinder_2_piston_work_W` | p-dV-Leistung am Kolben. |",
+        "| `cylinder_1_piston_work_cycle_J`, `cylinder_2_piston_work_cycle_J` | Zyklusintegral der Kolbenarbeit. |",
+        "| `cylinder_1_indicated_power_W`, `cylinder_2_indicated_power_W` | Innere/indizierte Leistung aus pV-Arbeit pro Zykluszeit. |",
+        "| `cylinder_1_scavenging_transfer_in_kg_per_s`, `cylinder_2_scavenging_transfer_in_kg_per_s` | Spuel-Massenstrom in den Arbeitszylinder. |",
+        "| `cylinder_1_scavenging_exhaust_out_kg_per_s`, `cylinder_2_scavenging_exhaust_out_kg_per_s` | Abgas-/Spuel-Massenstrom aus dem Arbeitszylinder. |",
+        "| `cylinder_1_scavenging_efficiency_0to1`, `cylinder_2_scavenging_efficiency_0to1` | Spuelwirkungsgrad. |",
+    ]
+    return "\n".join(lines)
+
+
 def build_geometry_markdown(bundle, rows: list[dict[str, float | int]] | None = None, title: str = "Geometrie-Übersicht") -> str:
     entries = build_geometry_entries(bundle)
     lines = [f"# {title}", "", "| Kategorie | Name | Größe | Wert | Einheit |", "|---|---|---|---:|---|"]
@@ -962,6 +1072,10 @@ def build_geometry_markdown(bundle, rows: list[dict[str, float | int]] | None = 
     if last_cycle_section:
         lines.append("")
         lines.append(last_cycle_section)
+    results_signal_section = _build_free_piston_results_signal_markdown(bundle)
+    if results_signal_section:
+        lines.append("")
+        lines.append(results_signal_section)
     return "\n".join(lines)
 
 

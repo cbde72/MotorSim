@@ -19,19 +19,19 @@ free_piston:
       injection_armed: false
       burned_mass_percent: 0.0
   mechanics:
-    moving_mass_kg: 0.7
+    moving_mass_kg: 3.0
     piston_diameter_m: 0.0605
     compression_ratio: 50
     x_min_m: 0.0
     x_max_m: 0.10807
   friction:
     model: coulomb_viscous
-    fc_N: 40.0
+    fc_N: 80.0 # 2 x40
     cv_Ns_per_m: 0
   load:
     model: generator_controlled
     damping_Ns_per_m: 0.0
-    max_damping_Ns_per_m: 3000.0
+    max_damping_Ns_per_m: 10000 #2 x 3000.0
     control_zone_m: 0.006
     #assist_velocity_threshold_m_per_s: 1.5
     #assist_force_N: 350.0
@@ -366,7 +366,7 @@ simulation:
   dt_s: 1.0e-05
   total_cycles: 3
   save_last_cycles: 2
-  simulationtime: 0.1
+  simulationtime: 0.2
   solver:
     kind: rk4
     rtol: 1.0e-05
@@ -374,10 +374,10 @@ simulation:
 postprocessing:
   auto_update_initial_conditions: false
   csv_enabled: true
-  csv_path: results/free_piston_GenSet_V11.csv
+  csv_path: results/free_piston_GenSet_V12.csv
   csv_separator: ;
-  excel_enabled: true
-  excel_path: results/free_piston_GenSet_V11.xlsx
+  excel_enabled: false
+  excel_path: results/free_piston_GenSet_V12.xlsx
   sampling:
     mode: time
     step_s: 0.0001
@@ -402,7 +402,7 @@ postprocessing:
           path: plot-v11_hub.yaml
           prefix: plot_v11_hub
 
-        - enabled: true
+        - enabled: false
           path: plot-v11_Energy.yaml
           prefix: plot_fp_energy
         
@@ -410,7 +410,7 @@ postprocessing:
           path: plot-v11_fp4.yaml
           prefix: plot_fp4
 
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_pressure.yaml
           prefix: plot_fp_pressure
 
@@ -418,23 +418,23 @@ postprocessing:
           path: plot-v11-fp_mass.yaml
           prefix: plot_fp_mass
         
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_flow.yaml
           prefix: plot_fp_mass        
 
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_scavenging_check.yaml
           prefix: plot_fp_scavenging_check
 
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_scavenging_lastcycle_zoom.yaml
           prefix: plot_fp_scavenging_lastcycle
 
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_species_tracking_check.yaml
           prefix: plot_fp_species_check
 
-        - enabled: true
+        - enabled: false
           path: plot-v11-fp_species_transport_detail.yaml
           prefix: plot_fp_species_transport
 

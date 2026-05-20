@@ -8,6 +8,7 @@ import pytest
 from thermo0d.config.models import load_config
 from thermo0d.input.model_builder import build_model_bundle
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_dvdt_from_velocity, cylinder_volume_from_position
+from thermo0d.model.free_piston.combustion_latch import update_free_piston_combustion_latch_state
 from thermo0d.model.free_piston.rhs import compute_free_piston_rhs
 from thermo0d.model.free_piston.simulator import simulate_free_piston
 from thermo0d.model.free_piston.thermo import mass_from_pTV, pressure_from_state, specific_internal_energy_from_temperature, temperature_from_state
@@ -61,3 +62,44 @@ def test_free_piston_a2_runs_without_classic_cylinder_placeholder() -> None:
     assert bundle.cylinder_indices == [0]
     assert bundle.volume_names == ['cylinder']
     assert bundle.kin_matrix.shape[0] == 0
+
+
+def test_free_piston_v11_initial_rhs_is_finite_with_two_wall_heat_cylinders() -> None:
+    cfg_path = Path('Projekte/variants/free_piston_GenSet_V11.yaml')
+    cfg = load_config(cfg_path)
+    bundle = build_model_bundle(cfg, cfg_path)
+
+    dy = compute_free_piston_rhs(0.0, bundle.y_init.copy(), bundle)
+
+    assert bundle.cylinder_indices == [0, 1]
+    assert int(bundle.free_piston.mechanical_dofs) == 1
+    assert bundle.free_piston.volume_mechanical_dof.tolist()[:4] == [0, 0, 0, 0]
+    assert bundle.free_piston.volume_mechanical_sign.tolist()[:4] == [1.0, -1.0, 1.0, -1.0]
+    assert np.all(bundle.wall_bore_by_vol[bundle.cylinder_indices] > 0.0)
+    assert np.all(bundle.wall_ups_by_vol[bundle.cylinder_indices] > 0.0)
+    assert np.all(np.isfinite(dy))
+
+
+def test_free_piston_v12_latches_each_cylinder_against_its_own_slots() -> None:
+    cfg_path = Path('Projekte/variants/free_piston_GenSet_V12.yaml')
+    cfg = load_config(cfg_path)
+    bundle = build_model_bundle(cfg, cfg_path)
+    fp = bundle.free_piston
+    y = bundle.y_init.copy()
+    x_idx, v_idx = bundle.state_layout.free_piston_indices()
+    cyl1, cyl2 = bundle.cylinder_indices[:2]
+
+    # cylinder_1 is near TDC and compressing, while the mirrored cylinder_2 is
+    # near BDC with ports open. The latch must only inspect cylinder_1 slots.
+    y[x_idx] = 0.010
+    y[v_idx] = -1.0
+    fp.runtime_slots_were_open_by_vol = np.zeros(bundle.vol_matrix.shape[0], dtype=np.int64)
+    fp.runtime_latch_valid_by_vol = np.zeros(bundle.vol_matrix.shape[0], dtype=np.int64)
+    fp.runtime_latched_energy_by_vol_J = np.zeros(bundle.vol_matrix.shape[0], dtype=np.float64)
+    fp.runtime_slots_were_open_by_vol[cyl1] = 1
+
+    update_free_piston_combustion_latch_state(bundle, 0.02, y)
+
+    assert int(fp.runtime_latch_valid_by_vol[cyl1]) == 1
+    assert float(fp.runtime_latched_energy_by_vol_J[cyl1]) > 0.0
+    assert int(fp.runtime_latch_valid_by_vol[cyl2]) == 0

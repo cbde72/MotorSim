@@ -448,6 +448,7 @@ def write_free_piston_last_ut_ot_ut_pv_plot(bundle, rows: list[dict[str, float |
     if np.isfinite(t_s[ut1]) and np.isfinite(t_s[ut2]) and t_s[ut2] > t_s[ut1]:
         duration_s = float(t_s[ut2] - t_s[ut1])
     frequency_hz = 1.0 / duration_s if duration_s is not None and duration_s > 1.0e-15 else None
+    indicated_power_W = piston_work_J / duration_s if duration_s is not None and duration_s > 1.0e-15 else None
     added_energy_J = _integrate_over_time(added_energy_W, t_s, ut1, ut2)
     if added_energy_J is None:
         added_energy_J = _cycle_window_delta(segment_rows, [f"{cyl_name}_added_energy_cycle_J", "cylinder_added_energy_cycle_J"])
@@ -498,7 +499,15 @@ def write_free_piston_last_ut_ot_ut_pv_plot(bundle, rows: list[dict[str, float |
     restgas_percent = None
     burned_percent = None
     lambda_thermo_at_combustion_start = None
+    combustion_start_pressure_bar = None
+    combustion_start_temperature_K = None
     if restgas_row is not None:
+        combustion_start_pressure_Pa = _last_finite_value([restgas_row], [f"{cyl_name}_p_Pa", "cylinder_p_Pa"])
+        if combustion_start_pressure_Pa is None:
+            combustion_start_pressure_bar = _last_finite_value([restgas_row], [f"{cyl_name}_p_bar", "cylinder_p_bar"])
+        else:
+            combustion_start_pressure_bar = combustion_start_pressure_Pa * 1.0e-5
+        combustion_start_temperature_K = _last_finite_value([restgas_row], [f"{cyl_name}_T_K", "cylinder_T_K"])
         lambda_thermo_at_combustion_start = _last_finite_value([restgas_row], [
             f"{cyl_name}_thermo_lambda",
             "cylinder_thermo_lambda",
@@ -521,6 +530,9 @@ def write_free_piston_last_ut_ot_ut_pv_plot(bundle, rows: list[dict[str, float |
 
     info_text = "\n".join([
         f"Kolbenarbeit: {_format_value(piston_work_J, 'J')}",
+        f"Innere Leistung: {_format_value(indicated_power_W/1000, 'kW')}",
+        f"Druck Brennbeginn: {_format_value(combustion_start_pressure_bar, 'bar')}",
+        f"Temperatur Brennbeginn: {_format_value(combustion_start_temperature_K, 'K')}",
         f"Lambda Latch: {_format_value(lambda_latch_value, '-', 3)}",
         f"Lambda thermo Brennbeginn: {_format_value(lambda_thermo_at_combustion_start, '-', 3)}",
         f"Frequenz: {_format_value(frequency_hz, 'Hz')}",
@@ -529,11 +541,10 @@ def write_free_piston_last_ut_ot_ut_pv_plot(bundle, rows: list[dict[str, float |
         f"Wandwaermeverluste: {_format_value(wall_heat_loss_J, 'J')}",
         f"pmax: {_format_value(pmax_bar, 'bar')}",
         f"Masse Einlassschluss: {_format_value(mass_at_intake_close_mg, 'mg')}",
-        f"Verdichtung geom.: {_format_value(geom_cr, '-', 2)}",
-        f"Verdichtung eff.: {_format_value(eff_cr, '-', 2)}",
-        f"Verdichtung real: {_format_value(real_cr, '-', 2)}",
-        f"Restgasanteil: {_format_value(restgas_percent, '%', 4)}",
-        f"Verbranntanteil: {_format_value(burned_percent, '%', 2)}",
+        f"Verdichtung geom.: {_format_value(geom_cr, '-', 1)}",
+        f"Verdichtung eff.: {_format_value(eff_cr, '-', 1)}",
+        f"Verdichtung real: {_format_value(real_cr, '-', 1)}",
+        f"Restgasanteil: {_format_value(restgas_percent, '%', 1)}",
     ])
 
     fig, ax = plt.subplots(figsize=(8.0, 5.0), dpi=150)

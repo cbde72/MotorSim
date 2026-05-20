@@ -113,6 +113,23 @@ class FreePistonModelData:
     runtime_slotclose_charge_end_time_s: float = 0.0
     runtime_slotclose_charge_target_fuel_mass_kg: float = 0.0
     runtime_slotclose_charge_rate_kg_per_s: float = 0.0
+    runtime_slots_were_open_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    runtime_latch_valid_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    runtime_latched_cylinder_mass_by_vol_kg: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_latched_fuel_mass_by_vol_kg: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_latched_energy_by_vol_J: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_last_slot_area_by_vol_m2: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_time_combustion_initialized_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    runtime_time_combustion_armed_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    runtime_soc_active_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    runtime_soc_time_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_soc_end_time_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_soc_energy_by_vol_J: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_slotclose_charge_active_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    runtime_slotclose_charge_time_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_slotclose_charge_end_time_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_slotclose_charge_rate_by_vol_kg_per_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_slotclose_charge_target_fuel_by_vol_kg: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     runtime_combustion_fuel_burn_rate_kg_per_s: float = 0.0
     runtime_combustion_air_consumption_rate_kg_per_s: float = 0.0
     runtime_combustion_burned_production_rate_kg_per_s: float = 0.0

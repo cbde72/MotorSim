@@ -425,6 +425,9 @@ class PostprocessingService:
                 q_evap = float(row.get(prefix + '_evaporation_sink_cycle_J', 0.0))
                 w_pv = float(row.get(prefix + '_piston_work_cycle_J', 0.0))
                 row[prefix + '_energy_balance_residual_J'] = float(delta_u - (h_net + q_wall + q_add - q_evap - w_pv))
+                t0 = float(cycle_starts.setdefault((cycle_index, prefix + '_cycle_start_t_s'), float(row['t_s'])))
+                elapsed_s = max(0.0, float(row['t_s']) - t0)
+                row[prefix + '_indicated_power_W'] = float(w_pv / elapsed_s) if elapsed_s > 1.0e-15 else 0.0
 
                 m_key = prefix + '_m_kg'
                 if m_key in row:
