@@ -530,6 +530,13 @@ CombustionConfig = Annotated[Union[DisabledCombustionConfig, VibeCombustionConfi
 EvaporationConfig = Annotated[Union[DisabledEvaporationConfig, SimpleEvaporationConfig], Field(discriminator="model")]
 
 
+class SubmodelLibraryConfig(StrictBaseModel):
+    volumes: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
+    wall_heat: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
+    combustion: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
+    connections: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
+
+
 class CrankSliderKinematicsConfig(StrictBaseModel):
     type: Literal["crank_slider"]
     bore_m: StrictFloat
@@ -1178,6 +1185,7 @@ class PreprocessingConfig(StrictBaseModel):
     gas_properties: GasPropertiesConfig
     features: FeatureToggleConfig
     engine: EngineConfig
+    submodels: SubmodelLibraryConfig = Field(default_factory=SubmodelLibraryConfig)
     volumes: list[VolumeConfig]
     connections: list[ConnectionConfig]
 

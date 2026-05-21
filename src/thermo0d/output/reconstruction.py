@@ -573,14 +573,18 @@ class SignalReconstructionService:
                         theta_deg = free_piston_local_cycle_angle_deg(local_piston_x, local_piston_v, fp.x_min_m, fp.x_max_m, cycle_deg)
                         dtheta_dt = free_piston_local_cycle_angle_rate_deg_s(local_piston_v, fp.x_min_m, fp.x_max_m, cycle_deg)
                         compression_active_by_vol[i] = 1 if free_piston_is_compression_stroke(local_piston_v, local_piston_x, fp.x_min_m, fp.x_max_m) else 0
+                        lambda_air_mass = air_mass
+                        lambda_fuel_mass = fuel_vapor_mass
                         if use_fp_slot_lambda and i in cylinder_latch_histories and float(cylinder_latch_histories[i][1][k]) > 0.0:
+                            lambda_air_mass = float(cylinder_latch_histories[i][0][k])
                             fuel_mass_eff = float(cylinder_latch_histories[i][1][k])
+                            lambda_fuel_mass = fuel_mass_eff
                             afr_eff = float(getattr(fp, "combustion_afr_stoich_kg_air_per_kg_fuel", 14.5) or 14.5)
                         else:
                             fuel_mass_eff = float(bundle.combustion_fuel_mass_by_vol[i]) if getattr(bundle, "combustion_fuel_mass_by_vol", None) is not None and i < int(bundle.combustion_fuel_mass_by_vol.shape[0]) else 0.0
                             afr_eff = float(bundle.combustion_afr_stoich_by_vol[i]) if getattr(bundle, "combustion_afr_stoich_by_vol", None) is not None and i < int(bundle.combustion_afr_stoich_by_vol.shape[0]) else 14.5
                         if use_promo_thermo:
-                            lambda_eff = lambda_from_air_and_fuel_mass(air_mass, fuel_vapor_mass, afr_eff)
+                            lambda_eff = lambda_from_air_and_fuel_mass(lambda_air_mass, lambda_fuel_mass, afr_eff)
                             temp, cp_i, cv_i, gas_constant_i, kappa_i = properties_from_mass_energy_components_quellen(mass, energy, air_mass, fuel_vapor_mass, burned_mass, float(cv_default))
                             pressure = pressure_from_state(mass, energy, volume, gas_constant_i, cv_i)
                             cp_by_vol[i] = cp_i

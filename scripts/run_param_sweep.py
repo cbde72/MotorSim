@@ -580,7 +580,7 @@ if __name__ == '__main__':
     project_root = this_file.parents[1] if this_file.parent.name == 'scripts' else this_file.parent
 # %%
 # %%
-    default_cfg = project_root / 'Projekte' / 'sweeps' / 'transfer_01.yaml'
+    default_cfg = project_root / 'Projekte' / 'sweeps' / 'comb_start.yaml'
 
 
     print (default_cfg)

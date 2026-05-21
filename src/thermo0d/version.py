@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-VERSION = (7, 1, 118)
+VERSION = (7, 1, 120)
 __version__ = ".".join(str(x) for x in VERSION)
-CURRENT_CONFIG_SCHEMA_VERSION = 5
+CURRENT_CONFIG_SCHEMA_VERSION = 7
 
 
 @dataclass(frozen=True)

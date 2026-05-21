@@ -10,7 +10,8 @@ modeling:
 free_piston:
   initial_conditions:
     x0_m: 0.054
-    v0_m_per_s: -9.117254712261118
+    # previous_auto_initial_state_from_last_compression_at_x0_m: v0_m_per_s: -9.117254712261118
+    v0_m_per_s: -5.271265287258423
     combustion_state:
       burned_fraction_0to1: 0.0
       released_energy_J: 0.0
@@ -57,6 +58,55 @@ preprocessing:
     cycle_type: 2t
     speed_rpm: 25.0
   submodels:
+    volumes:
+      cylinder_free_piston:
+        type: cylinder
+        kinematics:
+          type: crank_slider
+          bore_m: 1.0745
+          stroke_m: 1.08
+          conrod_m: 1.12
+          compression_ratio: 50.0
+          phase_deg: 0.0
+        wall_heat:
+          ref: woschni_promo_wall
+        combustion:
+          ref: vibe_lambda_slot
+        evaporation:
+          model: none
+      compressor_bounce:
+        type: bounce_chamber
+        model: gas_exchange
+        initial_burned_fraction_0to1: 0.0
+        initial_burned_mass_percent: 0.0
+        chamber_diameter_m: 0.07
+        chamber_length_m: 0.10807
+        compression_ratio: 16
+        polytropic_exponent: 1.3
+        chamber_volume0_m3: null
+        p0_Pa: null
+      receiver_plenum:
+        type: plenum
+        fixed_volume_m3: 0.00048
+        wall_heat:
+          model: none
+        combustion:
+          model: none
+        evaporation:
+          model: none
+      exhaust_plenum:
+        type: plenum
+        fixed_volume_m3: 0.00260279
+        wall_heat:
+          model: none
+        combustion:
+          model: none
+        evaporation:
+          model: none
+      ambient_environment:
+        type: environment
+        pressure_Pa: 101325.0
+        temperature_K: 300.0
     wall_heat:
       woschni_promo_wall:
         model: woschni
@@ -76,8 +126,10 @@ preprocessing:
     combustion:
       vibe_lambda_slot:
         model: vibe
-        start_mode: hign_position
+        start_mode: hign_position #Kolbenstand vor OT
         duration_mode: time
+        hign_mm: 15.0 #15mm vor OT
+        duration_ms: 6.0
         a: 6.9
         m: 2.0
         energy_coupling: none
@@ -92,254 +144,146 @@ preprocessing:
         slot_closed_threshold_m2: 1.0e-12
         compression_velocity_threshold_m_per_s: 0.02
         angle_reference: absolute
+    connections:
+      compressor_in_check_valve:
+        type: check_valve
+        diameter_mm: 55
+        discharge_coefficient: 0.82
+        cracking_pressure_Pa: 0.0
+      compressor_out_check_valve:
+        type: check_valve
+        diameter_mm: 55.3
+        discharge_coefficient: 0.82
+        cracking_pressure_Pa: 50000.0
+      transfer_slot:
+        type: slot
+        source_of_data: rectangle
+        opening_mode: by_distance
+        distance_from_tdc_mm: 92.07
+        opening_angle_deg: null
+        piston_height_if_crankcase_m: 0.0
+        entrance_angle_deg: 0.0
+        width_mm: 26.0
+        height_mm: 16.0
+        open_fillet_radius_m: 0.0
+        full_fillet_radius_m: 0.0
+        number_of_identical_holes: 6
+        discharge_coefficients:
+          mode: constant
+          forward_cd: 0.95
+          reverse_cd: 0.95
+      exhaust_slot:
+        type: slot
+        source_of_data: rectangle
+        opening_mode: by_distance
+        distance_from_tdc_mm: 90.6
+        opening_angle_deg: null
+        piston_height_if_crankcase_m: 0.0
+        entrance_angle_deg: 0.0
+        width_mm: 24
+        height_mm: 18
+        open_fillet_radius_m: 0.0
+        full_fillet_radius_m: 0.0
+        number_of_identical_holes: 6
+        discharge_coefficients:
+          mode: constant
+          forward_cd: 0.95
+          reverse_cd: 0.95
+      exhaust_bleed:
+        type: orifice
+        diameter_mm: 14.0
+        forward_cd: 0.98
+        reverse_cd: 0.98
   volumes:
   - name: cylinder_1
-    type: cylinder
+    ref: cylinder_free_piston
     initial_pressure_Pa: 257686.2578843034
     initial_temperature_K: 487.1451361449823
-    kinematics:
-      type: crank_slider
-      bore_m: 1.0745
-      stroke_m: 1.08
-      conrod_m: 1.12
-      compression_ratio: 50.0
-      phase_deg: 0.0
-    wall_heat:
-      ref: woschni_promo_wall
-    combustion:
-      ref: vibe_lambda_slot
-      hign_mm: 10.0
-      duration_ms: 6.0
-    evaporation:
-      model: none
     initial_burned_fraction_0to1: 0.26880184209044594
     initial_burned_mass_percent: 26.880184209044593
   - name: cylinder_2
-    type: cylinder
+    ref: cylinder_free_piston
     initial_pressure_Pa: 542041.7401361301
     initial_temperature_K: 1010.9070106970368
-    kinematics:
-      type: crank_slider
-      bore_m: 1.0745
-      stroke_m: 1.08
-      conrod_m: 1.12
-      compression_ratio: 50.0
-      phase_deg: 0.0
-    wall_heat:
-      ref: woschni_promo_wall
-    combustion:
-      ref: vibe_lambda_slot
-      hign_mm: 20.0
-      duration_ms: 3.0
-    evaporation:
-      model: none
     initial_burned_fraction_0to1: 0.8712299779910716
     initial_burned_mass_percent: 87.12299779910715
   - name: compressor_1
-    type: bounce_chamber
-    model: gas_exchange
+    ref: compressor_bounce
     initial_pressure_Pa: 101134.76663730493
     initial_temperature_K: 299.424290135677
-    initial_burned_fraction_0to1: 0.0
-    initial_burned_mass_percent: 0.0
-    chamber_diameter_m: 0.07
-    chamber_length_m: 0.10807
-    compression_ratio: 16
-    polytropic_exponent: 1.3
-    chamber_volume0_m3: null
-    p0_Pa: null
   - name: compressor_2
-    type: bounce_chamber
-    model: gas_exchange
+    ref: compressor_bounce
     initial_pressure_Pa: 198464.6892500843
     initial_temperature_K: 361.45685718326035
-    initial_burned_fraction_0to1: 0.0
-    initial_burned_mass_percent: 0.0
-    chamber_diameter_m: 0.07
-    chamber_length_m: 0.10807
-    compression_ratio: 16
-    polytropic_exponent: 1.3
-    chamber_volume0_m3: null
-    p0_Pa: null
   - name: receiver_1
-    type: plenum
+    ref: receiver_plenum
     initial_pressure_Pa: 134002.76562248185
     initial_temperature_K: 345.65556573570336
-    fixed_volume_m3: 0.00048
-    wall_heat:
-      model: none
-    combustion:
-      model: none
-    evaporation:
-      model: none
     initial_burned_fraction_0to1: 0.013388033957062654
     initial_burned_mass_percent: 1.3388033957062653
   - name: receiver_2
-    type: plenum
+    ref: receiver_plenum
     initial_pressure_Pa: 149846.55096679396
     initial_temperature_K: 366.9824892796944
-    fixed_volume_m3: 0.00048
-    wall_heat:
-      model: none
-    combustion:
-      model: none
-    evaporation:
-      model: none
     initial_burned_fraction_0to1: 0.023555537179546386
     initial_burned_mass_percent: 2.3555537179546384
   - name: exhaust_plenum_1
-    type: plenum
+    ref: exhaust_plenum
     initial_pressure_Pa: 123188.4645178203
     initial_temperature_K: 499.4320592240638
-    fixed_volume_m3: 0.00260279
-    wall_heat:
-      model: none
-    combustion:
-      model: none
-    evaporation:
-      model: none
     initial_burned_fraction_0to1: 0.30316959683064754
     initial_burned_mass_percent: 30.316959683064752
   - name: exhaust_plenum_2
-    type: plenum
+    ref: exhaust_plenum
     initial_pressure_Pa: 105762.06635913745
     initial_temperature_K: 497.89529443664713
-    fixed_volume_m3: 0.00260279
-    wall_heat:
-      model: none
-    combustion:
-      model: none
-    evaporation:
-      model: none
     initial_burned_fraction_0to1: 0.31810838102263905
     initial_burned_mass_percent: 31.810838102263904
   - name: ambient_in
-    type: environment
-    pressure_Pa: 101325.0
-    temperature_K: 300.0
+    ref: ambient_environment
   - name: ambient_out
-    type: environment
-    pressure_Pa: 101325.0
-    temperature_K: 300.0
+    ref: ambient_environment
   connections:
   - name: compressor_1_in_cv
-    type: check_valve
+    ref: compressor_in_check_valve
     from_volume: ambient_in
     to_volume: compressor_1
-    diameter_mm: 55
-    discharge_coefficient: 0.82
-    cracking_pressure_Pa: 0.0
   - name: compressor_1_out_cv
-    type: check_valve
+    ref: compressor_out_check_valve
     from_volume: compressor_1
     to_volume: receiver_1
-    diameter_mm: 55.3
-    discharge_coefficient: 0.82
-    cracking_pressure_Pa: 50000.0
   - name: compressor_2_in_cv
-    type: check_valve
+    ref: compressor_in_check_valve
     from_volume: ambient_in
     to_volume: compressor_2
-    diameter_mm: 55
-    discharge_coefficient: 0.82
-    cracking_pressure_Pa: 0.0
   - name: compressor_2_out_cv
-    type: check_valve
+    ref: compressor_out_check_valve
     from_volume: compressor_2
     to_volume: receiver_2
-    diameter_mm: 55.3
-    discharge_coefficient: 0.82
-    cracking_pressure_Pa: 50000.0
   - name: transfer_slot_1
-    type: slot
+    ref: transfer_slot
     from_volume: receiver_1
     to_volume: cylinder_1
-    source_of_data: rectangle
-    opening_mode: by_distance
-    distance_from_tdc_mm: 92.07
-    opening_angle_deg: null
-    piston_height_if_crankcase_m: 0.0
-    entrance_angle_deg: 0.0
-    width_mm: 26.0
-    height_mm: 16.0
-    open_fillet_radius_m: 0.0
-    full_fillet_radius_m: 0.0
-    number_of_identical_holes: 6
-    discharge_coefficients:
-      mode: constant
-      forward_cd: 0.95
-      reverse_cd: 0.95
   - name: transfer_slot_2
-    type: slot
+    ref: transfer_slot
     from_volume: receiver_2
     to_volume: cylinder_2
-    source_of_data: rectangle
-    opening_mode: by_distance
-    distance_from_tdc_mm: 92.07
-    opening_angle_deg: null
-    piston_height_if_crankcase_m: 0.0
-    entrance_angle_deg: 0.0
-    width_mm: 26.0
-    height_mm: 16.0
-    open_fillet_radius_m: 0.0
-    full_fillet_radius_m: 0.0
-    number_of_identical_holes: 6
-    discharge_coefficients:
-      mode: constant
-      forward_cd: 0.95
-      reverse_cd: 0.95
   - name: exhaust_slot_1
-    type: slot
+    ref: exhaust_slot
     from_volume: cylinder_1
     to_volume: exhaust_plenum_1
-    source_of_data: rectangle
-    opening_mode: by_distance
-    distance_from_tdc_mm: 90.6
-    opening_angle_deg: null
-    piston_height_if_crankcase_m: 0.0
-    entrance_angle_deg: 0.0
-    width_mm: 24
-    height_mm: 18
-    open_fillet_radius_m: 0.0
-    full_fillet_radius_m: 0.0
-    number_of_identical_holes: 6
-    discharge_coefficients:
-      mode: constant
-      forward_cd: 0.95
-      reverse_cd: 0.95
   - name: exhaust_slot_2
-    type: slot
+    ref: exhaust_slot
     from_volume: cylinder_2
     to_volume: exhaust_plenum_2
-    source_of_data: rectangle
-    opening_mode: by_distance
-    distance_from_tdc_mm: 90.6
-    opening_angle_deg: null
-    piston_height_if_crankcase_m: 0.0
-    entrance_angle_deg: 0.0
-    width_mm: 24
-    height_mm: 18
-    open_fillet_radius_m: 0.0
-    full_fillet_radius_m: 0.0
-    number_of_identical_holes: 6
-    discharge_coefficients:
-      mode: constant
-      forward_cd: 0.95
-      reverse_cd: 0.95
   - name: exhaust_bleed_1
-    type: orifice
+    ref: exhaust_bleed
     from_volume: exhaust_plenum_1
     to_volume: ambient_out
-    diameter_mm: 14.0
-    forward_cd: 0.98
-    reverse_cd: 0.98
   - name: exhaust_bleed_2
-    type: orifice
+    ref: exhaust_bleed
     from_volume: exhaust_plenum_2
     to_volume: ambient_out
-    diameter_mm: 14.0
-    forward_cd: 0.98
-    reverse_cd: 0.98
 simulation:
   dt_s: 1.0e-05
   total_cycles: 3
@@ -350,12 +294,12 @@ simulation:
     rtol: 1.0e-05
     atol: 1.0e-07
 postprocessing:
-  auto_update_initial_conditions: false
+  auto_update_initial_conditions: true
   csv_enabled: true
-  csv_path: results/free_piston_GenSet_V13.csv
+  csv_path: results/free_piston_GenSet_V14.csv
   csv_separator: ;
   excel_enabled: false
-  excel_path: results/free_piston_GenSet_V13.xlsx
+  excel_path: results/free_piston_GenSet_V14.xlsx
   sampling:
     mode: time
     step_s: 0.0001

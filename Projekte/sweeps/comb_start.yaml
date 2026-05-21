@@ -1,0 +1,33 @@
+project_root: ../..
+base_config: Projekte/variants/free_piston_GenSet_V14.yaml
+sweep_name: comb_start
+output_dir: Projekte/results/sweeps/comb_start
+excel: false
+keep_temp_configs: false
+
+description_template: "Free-piston sweep | {parameter_name}={value}"
+outdir_template: '{sweep_name}_{run_tag}'
+csv_name_template: '{run_tag}.csv'
+excel_name_template: '{run_tag}.xlsx'
+
+parameter:
+  path: preprocessing.submodels.combustion.vibe_lambda_slot.hign_mm
+  label: hign_mm
+  round_digits: 2
+  linspace:
+    start: 5.0
+    end: 30.0
+    num: 26
+  #values:
+  #  - 10.0
+  #  - 15.0
+  #  - 20.0
+  #  - 25.0
+
+collect:
+  copy_configs: true
+  copy_csv: true
+  copy_plots: true
+  copy_excel: false
+  plots_dir_name: plots
+  delete_source_plots_after_collect: false

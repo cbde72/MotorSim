@@ -79,7 +79,14 @@ class ConfigLoader:
                 kind='plot_layout_instead_of_simulation_config',
             )
 
-        migrated = migrate_config_data(raw)
+        try:
+            migrated = migrate_config_data(raw)
+        except ValueError as exc:
+            raise ConfigLoadError(
+                resolved,
+                _format_config_normalization_error(resolved, exc),
+                kind='config_normalization_error',
+            ) from exc
         validated_input = dict(migrated)
         validated_input.pop(VERSIONING_KEY, None)
 
@@ -166,6 +173,19 @@ def _format_plot_layout_error(path: Path, raw: dict[str, Any]) -> str:
         'Die Datei enthält "figures" und sieht wie eine Plot-Konfiguration aus.',
         'Erwartet werden Top-Level-Felder wie preprocessing, simulation und postprocessing.',
         'Bitte diese Datei nicht als Simulations-Config laden und nicht im Varianten-Batch mitlaufen lassen.',
+        _LINE,
+    ])
+
+
+def _format_config_normalization_error(path: Path, exc: ValueError) -> str:
+    return '\n'.join([
+        _LINE,
+        'KONFIGURATIONS-NORMALISIERUNG FEHLGESCHLAGEN',
+        _SUBLINE,
+        f'Datei   : {path}',
+        f'Fehler  : {exc}',
+        _SUBLINE,
+        'Bitte zentrale Submodel-Referenzen und geerbte Felder der YAML-Datei pruefen.',
         _LINE,
     ])
 

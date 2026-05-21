@@ -84,6 +84,131 @@ def _deepcopy_mapping(config_data: Mapping[str, Any] | None) -> dict[str, Any]:
     return {}
 
 
+def _resolve_submodel_reference(
+    *,
+    library: Mapping[str, Any],
+    local_config: Any,
+    legacy_ref: Any = None,
+    context: str,
+) -> dict[str, Any] | Any:
+    if not isinstance(local_config, Mapping):
+        if legacy_ref is None:
+            return local_config
+        local: dict[str, Any] = {}
+    else:
+        local = copy.deepcopy(dict(local_config))
+
+    ref_name = local.pop("ref", None)
+    if ref_name is None:
+        ref_name = local.pop("reference", None)
+    if ref_name is None:
+        ref_name = legacy_ref
+    if ref_name is None:
+        return local
+
+    ref_key = str(ref_name)
+    base = library.get(ref_key)
+    if not isinstance(base, Mapping):
+        raise ValueError(f"{context} references unknown submodel {ref_key!r}")
+    resolved = copy.deepcopy(dict(base))
+    resolved.update(local)
+    return resolved
+
+
+def _normalize_preprocessing_nested_keys(preprocessing: dict[str, Any]) -> None:
+    volumes = preprocessing.get("volumes")
+    if isinstance(volumes, list):
+        for volume in volumes:
+            if not isinstance(volume, dict):
+                continue
+            combustion = volume.get("combustion")
+            if isinstance(combustion, dict) and "angle_ref" in combustion and "angle_reference" not in combustion:
+                combustion["angle_reference"] = combustion.pop("angle_ref")
+
+    connections = preprocessing.get("connections")
+    if isinstance(connections, list):
+        for conn in connections:
+            if not isinstance(conn, dict):
+                continue
+            _rename_if_present(conn, "opening_ref", "opening_reference")
+            _rename_if_present(conn, "alphak_file", "alpha_k_file")
+            _rename_if_present(conn, "number_of_holes", "number_of_identical_holes")
+            _rename_if_present(conn, "forward_discharge_coefficient", "forward_cd")
+            _rename_if_present(conn, "reverse_discharge_coefficient", "reverse_cd")
+
+
+def resolve_preprocessing_submodel_references(config_data: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Resolve central preprocessing.submodels references into local config blocks."""
+    out = _deepcopy_mapping(config_data)
+    preprocessing = out.get("preprocessing")
+    if not isinstance(preprocessing, dict):
+        return out
+    submodels = preprocessing.get("submodels")
+    if not isinstance(submodels, Mapping):
+        submodels = {}
+    volume_library = submodels.get("volumes") if isinstance(submodels.get("volumes"), Mapping) else {}
+    wall_heat_library = submodels.get("wall_heat") if isinstance(submodels.get("wall_heat"), Mapping) else {}
+    combustion_library = submodels.get("combustion") if isinstance(submodels.get("combustion"), Mapping) else {}
+    connection_library = submodels.get("connections") if isinstance(submodels.get("connections"), Mapping) else {}
+    volumes = preprocessing.get("volumes")
+    if isinstance(volumes, list):
+        for index, volume in enumerate(volumes):
+            if not isinstance(volume, dict):
+                continue
+            vol_name = str(volume.get("name", f"volumes[{index}]"))
+            ref_present = "ref" in volume or "reference" in volume
+            legacy_volume_ref = volume.pop("volume_ref", None)
+            if ref_present or legacy_volume_ref is not None:
+                resolved_volume = _resolve_submodel_reference(
+                    library=volume_library,
+                    local_config=volume,
+                    legacy_ref=legacy_volume_ref,
+                    context=f"preprocessing.volumes[{index}] {vol_name}",
+                )
+                if isinstance(resolved_volume, dict):
+                    volume = resolved_volume
+                    volumes[index] = volume
+                else:
+                    continue
+            vol_name = str(volume.get("name", f"volumes[{index}]"))
+            wall_heat_config = volume.get("wall_heat")
+            wall_heat_ref_present = isinstance(wall_heat_config, Mapping) and ("ref" in wall_heat_config or "reference" in wall_heat_config)
+            legacy_wall_heat_ref = volume.pop("wall_heat_ref", None)
+            if wall_heat_ref_present or legacy_wall_heat_ref is not None:
+                volume["wall_heat"] = _resolve_submodel_reference(
+                    library=wall_heat_library,
+                    local_config=wall_heat_config,
+                    legacy_ref=legacy_wall_heat_ref,
+                    context=f"preprocessing.volumes[{index}] {vol_name}.wall_heat",
+                )
+            combustion_config = volume.get("combustion")
+            combustion_ref_present = isinstance(combustion_config, Mapping) and ("ref" in combustion_config or "reference" in combustion_config)
+            legacy_combustion_ref = volume.pop("combustion_ref", None)
+            if combustion_ref_present or legacy_combustion_ref is not None:
+                volume["combustion"] = _resolve_submodel_reference(
+                    library=combustion_library,
+                    local_config=combustion_config,
+                    legacy_ref=legacy_combustion_ref,
+                    context=f"preprocessing.volumes[{index}] {vol_name}.combustion",
+                )
+    connections = preprocessing.get("connections")
+    if isinstance(connections, list):
+        for index, connection in enumerate(connections):
+            if not isinstance(connection, dict):
+                continue
+            conn_name = str(connection.get("name", f"connections[{index}]"))
+            ref_present = "ref" in connection or "reference" in connection
+            legacy_ref = connection.pop("connection_ref", None)
+            if ref_present or legacy_ref is not None:
+                connections[index] = _resolve_submodel_reference(
+                    library=connection_library,
+                    local_config=connection,
+                    legacy_ref=legacy_ref,
+                    context=f"preprocessing.connections[{index}] {conn_name}",
+                )
+    return out
+
+
 def migrate_config_data(config_data: Mapping[str, Any] | None) -> dict[str, Any]:
     """Migrate older config dicts to the current schema in memory.
 
@@ -101,25 +226,11 @@ def migrate_config_data(config_data: Mapping[str, Any] | None) -> dict[str, Any]
         if isinstance(features, dict) and "heat_transfer" in features and "wall_heat" not in features:
             features["wall_heat"] = features.pop("heat_transfer")
 
-        volumes = preprocessing.get("volumes")
-        if isinstance(volumes, list):
-            for volume in volumes:
-                if not isinstance(volume, dict):
-                    continue
-                combustion = volume.get("combustion")
-                if isinstance(combustion, dict) and "angle_ref" in combustion and "angle_reference" not in combustion:
-                    combustion["angle_reference"] = combustion.pop("angle_ref")
-
-        connections = preprocessing.get("connections")
-        if isinstance(connections, list):
-            for conn in connections:
-                if not isinstance(conn, dict):
-                    continue
-                _rename_if_present(conn, "opening_ref", "opening_reference")
-                _rename_if_present(conn, "alphak_file", "alpha_k_file")
-                _rename_if_present(conn, "number_of_holes", "number_of_identical_holes")
-                _rename_if_present(conn, "forward_discharge_coefficient", "forward_cd")
-                _rename_if_present(conn, "reverse_discharge_coefficient", "reverse_cd")
+        _normalize_preprocessing_nested_keys(preprocessing)
+        out = resolve_preprocessing_submodel_references(out)
+        preprocessing = out.get("preprocessing")
+        if isinstance(preprocessing, dict):
+            _normalize_preprocessing_nested_keys(preprocessing)
 
     simulation = out.get("simulation")
     if isinstance(simulation, dict):
@@ -228,6 +339,7 @@ def normalize_config_data(config_data: Mapping[str, Any] | None) -> dict[str, An
     pre = out.setdefault("preprocessing", {})
     pre.setdefault("gas_properties", {"cp_J_per_kgK": 1005.0, "cv_J_per_kgK": 718.0, "R_J_per_kgK": 287.0, "thermo_model": "constant"})
     pre.setdefault("features", {"mass_flow": True, "wall_heat": False, "combustion": False, "evaporation": False, "pv_work": True})
+    pre.setdefault("submodels", {"volumes": {}, "wall_heat": {}, "combustion": {}, "connections": {}})
     pre.setdefault("engine", {"cycle_type": "4t", "speed_rpm": 3000.0})
     pre.setdefault("volumes", [])
     pre.setdefault("connections", [])
