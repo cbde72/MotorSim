@@ -233,7 +233,11 @@ class ImagePane(QFrame):
         return sorted(files, key=lambda p: p.name.lower())
 
     def _refresh_file_list(self, reset_index: bool = False) -> None:
-        old_current = self.image_files[self.current_index] if self.image_files and not reset_index else None
+        if self.image_files and not reset_index:
+            self.current_index = max(0, min(self.current_index, len(self.image_files) - 1))
+            old_current = self.image_files[self.current_index]
+        else:
+            old_current = None
         self.image_files = self._get_images()
 
         if not self.image_files:
@@ -268,7 +272,11 @@ class ImagePane(QFrame):
         if self.folder_path is None:
             return
 
-        current_file = self.image_files[self.current_index] if self.image_files else None
+        if self.image_files:
+            self.current_index = max(0, min(self.current_index, len(self.image_files) - 1))
+            current_file = self.image_files[self.current_index]
+        else:
+            current_file = None
         before_names = [p.name for p in self.image_files]
         self._refresh_file_list(reset_index=False)
         after_names = [p.name for p in self.image_files]
