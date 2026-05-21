@@ -4,7 +4,7 @@ import numpy as np
 
 from thermo0d.compute.jacobian import build_rhs_jacobian_sparsity, greedy_color_columns
 from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, CombStartMode, CombustionModel, ConnCol, ConnectionType, CycleType, EvapCol, HeatTransferModel, VolumeCol, VolumeType, WallCol, WallRefCol
-from thermo0d.config.models import BounceChamberVolumeConfig, CylinderVolumeConfig, DisabledSubmodelConfig, EnvironmentVolumeConfig, PlenumVolumeConfig, VibeCombustionConfig, WoschniHeatTransferConfig
+from thermo0d.config.models import BounceChamberVolumeConfig, CylinderVolumeConfig, DisabledSubmodelConfig, EnvironmentVolumeConfig, HcciDieselCombustionConfig, PlenumVolumeConfig, VibeCombustionConfig, WoschniHeatTransferConfig
 from thermo0d.core.model_bundle import FreePistonModelData, ModelBundle
 from thermo0d.model.free_piston.combustion_latch import bootstrap_free_piston_combustion_latch
 from thermo0d.core.state_layout import StateLayout
@@ -475,6 +475,17 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     combustion_afr_stoich_by_vol = np.full(n_vol, 14.5, dtype=np.float64)
     combustion_efficiency_by_vol = np.ones(n_vol, dtype=np.float64)
     combustion_lhv_by_vol = np.zeros(n_vol, dtype=np.float64)
+    hcci_enabled_by_vol = np.zeros(n_vol, dtype=np.int64)
+    hcci_tau_A_by_vol_s = np.zeros(n_vol, dtype=np.float64)
+    hcci_pressure_exponent_by_vol = np.zeros(n_vol, dtype=np.float64)
+    hcci_activation_temperature_by_vol_K = np.zeros(n_vol, dtype=np.float64)
+    hcci_reference_pressure_by_vol_Pa = np.zeros(n_vol, dtype=np.float64)
+    hcci_reference_lambda_by_vol = np.ones(n_vol, dtype=np.float64)
+    hcci_lambda_slowdown_exponent_by_vol = np.zeros(n_vol, dtype=np.float64)
+    hcci_residual_slowdown_factor_by_vol = np.ones(n_vol, dtype=np.float64)
+    hcci_start_temperature_min_by_vol_K = np.zeros(n_vol, dtype=np.float64)
+    hcci_start_pressure_min_by_vol_Pa = np.zeros(n_vol, dtype=np.float64)
+    hcci_max_ignition_delay_by_vol_s = np.zeros(n_vol, dtype=np.float64)
 
     cylinder_cfg_for_submodels: CylinderVolumeConfig | None = None
     cylinder_cfg_by_index: dict[int, CylinderVolumeConfig] = {}
@@ -673,9 +684,10 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     nominal_stroke_m = float(fp.mechanics.x_max_m) - float(fp.mechanics.x_min_m)
     for cyl_i in cylinder_indices:
         cyl_cfg_i = cylinder_cfg_by_index.get(int(cyl_i), cylinder_cfg_for_submodels)
-        if cyl_cfg_i is None or not isinstance(cyl_cfg_i.combustion, VibeCombustionConfig):
+        if cyl_cfg_i is None or not isinstance(cyl_cfg_i.combustion, (VibeCombustionConfig, HcciDieselCombustionConfig)):
             continue
         combustion_cfg_local = cyl_cfg_i.combustion
+        is_hcci_diesel = isinstance(combustion_cfg_local, HcciDieselCombustionConfig)
         if str(getattr(combustion_cfg_local, 'fueling_mode', 'fixed_energy')) in ('lambda_from_cylinder_mass_at_slot_close', 'lambda_from_cylinder_air_at_slot_close_vapor_injector'):
             q_total_J = 0.0
             comb_fuel_mass = 0.0
@@ -694,19 +706,37 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         combustion_afr_stoich_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5)
         combustion_efficiency_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'combustion_efficiency_0to1', 1.0) or 1.0)
         combustion_lhv_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'lhv_J_per_kg', 0.0) or 0.0)
-        start_deg, duration_value, ref_type, start_mode_enum, duration_mode_enum = _resolve_combustion_timing_for_free_piston(
-            combustion_cfg_local,
-            nominal_stroke_m,
-            cycle_deg,
-        )
-        if int(ref_type) == int(AngleReference.COMPRESSION_TDC):
+        if is_hcci_diesel:
+            start_deg = 0.0
+            duration_value = float(combustion_cfg_local.duration_s) if combustion_cfg_local.duration_s is not None else float(combustion_cfg_local.duration_ms) * 1.0e-3
             ref_enum_value = float(builder._ref_enum('compression_tdc'))
-        elif int(ref_type) == int(AngleReference.GAS_EXCHANGE_TDC):
-            ref_enum_value = float(builder._ref_enum('gas_exchange_tdc'))
+            start_mode_enum = CombStartMode.AUTOIGNITION
+            duration_mode_enum = CombDurationMode.TIME
+            hcci_enabled_by_vol[int(cyl_i)] = 1
+            hcci_tau_A_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.tau_A_s)
+            hcci_pressure_exponent_by_vol[int(cyl_i)] = float(combustion_cfg_local.tau_pressure_exponent)
+            hcci_activation_temperature_by_vol_K[int(cyl_i)] = float(combustion_cfg_local.tau_activation_temperature_K)
+            hcci_reference_pressure_by_vol_Pa[int(cyl_i)] = float(combustion_cfg_local.tau_reference_pressure_Pa)
+            hcci_reference_lambda_by_vol[int(cyl_i)] = float(combustion_cfg_local.tau_reference_lambda)
+            hcci_lambda_slowdown_exponent_by_vol[int(cyl_i)] = float(combustion_cfg_local.lambda_slowdown_exponent)
+            hcci_residual_slowdown_factor_by_vol[int(cyl_i)] = float(combustion_cfg_local.residual_slowdown_factor)
+            hcci_start_temperature_min_by_vol_K[int(cyl_i)] = float(combustion_cfg_local.start_temperature_min_K)
+            hcci_start_pressure_min_by_vol_Pa[int(cyl_i)] = float(combustion_cfg_local.start_pressure_min_Pa)
+            hcci_max_ignition_delay_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.max_ignition_delay_s)
         else:
-            ref_enum_value = float(builder._ref_enum(combustion_cfg_local.angle_reference))
+            start_deg, duration_value, ref_type, start_mode_enum, duration_mode_enum = _resolve_combustion_timing_for_free_piston(
+                combustion_cfg_local,
+                nominal_stroke_m,
+                cycle_deg,
+            )
+            if int(ref_type) == int(AngleReference.COMPRESSION_TDC):
+                ref_enum_value = float(builder._ref_enum('compression_tdc'))
+            elif int(ref_type) == int(AngleReference.GAS_EXCHANGE_TDC):
+                ref_enum_value = float(builder._ref_enum('gas_exchange_tdc'))
+            else:
+                ref_enum_value = float(builder._ref_enum(combustion_cfg_local.angle_reference))
         comb_row = np.array([
-            float(CombustionModel.VIBE),
+            float(CombustionModel.HCCI_DIESEL if is_hcci_diesel else CombustionModel.VIBE),
             float(start_deg),
             float(duration_value),
             float(combustion_cfg_local.a),
@@ -866,6 +896,17 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         injector_duration_s=(float(getattr(combustion_cfg, 'injection_duration_s', 0.0) or 0.0) if getattr(combustion_cfg, 'injection_duration_s', None) is not None else float(getattr(combustion_cfg, 'injection_duration_ms', 0.0) or 0.0) * 1.0e-3),
         combustion_comb_idx=int(vol_matrix[cyl_idx, VolumeCol.COMB_ROW]),
         combustion_cylinder_slot_conn_indices=cylinder_slot_conn_indices,
+        hcci_enabled_by_vol=hcci_enabled_by_vol,
+        hcci_tau_A_by_vol_s=hcci_tau_A_by_vol_s,
+        hcci_pressure_exponent_by_vol=hcci_pressure_exponent_by_vol,
+        hcci_activation_temperature_by_vol_K=hcci_activation_temperature_by_vol_K,
+        hcci_reference_pressure_by_vol_Pa=hcci_reference_pressure_by_vol_Pa,
+        hcci_reference_lambda_by_vol=hcci_reference_lambda_by_vol,
+        hcci_lambda_slowdown_exponent_by_vol=hcci_lambda_slowdown_exponent_by_vol,
+        hcci_residual_slowdown_factor_by_vol=hcci_residual_slowdown_factor_by_vol,
+        hcci_start_temperature_min_by_vol_K=hcci_start_temperature_min_by_vol_K,
+        hcci_start_pressure_min_by_vol_Pa=hcci_start_pressure_min_by_vol_Pa,
+        hcci_max_ignition_delay_by_vol_s=hcci_max_ignition_delay_by_vol_s,
     )
 
     bundle = ModelBundle(

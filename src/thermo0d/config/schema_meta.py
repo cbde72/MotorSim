@@ -116,7 +116,7 @@ FIELD_META: dict[str, FieldMeta] = {
     "wall_heat.swirl_number": FieldMeta("Swirl number", "float", default=0.0, help_text="Swirl-Zahl für swirl-/GT-nahe Varianten.", section="submodel", visible_if=("wall_heat.model", "woschni")),
     "wall_heat.imep_bar": FieldMeta("IMEP [bar]", "float", default=0.0, help_text="IMEP-Eingang für Huber-nahe Varianten.", section="submodel", visible_if=("wall_heat.model", "woschni")),
 
-    "combustion.model": FieldMeta("Combustion model", "choice", default="none", choices=("none", "vibe"), help_text="Verbrennungsmodell dieses Volumens.", section="submodel"),
+    "combustion.model": FieldMeta("Combustion model", "choice", default="none", choices=("none", "vibe", "hcci_diesel"), help_text="Verbrennungsmodell dieses Volumens.", section="submodel"),
     "combustion.start_mode": FieldMeta("Start mode", "choice", default="angle", choices=("angle", "compression_hub", "hign_position"), help_text="Startfenster entweder über Winkel oder über den Free-Piston-Kompressionshub angeben.", section="submodel", visible_if=("combustion.model", "vibe")),
     "combustion.start_deg": FieldMeta("Start [deg]", "float", default=350.0, help_text="Startwinkel des Verbrennungsmodells.", section="submodel", visible_if=("combustion.model", "vibe")),
     "combustion.start_hub_m": FieldMeta("Start hub [m]", "float", default=None, help_text="Startpunkt entlang des Free-Piston-Kompressionshubs, gemessen ab BDC in Richtung TDC.", section="submodel", visible_if=("combustion.model", "vibe")),

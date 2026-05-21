@@ -516,6 +516,84 @@ class VibeCombustionConfig(StrictBaseModel):
         return self
 
 
+class HcciDieselCombustionConfig(StrictBaseModel):
+    model: Literal["hcci_diesel"]
+    ignition_model: Literal["livengood_wu"] = "livengood_wu"
+    burn_model: Literal["wiebe_autoignition"] = "wiebe_autoignition"
+    duration_mode: Literal["time"] = "time"
+    duration_s: StrictFloat | None = None
+    duration_ms: StrictFloat | None = None
+    a: StrictFloat = 6.9
+    m: StrictFloat = 2.0
+    fueling_mode: Literal["lambda_from_cylinder_mass_at_slot_close"] = "lambda_from_cylinder_mass_at_slot_close"
+    lambda_target: StrictFloat
+    lhv_J_per_kg: StrictFloat
+    afr_stoich_kg_air_per_kg_fuel: StrictFloat = 14.5
+    combustion_efficiency_0to1: StrictFloat = 0.96
+    slot_open_threshold_m2: StrictFloat = 1.0e-7
+    slot_closed_threshold_m2: StrictFloat = 1.0e-9
+    compression_velocity_threshold_m_per_s: StrictFloat = 0.02
+    tau_A_s: StrictFloat = 2.5e-6
+    tau_pressure_exponent: StrictFloat = 1.2
+    tau_activation_temperature_K: StrictFloat = 15000.0
+    tau_reference_pressure_Pa: StrictFloat = 1000000.0
+    tau_reference_lambda: StrictFloat = 1.4
+    lambda_slowdown_exponent: StrictFloat = 0.7
+    residual_slowdown_factor: StrictFloat = 1.5
+    start_temperature_min_K: StrictFloat = 780.0
+    start_pressure_min_Pa: StrictFloat = 2000000.0
+    max_ignition_delay_s: StrictFloat = 0.02
+
+    @model_validator(mode="after")
+    def validate_values(self) -> "HcciDieselCombustionConfig":
+        has_duration_s = self.duration_s is not None
+        has_duration_ms = self.duration_ms is not None
+        if has_duration_s == has_duration_ms:
+            raise ValueError("Use exactly one of duration_s or duration_ms for hcci_diesel")
+        duration_s = float(self.duration_s) if has_duration_s else float(self.duration_ms) * 1.0e-3
+        if duration_s <= 0.0:
+            raise ValueError("duration_s/duration_ms must resolve to > 0")
+        if self.a <= 0.0:
+            raise ValueError("a must be > 0")
+        if self.m < 0.0:
+            raise ValueError("m must be >= 0")
+        if self.lambda_target <= 0.0:
+            raise ValueError("lambda_target must be > 0")
+        if self.lhv_J_per_kg <= 0.0:
+            raise ValueError("lhv_J_per_kg must be > 0")
+        if self.afr_stoich_kg_air_per_kg_fuel <= 0.0:
+            raise ValueError("afr_stoich_kg_air_per_kg_fuel must be > 0")
+        if not (0.0 < self.combustion_efficiency_0to1 <= 1.0):
+            raise ValueError("combustion_efficiency_0to1 must be > 0 and <= 1")
+        if self.slot_open_threshold_m2 < 0.0 or self.slot_closed_threshold_m2 < 0.0:
+            raise ValueError("slot thresholds must be >= 0")
+        if self.slot_closed_threshold_m2 > self.slot_open_threshold_m2:
+            raise ValueError("slot_closed_threshold_m2 must be <= slot_open_threshold_m2")
+        if self.compression_velocity_threshold_m_per_s < 0.0:
+            raise ValueError("compression_velocity_threshold_m_per_s must be >= 0")
+        if self.tau_A_s <= 0.0:
+            raise ValueError("tau_A_s must be > 0")
+        if self.tau_pressure_exponent < 0.0:
+            raise ValueError("tau_pressure_exponent must be >= 0")
+        if self.tau_activation_temperature_K <= 0.0:
+            raise ValueError("tau_activation_temperature_K must be > 0")
+        if self.tau_reference_pressure_Pa <= 0.0:
+            raise ValueError("tau_reference_pressure_Pa must be > 0")
+        if self.tau_reference_lambda <= 0.0:
+            raise ValueError("tau_reference_lambda must be > 0")
+        if self.lambda_slowdown_exponent < 0.0:
+            raise ValueError("lambda_slowdown_exponent must be >= 0")
+        if self.residual_slowdown_factor < 1.0:
+            raise ValueError("residual_slowdown_factor must be >= 1")
+        if self.start_temperature_min_K <= 0.0:
+            raise ValueError("start_temperature_min_K must be > 0")
+        if self.start_pressure_min_Pa <= 0.0:
+            raise ValueError("start_pressure_min_Pa must be > 0")
+        if self.max_ignition_delay_s <= 0.0:
+            raise ValueError("max_ignition_delay_s must be > 0")
+        return self
+
+
 class SimpleEvaporationConfig(StrictBaseModel):
     model: Literal["simple"]
     start_deg: StrictFloat
@@ -526,7 +604,7 @@ class SimpleEvaporationConfig(StrictBaseModel):
 
 
 WallHeatConfig = Annotated[Union[DisabledSubmodelConfig, WoschniHeatTransferConfig], Field(discriminator="model")]
-CombustionConfig = Annotated[Union[DisabledCombustionConfig, VibeCombustionConfig], Field(discriminator="model")]
+CombustionConfig = Annotated[Union[DisabledCombustionConfig, VibeCombustionConfig, HcciDieselCombustionConfig], Field(discriminator="model")]
 EvaporationConfig = Annotated[Union[DisabledEvaporationConfig, SimpleEvaporationConfig], Field(discriminator="model")]
 
 

@@ -85,12 +85,14 @@ class WoschniPhaseMode(IntEnum):
 class CombustionModel(IntEnum):
     NONE = 0
     VIBE = 1
+    HCCI_DIESEL = 2
 
 
 class CombStartMode(IntEnum):
     ANGLE = 1
     COMPRESSION_HUB = 2
     HIGN_POSITION = 3
+    AUTOIGNITION = 4
 
 
 class CombDurationMode(IntEnum):

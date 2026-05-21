@@ -134,6 +134,20 @@ class FreePistonModelData:
     runtime_combustion_air_consumption_rate_kg_per_s: float = 0.0
     runtime_combustion_burned_production_rate_kg_per_s: float = 0.0
     runtime_combustion_qdot_W: float = 0.0
+    hcci_enabled_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    hcci_tau_A_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    hcci_pressure_exponent_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    hcci_activation_temperature_by_vol_K: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    hcci_reference_pressure_by_vol_Pa: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    hcci_reference_lambda_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    hcci_lambda_slowdown_exponent_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    hcci_residual_slowdown_factor_by_vol: np.ndarray = field(default_factory=lambda: np.ones(0, dtype=np.float64))
+    hcci_start_temperature_min_by_vol_K: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    hcci_start_pressure_min_by_vol_Pa: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    hcci_max_ignition_delay_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_hcci_integral_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_hcci_last_update_time_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_hcci_tau_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     runtime_scavenging_transfer_in_kg_per_s: float = 0.0
     runtime_scavenging_exhaust_out_kg_per_s: float = 0.0
     runtime_scavenging_burned_correction_kg_per_s: float = 0.0
