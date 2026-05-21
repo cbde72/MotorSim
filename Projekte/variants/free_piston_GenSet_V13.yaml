@@ -18,7 +18,7 @@ free_piston:
       injection_armed: false
       burned_mass_percent: 0.0
   mechanics:
-    moving_mass_kg: 6.0
+    moving_mass_kg: 11.8
     piston_diameter_m: 0.0605
     compression_ratio: 50
     x_min_m: 0.0
@@ -136,9 +136,9 @@ preprocessing:
     combustion:
       model: vibe
       start_mode: hign_position
-      hign_mm: 20.0
+      hign_mm: 10.0
       duration_mode: time
-      duration_ms: 3.0
+      duration_ms: 6.0
       a: 6.9
       m: 2.0
       energy_coupling: none
@@ -366,7 +366,7 @@ simulation:
   dt_s: 1.0e-05
   total_cycles: 3
   save_last_cycles: 2
-  simulationtime: 0.2
+  simulationtime: 1.0
   solver:
     kind: rk4
     rtol: 1.0e-05
@@ -407,6 +407,9 @@ postprocessing:
       - enabled: true
         path: plot_CFG/plot-v11_fp4.yaml
         prefix: plot_fp4
+      - enabled: true
+        path: plot_CFG/plot_com_inj.yaml
+        prefix: plot_com_inj
       - enabled: false
         path: plot_CFG/plot-v11-fp_pressure.yaml
         prefix: plot_fp_pressure

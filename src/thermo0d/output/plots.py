@@ -284,18 +284,27 @@ def write_last_cycle_pressure_plot(bundle, t: np.ndarray, y: np.ndarray, cycle_i
     return output_path
 
 
-def write_free_piston_last_ut_ot_ut_pv_plot(bundle, rows: list[dict[str, float | int]], output_path: str | Path, run_config_path: str | Path | None = None) -> str | None:
+def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
+    bundle,
+    rows: list[dict[str, float | int]],
+    output_path: str | Path,
+    cylinder_idx: int,
+    run_config_path: str | Path | None = None,
+) -> str | None:
     output = Path(output_path).resolve()
     if not rows:
         return None
     cyl_indices = list(getattr(bundle, 'cylinder_indices', []) or [])
     if not cyl_indices:
         return None
-    cyl_name = str(bundle.volume_names[int(cyl_indices[0])])
+    cyl_idx = int(cylinder_idx)
+    if cyl_idx not in [int(idx) for idx in cyl_indices]:
+        return None
+    cyl_name = str(bundle.volume_names[cyl_idx])
     p_key = f"{cyl_name}_p_Pa"
     V_key = f"{cyl_name}_V_m3"
-    x_key = 'free_piston_distance_from_tdc_m'
-    v_key = 'free_piston_v_m_per_s'
+    x_key = f"{cyl_name}_piston_distance_from_tdc_m" if f"{cyl_name}_piston_distance_from_tdc_m" in rows[0] else 'free_piston_distance_from_tdc_m'
+    v_key = f"{cyl_name}_piston_v_m_per_s" if f"{cyl_name}_piston_v_m_per_s" in rows[0] else 'free_piston_v_m_per_s'
     if any(key not in rows[0] for key in (p_key, V_key, x_key, v_key)):
         return None
 
@@ -399,7 +408,7 @@ def write_free_piston_last_ut_ot_ut_pv_plot(bundle, rows: list[dict[str, float |
         if getattr(bundle, "architecture", "classic") != "free_piston" or getattr(bundle, "free_piston", None) is None:
             return None
         fp = bundle.free_piston
-        cylinder_idx = int(cyl_indices[0])
+        cylinder_idx = cyl_idx
         slot_open_distances: list[float] = []
         for conn_idx in range(int(bundle.conn_matrix.shape[0])):
             conn = bundle.conn_matrix[conn_idx]
@@ -555,6 +564,7 @@ def write_free_piston_last_ut_ot_ut_pv_plot(bundle, rows: list[dict[str, float |
     ax.annotate('UT', (V_m3[ut2] * 1.0e6, p_pa[ut2] / 1.0e5), xytext=(6, 6), textcoords='offset points')
     ax.set_xlabel('Zylindervolumen [cm³]')
     ax.set_ylabel('Zylinderdruck [bar]')
+    ax.set_title(f'{cyl_name}: Druck-Volumen - letzter UT-OT-UT-Zyklus')
     ax.grid(True, alpha=0.35)
     ax.text(
         0.98,
@@ -568,7 +578,7 @@ def write_free_piston_last_ut_ot_ut_pv_plot(bundle, rows: list[dict[str, float |
         bbox=dict(boxstyle='square,pad=0.45', facecolor='white', edgecolor='black', linewidth=1.0, alpha=0.96),
     )
     run_config_text = f"Config: {Path(run_config_path).name}" if run_config_path is not None else ""
-    plot_config_text = "Plot: built-in free-piston plot"
+    plot_config_text = f"Plot: built-in free-piston pV plot | {cyl_name}"
     footer_text = "\n".join(part for part in (run_config_text, plot_config_text) if part)
     if footer_text:
         fig.text(0.995, 0.006, footer_text, ha="right", va="bottom", fontsize=6, color="#666666", alpha=0.9)
@@ -577,6 +587,30 @@ def write_free_piston_last_ut_ot_ut_pv_plot(bundle, rows: list[dict[str, float |
     fig.savefig(output)
     plt.close(fig)
     return str(output)
+
+
+def write_free_piston_last_ut_ot_ut_pv_plot(bundle, rows: list[dict[str, float | int]], output_path: str | Path, run_config_path: str | Path | None = None) -> list[str] | None:
+    output = Path(output_path).resolve()
+    cyl_indices = [int(idx) for idx in (getattr(bundle, 'cylinder_indices', []) or [])]
+    if not cyl_indices:
+        return None
+
+    written: list[str] = []
+    for order, cyl_idx in enumerate(cyl_indices):
+        cyl_name = str(bundle.volume_names[cyl_idx])
+        cyl_output = output
+        if order > 0:
+            cyl_output = output.with_name(f"{output.stem}__{cyl_name}{output.suffix}")
+        path = _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
+            bundle,
+            rows,
+            cyl_output,
+            cyl_idx,
+            run_config_path=run_config_path,
+        )
+        if path is not None:
+            written.append(path)
+    return written or None
 
 
 def write_free_piston_last_ut_ot_ut_species_plot(bundle, rows: list[dict[str, float | int]], output_path: str | Path, run_config_path: str | Path | None = None) -> str | None:

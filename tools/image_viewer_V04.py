@@ -32,15 +32,35 @@ DEFAULT_INITIAL_PATH = (
 )
 
 
+def _settings_bool(settings: QSettings, key: str, default: bool = False) -> bool:
+    value = settings.value(key, default, bool)
+    return bool(value)
+
+
+def _settings_str(settings: QSettings, key: str, default: str = "") -> str:
+    value = settings.value(key, default, str)
+    return str(value) if value is not None else default
+
+
+def _settings_int_or_none(settings: QSettings, key: str) -> int | None:
+    value = settings.value(key, None)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class ImageLabel(QLabel):
     clicked = Signal()
 
     def __init__(self) -> None:
         super().__init__()
-        self.setAlignment(Qt.AlignCenter)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setStyleSheet("background-color: black; color: white;")
         self.setText("Keine Bilder geladen")
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumSize(240, 180)
         self._pixmap_original: QPixmap | None = None
 
@@ -53,7 +73,7 @@ class ImageLabel(QLabel):
         super().setPixmap(QPixmap())
 
     def mousePressEvent(self, event) -> None:  # type: ignore[override]
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
         super().mousePressEvent(event)
 
@@ -69,8 +89,8 @@ class ImageLabel(QLabel):
             return
         scaled = self._pixmap_original.scaled(
             target,
-            Qt.KeepAspectRatio,
-            Qt.SmoothTransformation,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
         )
         super().setPixmap(scaled)
 
@@ -87,17 +107,17 @@ class ImagePane(QFrame):
         self.image_files: List[Path] = []
         self.current_index = 0
 
-        self.setFrameShape(QFrame.StyledPanel)
+        self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setLineWidth(2)
         self.setObjectName(f"imagePane_{side_key}")
         self.setMinimumSize(280, 220)
 
         self.header_label = QLabel(f"{self.side_name}: Kein Ordner")
-        self.header_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.header_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.header_label.setWordWrap(True)
 
         self.info_label = QLabel("0 / 0")
-        self.info_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.info_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         self.image_label = ImageLabel()
         self.image_label.clicked.connect(self.activate)
@@ -132,7 +152,7 @@ class ImagePane(QFrame):
         self.set_active(False)
 
     def mousePressEvent(self, event) -> None:  # type: ignore[override]
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.activate()
         super().mousePressEvent(event)
 
@@ -147,7 +167,7 @@ class ImagePane(QFrame):
         )
 
     def _resolve_start_folder(self, initial_path: str | None) -> Path | None:
-        last_folder = self.settings.value(f"last_folder_{self.side_key}", "", str)
+        last_folder = _settings_str(self.settings, f"last_folder_{self.side_key}")
         candidates = [last_folder, initial_path or "", DEFAULT_INITIAL_PATH if self.side_key == "left" else ""]
         for candidate in candidates:
             if not candidate:
@@ -291,11 +311,11 @@ class ImageDockWidget(QDockWidget):
         self.side_key = side_key
         self.pane = pane
         self.setObjectName(f"dock_{side_key}")
-        self.setAllowedAreas(Qt.AllDockWidgetAreas)
+        self.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.setFeatures(
-            QDockWidget.DockWidgetMovable
-            | QDockWidget.DockWidgetFloatable
-            | QDockWidget.DockWidgetClosable
+            QDockWidget.DockWidgetFeature.DockWidgetMovable
+            | QDockWidget.DockWidgetFeature.DockWidgetFloatable
+            | QDockWidget.DockWidgetFeature.DockWidgetClosable
         )
         self.setMinimumSize(300, 220)
         self.setWidget(pane)
@@ -307,7 +327,7 @@ class ImageDockWidget(QDockWidget):
             self.activated.emit(self.side_key)
 
     def mousePressEvent(self, event) -> None:  # type: ignore[override]
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.activated.emit(self.side_key)
         super().mousePressEvent(event)
 
@@ -323,10 +343,10 @@ class ImageViewerWindow(QMainWindow):
         self._applying_layout = False
 
         self.setDockOptions(
-            QMainWindow.AllowNestedDocks
-            | QMainWindow.AllowTabbedDocks
-            | QMainWindow.GroupedDragging
-            | QMainWindow.AnimatedDocks
+            QMainWindow.DockOption.AllowNestedDocks
+            | QMainWindow.DockOption.AllowTabbedDocks
+            | QMainWindow.DockOption.GroupedDragging
+            | QMainWindow.DockOption.AnimatedDocks
         )
 
         self._central_placeholder = QWidget()
@@ -342,8 +362,8 @@ class ImageViewerWindow(QMainWindow):
         self.left_dock.activated.connect(self._set_active_pane)
         self.right_dock.activated.connect(self._set_active_pane)
 
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.left_dock)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.right_dock)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.left_dock)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.right_dock)
 
         self.status = QStatusBar()
         self.setStatusBar(self.status)
@@ -361,9 +381,9 @@ class ImageViewerWindow(QMainWindow):
 
         restored = self._restore_layout_from_settings()
         if not restored:
-            split_enabled = self.settings.value("split_enabled", False, bool)
+            split_enabled = _settings_bool(self.settings, "split_enabled")
             self._apply_default_layout(
-                orientation=Qt.Horizontal,
+                orientation=Qt.Orientation.Horizontal,
                 show_right=split_enabled,
                 save=False,
             )
@@ -372,7 +392,7 @@ class ImageViewerWindow(QMainWindow):
             self._sync_actions_from_current_layout()
             QTimer.singleShot(0, self.make_docks_equal)
 
-        self._set_active_pane(self.settings.value("active_side", "left", str) or "left")
+        self._set_active_pane(_settings_str(self.settings, "active_side", "left") or "left")
 
         if self.left_pane.folder_path is None and self.right_pane.folder_path is None:
             QTimer.singleShot(0, self.choose_active_folder)
@@ -382,7 +402,7 @@ class ImageViewerWindow(QMainWindow):
 
     def _build_actions(self) -> None:
         self.action_choose_folder = QAction("Ordner wählen…", self)
-        self.action_choose_folder.setShortcut(QKeySequence.Open)
+        self.action_choose_folder.setShortcut(QKeySequence.StandardKey.Open)
         self.action_choose_folder.triggered.connect(self.choose_active_folder)
 
         self.action_choose_left_folder = QAction("Ordner links wählen…", self)
@@ -394,15 +414,15 @@ class ImageViewerWindow(QMainWindow):
         self.action_choose_right_folder.triggered.connect(self.choose_right_folder)
 
         self.action_reload = QAction("Neu laden", self)
-        self.action_reload.setShortcut(QKeySequence.Refresh)
+        self.action_reload.setShortcut(QKeySequence.StandardKey.Refresh)
         self.action_reload.triggered.connect(self.reload_active_pane)
 
         self.action_prev = QAction("Vorheriges Bild", self)
-        self.action_prev.setShortcut(Qt.Key_Left)
+        self.action_prev.setShortcut(Qt.Key.Key_Left)
         self.action_prev.triggered.connect(lambda: self.navigate_active(-1))
 
         self.action_next = QAction("Nächstes Bild", self)
-        self.action_next.setShortcut(Qt.Key_Right)
+        self.action_next.setShortcut(Qt.Key.Key_Right)
         self.action_next.triggered.connect(lambda: self.navigate_active(1))
 
         self.action_split_view = QAction("Zweiten Bildbereich anzeigen", self)
@@ -413,18 +433,18 @@ class ImageViewerWindow(QMainWindow):
         self.action_sync_navigation = QAction("Synchron blättern", self)
         self.action_sync_navigation.setCheckable(True)
         self.action_sync_navigation.setShortcut("Ctrl+Shift+Y")
-        self.action_sync_navigation.setChecked(self.settings.value("sync_navigation", False, bool))
+        self.action_sync_navigation.setChecked(_settings_bool(self.settings, "sync_navigation"))
         self.action_sync_navigation.toggled.connect(self._on_sync_navigation_toggled)
 
         self.action_switch_active = QAction("Aktive Seite wechseln", self)
-        self.action_switch_active.setShortcut(Qt.Key_Tab)
+        self.action_switch_active.setShortcut(Qt.Key.Key_Tab)
         self.action_switch_active.triggered.connect(self.switch_active_pane)
 
         self.action_layout_side_by_side = QAction("Docks nebeneinander", self)
-        self.action_layout_side_by_side.triggered.connect(lambda: self._apply_default_layout(Qt.Horizontal, True, True))
+        self.action_layout_side_by_side.triggered.connect(lambda: self._apply_default_layout(Qt.Orientation.Horizontal, True, True))
 
         self.action_layout_top_bottom = QAction("Docks untereinander", self)
-        self.action_layout_top_bottom.triggered.connect(lambda: self._apply_default_layout(Qt.Vertical, True, True))
+        self.action_layout_top_bottom.triggered.connect(lambda: self._apply_default_layout(Qt.Orientation.Vertical, True, True))
 
         self.action_reset_equal_sizes = QAction("Docks gleich groß", self)
         self.action_reset_equal_sizes.triggered.connect(self.make_docks_equal)
@@ -433,7 +453,7 @@ class ImageViewerWindow(QMainWindow):
         self.action_reset_layout.triggered.connect(self.reset_layout)
 
         self.action_exit = QAction("Beenden", self)
-        self.action_exit.setShortcut(QKeySequence.Quit)
+        self.action_exit.setShortcut(QKeySequence.StandardKey.Quit)
         self.action_exit.triggered.connect(self.close)
 
     def _build_menu(self) -> None:
@@ -528,12 +548,9 @@ class ImageViewerWindow(QMainWindow):
     def _restore_layout_from_settings(self) -> bool:
         self._ensure_dock_widgets_bound()
 
-        stored_version = self.settings.value("window_state_version", None)
+        stored_version = _settings_int_or_none(self.settings, "window_state_version")
         if stored_version is not None:
-            try:
-                if int(stored_version) != LAYOUT_STATE_VERSION:
-                    return False
-            except (TypeError, ValueError):
+            if stored_version != LAYOUT_STATE_VERSION:
                 return False
 
         geometry = self._read_byte_array("window_geometry")
@@ -600,8 +617,8 @@ class ImageViewerWindow(QMainWindow):
         for dock in (self.left_dock, self.right_dock):
             dock.setFloating(False)
             self.removeDockWidget(dock)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.left_dock)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.right_dock)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.left_dock)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.right_dock)
         self._ensure_dock_widgets_bound()
 
     def _apply_default_layout(self, orientation: Qt.Orientation, show_right: bool, save: bool) -> None:
@@ -658,22 +675,22 @@ class ImageViewerWindow(QMainWindow):
 
     def toggle_split_view(self, checked: bool) -> None:
         if checked:
-            self._apply_default_layout(Qt.Horizontal, True, True)
+            self._apply_default_layout(Qt.Orientation.Horizontal, True, True)
         else:
-            self._apply_default_layout(Qt.Horizontal, False, True)
+            self._apply_default_layout(Qt.Orientation.Horizontal, False, True)
 
     def make_docks_equal(self) -> None:
         docks = self._visible_docks()
         if len(docks) < 2:
             return
-        self.resizeDocks([self.left_dock, self.right_dock], [1, 1], Qt.Horizontal)
-        self.resizeDocks([self.left_dock, self.right_dock], [1, 1], Qt.Vertical)
+        self.resizeDocks([self.left_dock, self.right_dock], [1, 1], Qt.Orientation.Horizontal)
+        self.resizeDocks([self.left_dock, self.right_dock], [1, 1], Qt.Orientation.Vertical)
 
     def reset_layout(self) -> None:
         self.settings.remove("window_geometry")
         self.settings.remove("window_state")
         self.settings.remove("window_state_version")
-        self._apply_default_layout(Qt.Horizontal, self.action_split_view.isChecked(), True)
+        self._apply_default_layout(Qt.Orientation.Horizontal, self.action_split_view.isChecked(), True)
         self.status.showMessage("Dock-Layout zurückgesetzt.", 4000)
 
     def choose_active_folder(self) -> None:
@@ -734,16 +751,16 @@ class ImageViewerWindow(QMainWindow):
             self.setWindowTitle(left_title)
 
     def keyPressEvent(self, event) -> None:  # type: ignore[override]
-        if event.key() == Qt.Key_Right:
+        if event.key() == Qt.Key.Key_Right:
             self.navigate_active(1)
             return
-        if event.key() == Qt.Key_Left:
+        if event.key() == Qt.Key.Key_Left:
             self.navigate_active(-1)
             return
-        if event.key() == Qt.Key_Tab:
+        if event.key() == Qt.Key.Key_Tab:
             self.switch_active_pane()
             return
-        if event.key() == Qt.Key_O and event.modifiers() & Qt.ControlModifier:
+        if event.key() == Qt.Key.Key_O and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             self.choose_active_folder()
             return
         super().keyPressEvent(event)

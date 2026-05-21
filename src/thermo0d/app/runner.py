@@ -247,11 +247,11 @@ class SimulationAppRunner:
                     output_dir = self._plot_output_dir()
                     pv_plot_path = output_dir / f"{self.config_path.stem}__last_ut_ot_ut_pv.png"
                     started = perf_counter()
-                    written_pv_path = write_free_piston_last_ut_ot_ut_pv_plot(self.bundle, pv_plot_rows, pv_plot_path, run_config_path=self.config_path)
+                    written_pv_paths = write_free_piston_last_ut_ot_ut_pv_plot(self.bundle, pv_plot_rows, pv_plot_path, run_config_path=self.config_path)
                     elapsed = perf_counter() - started
-                    if written_pv_path is not None:
-                        generated_plot_paths.append(written_pv_path)
-                        ConsoleArtifactReporter.print_path_status('plot:last-ut-ot-ut-pv', written_pv_path, elapsed_s=elapsed)
+                    if written_pv_paths:
+                        generated_plot_paths.extend(written_pv_paths)
+                        ConsoleArtifactReporter.print_many_status('plot:last-ut-ot-ut-pv', written_pv_paths, elapsed_s=elapsed)
                     else:
                         ConsoleArtifactReporter.print_status('plot:last-ut-ot-ut-pv', 'warn', elapsed_s=elapsed, reason='no-complete-ut-ot-ut')
                     species_plot_path = output_dir / f"{self.config_path.stem}__last_ut_ot_ut_species.png"
@@ -324,11 +324,11 @@ class SimulationAppRunner:
                     output_dir = self._plot_output_dir()
                     pv_plot_path = output_dir / f"{self.config_path.stem}__last_ut_ot_ut_pv.png"
                     started = perf_counter()
-                    written_pv_path = write_free_piston_last_ut_ot_ut_pv_plot(self.bundle, pv_plot_rows, pv_plot_path, run_config_path=self.config_path)
+                    written_pv_paths = write_free_piston_last_ut_ot_ut_pv_plot(self.bundle, pv_plot_rows, pv_plot_path, run_config_path=self.config_path)
                     elapsed = perf_counter() - started
-                    if written_pv_path is not None:
-                        generated_plot_paths.append(written_pv_path)
-                        ConsoleArtifactReporter.print_path_status('plot:last-ut-ot-ut-pv', written_pv_path, elapsed_s=elapsed)
+                    if written_pv_paths:
+                        generated_plot_paths.extend(written_pv_paths)
+                        ConsoleArtifactReporter.print_many_status('plot:last-ut-ot-ut-pv', written_pv_paths, elapsed_s=elapsed)
                     else:
                         ConsoleArtifactReporter.print_status('plot:last-ut-ot-ut-pv', 'warn', elapsed_s=elapsed, reason='no-complete-ut-ot-ut')
                     species_plot_path = output_dir / f"{self.config_path.stem}__last_ut_ot_ut_species.png"
