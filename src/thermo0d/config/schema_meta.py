@@ -8,7 +8,7 @@ SAMPLING_MODES = ["time", "crank_angle"]
 PLOT_SOURCES = ["last_cycle_uniform", "export_rows"]
 ANGLE_REFERENCES = ["absolute", "compression_tdc", "gas_exchange_tdc"]
 PROFILE_ANGLE_DOMAINS = ["crank", "cam"]
-VOLUME_TYPES = ["cylinder", "plenum", "environment"]
+VOLUME_TYPES = ["cylinder", "plenum", "bounce_chamber", "environment"]
 CONNECTION_TYPES = ["valve", "slot", "orifice", "check_valve"]
 
 
@@ -78,6 +78,13 @@ FIELD_META: dict[str, FieldMeta] = {
     "initial_burned_fraction_0to1": FieldMeta("Initial burned fraction [-]", "float", default=0.0, help_text="Anteil verbrannter Masse im Volumen zu Simulationsbeginn bzw. beim Auto-Update am letzten Kompressions-Crossing bei x0_m.", section="volume"),
     "initial_burned_mass_percent": FieldMeta("Initial burned mass [%]", "float", default=None, help_text="Alternative Prozentangabe für den verbrannten Massenanteil. Hat Vorrang vor initial_burned_fraction_0to1.", section="volume"),
     "fixed_volume_m3": FieldMeta("Volume [m³]", "float", default=2e-4, help_text="Festes Volumen eines Plenums.", section="plenum"),
+    "model": FieldMeta("Model", "choice", default="gas_spring", choices=("gas_spring", "gas_exchange"), help_text="Bounce-Chamber-Modell.", section="volume"),
+    "chamber_diameter_m": FieldMeta("Bounce chamber diameter [m]", "float", default=0.0745, help_text="Innendurchmesser des Bounce-Raums.", section="volume"),
+    "chamber_length_m": FieldMeta("Bounce chamber length [m]", "float", default=0.08, help_text="Wirksame Bounce-Hublänge.", section="volume"),
+    "compression_ratio": FieldMeta("Bounce compression ratio", "float", default=2.5, help_text="Verdichtungsverhältnis des Bounce-Raums.", section="volume"),
+    "chamber_volume0_m3": FieldMeta("Legacy chamber V0 [m³]", "float", default=None, help_text="Legacy-Vorgabe des Bounce-Kammervolumens.", section="volume"),
+    "p0_Pa": FieldMeta("p0 [Pa]", "float", default=None, help_text="Optionaler Referenzdruck des Bounce-Polytropenmodells.", section="volume"),
+    "polytropic_exponent": FieldMeta("Polytropic exponent", "float", default=1.3, help_text="Polytropenexponent des Bounce-Raums.", section="volume"),
     "pressure_Pa": FieldMeta("Pressure [Pa]", "float", default=101325.0, help_text="Fester Umgebungsdruck der Randbedingung.", section="environment"),
     "temperature_K": FieldMeta("Temperature [K]", "float", default=300.0, help_text="Feste Umgebungstemperatur der Randbedingung.", section="environment"),
     "kinematics.bore_m": FieldMeta("Bore [m]", "float", default=0.08, help_text="Zylinderbohrung.", section="cylinder"),
@@ -167,6 +174,8 @@ FIELD_META: dict[str, FieldMeta] = {
     "diameter_mm": FieldMeta("Diameter [mm]", "float", default=10.0, help_text="Alternativer Durchmesser in mm für Orifice/Check-Valve statt area_m2.", section="connection"),
     "forward_cd": FieldMeta("Forward Cd", "float", default=0.7, help_text="Durchflussbeiwert von from nach to.", section="connection"),
     "reverse_cd": FieldMeta("Reverse Cd", "float", default=0.7, help_text="Durchflussbeiwert von to nach from.", section="connection"),
+    "discharge_coefficient": FieldMeta("Discharge coefficient", "float", default=0.7, help_text="Durchflussbeiwert des Rückschlagventils.", section="connection"),
+    "cracking_pressure_Pa": FieldMeta("Cracking pressure [Pa]", "float", default=0.0, help_text="Öffnungsdruck des Rückschlagventils.", section="connection"),
 }
 
 

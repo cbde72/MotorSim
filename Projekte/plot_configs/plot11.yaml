@@ -1,5 +1,373 @@
 name: Standard Thermo0D Plotpaket Einzelplots
 figures:
+- id: b6a0e07d1501
+  title: Massenströme / Hubvolumen
+  rows: 1
+  cols: 1
+  subplots:
+  - id: e726f7726ba0
+    title: Subplot
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: data
+    x_min: 0.0
+    x_max: 10440.0
+    y_axes:
+    - id: ax_mdot
+      title: Massenstrom [kg/s]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: manual
+      y_min: -0.0005
+      y_max: 0.0005
+      tick_step: 0.0001
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    - id: ax_vol
+      title: Hubvolumen [cm³]
+      side: right
+      spine_offset: 0.0
+      color: '#666666'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    - id: e1b74efc9761
+      title: Ventilhub [mm]
+      side: right
+      spine_offset: 0.12
+      color: '#d62728'
+      visible: true
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 10.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    - id: 18175935f7f6
+      title: Y4
+      side: right
+      spine_offset: 0.24
+      color: '#d62728'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: 759c378553b8
+      signal_key: cylinder_V_m3
+      label: Hubvolumen
+      axis_id: ax_vol
+      visible: false
+      color: '#808080'
+      line_style: --
+      marker: ''
+      line_width: 0.0
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: 2791115c3b2f
+      signal_key: intake_valve_mdot_kg_per_s
+      label: Massenstrom (IV)
+      axis_id: ax_mdot
+      visible: true
+      color: '#5500ff'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: c933a9c355b4
+      signal_key: exhaust_valve_mdot_kg_per_s
+      label: Massenstrom (EV)
+      axis_id: ax_mdot
+      visible: true
+      color: '#ff0000'
+      line_style: '-'
+      marker: ''
+      line_width: 0.0
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: 297c47c29fa7
+      signal_key: intake_valve_valve_lift_m
+      label: Ventilhub (IV)
+      axis_id: e1b74efc9761
+      visible: true
+      color: '#5500ff'
+      line_style: --
+      marker: ''
+      line_width: 1.0
+      marker_size: 4.5
+      unit_preset: mm
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: 1ba5879975e6
+      signal_key: exhaust_valve_valve_lift_m
+      label: Ventilhub (EV)
+      axis_id: e1b74efc9761
+      visible: true
+      color: '#aa0000'
+      line_style: --
+      marker: ''
+      line_width: 1.0
+      marker_size: 4.5
+      unit_preset: mm
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: a3fd04ed9900
+      signal_key: cylinder_m_kg
+      label: cylinder_m_kg
+      axis_id: 18175935f7f6
+      visible: true
+      color: '#000000'
+      line_style: '-'
+      marker: ''
+      line_width: 2.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    events:
+    - id: b859d69bbbbe
+      x: 0.0
+      label: OT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 618d96aca0a5
+      x: 160.0
+      label: EVO
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 2ea8c2346ecc
+      x: 180.0
+      label: UT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 096cdf10b454
+      x: 300.0
+      label: EVC
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 4e762adbc1f4
+      x: 350.0
+      label: SOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: f6b1b439577e
+      x: 360.0
+      label: OT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 98a26b5620dd
+      x: 370.0
+      label: IVO
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 279b3897dbd0
+      x: 405.0
+      label: EOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 23199a3f1bc6
+      x: 510.0
+      label: IVC
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: fae2e35e7d5d
+      x: 540.0
+      label: UT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    legend_visible: true
+    legend_position: best
+    show_grid: true
 - id: 419f49da297e
   title: Temperatur / Ventilhub
   rows: 1
@@ -277,6 +645,606 @@ figures:
       label_ha: right
       label_va: top
     - id: feea143dcc4d
+      x: 540.0
+      label: UT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    legend_visible: true
+    legend_position: best
+    show_grid: true
+- id: 69e60c10b084
+  title: Innere Energie / Ventilhub
+  rows: 1
+  cols: 1
+  subplots:
+  - id: 67e08fe13dc9
+    title: ''
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    y_axes:
+    - id: ax_main
+      title: Innere Energie [J]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      spine_offset: 0.0
+      color: '#1f77b4'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: 5fcf8c3f301d
+      signal_key: cylinder_U_J
+      label: Innere Energie
+      axis_id: ax_main
+      visible: true
+      color: '#111111'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: 6dd8f0a36a47
+      signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      visible: true
+      color: '#0000ff'
+      line_style: --
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000.0
+      offset: 0.0
+      series_type: line
+    - id: 53b14d5e7932
+      signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      visible: true
+      color: '#ff0000'
+      line_style: --
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000.0
+      offset: 0.0
+      series_type: line
+    events:
+    - id: b676e6e28103
+      x: 0.0
+      label: OT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 098e88b33863
+      x: 160.0
+      label: EVO
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 8f9f8bc1ef1c
+      x: 180.0
+      label: UT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 9e1870b18984
+      x: 300.0
+      label: EVC
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 1d43f5d158a4
+      x: 350.0
+      label: SOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 44298d58194f
+      x: 360.0
+      label: OT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 6faa64f2a66c
+      x: 370.0
+      label: IVO
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 3e2422c34753
+      x: 405.0
+      label: EOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 875e54084417
+      x: 510.0
+      label: IVC
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 9873b02b61db
+      x: 540.0
+      label: UT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    legend_visible: true
+    legend_position: best
+    show_grid: true
+- id: c7aef278f069
+  title: Zylindermasse / Ventilhub
+  rows: 1
+  cols: 1
+  subplots:
+  - id: 786af073bf29
+    title: ''
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    y_axes:
+    - id: ax_main
+      title: Zylindermasse [mg]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      spine_offset: 0.0
+      color: '#1f77b4'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: fd5d1135c6bd
+      signal_key: cylinder_m_kg
+      label: Zylindermasse
+      axis_id: ax_main
+      visible: true
+      color: '#111111'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: 5fcf3f7d485c
+      signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      visible: true
+      color: '#0000ff'
+      line_style: --
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000.0
+      offset: 0.0
+      series_type: line
+    - id: 04590c2bb172
+      signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      visible: true
+      color: '#ff0000'
+      line_style: --
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000.0
+      offset: 0.0
+      series_type: line
+    events:
+    - id: 2b79ab008cba
+      x: 0.0
+      label: OT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 3e35dde7deb0
+      x: 160.0
+      label: EVO
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 6b54dce4ea98
+      x: 180.0
+      label: UT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: bc1a5bd04d29
+      x: 300.0
+      label: EVC
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 9e7b836f0ee4
+      x: 350.0
+      label: SOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 746875be324e
+      x: 360.0
+      label: OT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: ac5bc2d45311
+      x: 370.0
+      label: IVO
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 1ed9392f954c
+      x: 405.0
+      label: EOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: c911a32dbe92
+      x: 510.0
+      label: IVC
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 27370dc91c6a
       x: 540.0
       label: UT
       color: '#98a2b3'
@@ -600,6 +1568,306 @@ figures:
     legend_visible: true
     legend_position: best
     show_grid: true
+- id: 73af6636cfa9
+  title: Wandwärme kumuliert / Ventilhub
+  rows: 1
+  cols: 1
+  subplots:
+  - id: 20656009edf4
+    title: ''
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    y_axes:
+    - id: ax_main
+      title: Wandwärme [J]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      spine_offset: 0.0
+      color: '#1f77b4'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: 1c42988aafeb
+      signal_key: cylinder_wall_heat_cycle_J
+      label: Wandwärme (kumuliert)
+      axis_id: ax_main
+      visible: true
+      color: '#111111'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: 4f6bdc985462
+      signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      visible: true
+      color: '#0000ff'
+      line_style: --
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000.0
+      offset: 0.0
+      series_type: line
+    - id: bc7edb1434a7
+      signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      visible: true
+      color: '#ff0000'
+      line_style: --
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000.0
+      offset: 0.0
+      series_type: line
+    events:
+    - id: 559a2a190766
+      x: 0.0
+      label: OT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 23e187c614f5
+      x: 160.0
+      label: EVO
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: a4d148ea9190
+      x: 180.0
+      label: UT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: bdf35f333b40
+      x: 300.0
+      label: EVC
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 622d512a3e0b
+      x: 350.0
+      label: SOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 1381bb7acd90
+      x: 360.0
+      label: OT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 7fea8e1b28f5
+      x: 370.0
+      label: IVO
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 03cdb09bde05
+      x: 405.0
+      label: EOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 8bd3eacda9b3
+      x: 510.0
+      label: IVC
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: d7c22798298c
+      x: 540.0
+      label: UT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    legend_visible: true
+    legend_position: best
+    show_grid: true
 - id: 0642650190f1
   title: Enthalpie ein/aus kumuliert / Ventilhub
   rows: 1
@@ -891,6 +2159,306 @@ figures:
       label_ha: right
       label_va: top
     - id: 330a2b902f51
+      x: 540.0
+      label: UT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    legend_visible: true
+    legend_position: best
+    show_grid: true
+- id: e753cc603a1f
+  title: Kolbenarbeit kumuliert / Ventilhub
+  rows: 1
+  cols: 1
+  subplots:
+  - id: 29816264dec1
+    title: ''
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    y_axes:
+    - id: ax_main
+      title: Kolbenarbeit [J]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      spine_offset: 0.0
+      color: '#1f77b4'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: 6fc4fc8af61b
+      signal_key: cylinder_piston_work_cycle_J
+      label: Kolbenarbeit (kumuliert)
+      axis_id: ax_main
+      visible: true
+      color: '#111111'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: 10b035c9b824
+      signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      visible: true
+      color: '#0000ff'
+      line_style: --
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000.0
+      offset: 0.0
+      series_type: line
+    - id: e286a3057038
+      signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      visible: true
+      color: '#ff0000'
+      line_style: --
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000.0
+      offset: 0.0
+      series_type: line
+    events:
+    - id: c97efe8cd490
+      x: 0.0
+      label: OT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 2811104eb598
+      x: 160.0
+      label: EVO
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: bff7cb073892
+      x: 180.0
+      label: UT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 01180d764313
+      x: 300.0
+      label: EVC
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 578630fac3cf
+      x: 350.0
+      label: SOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 6cd7b15e19e2
+      x: 360.0
+      label: OT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: d1d2e767effb
+      x: 370.0
+      label: IVO
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 10124774a0eb
+      x: 405.0
+      label: EOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: d1ad10717c89
+      x: 510.0
+      label: IVC
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 918f65905a86
       x: 540.0
       label: UT
       color: '#98a2b3'
@@ -1261,7 +2829,7 @@ figures:
     x_max: 720.0
     y_axes:
     - id: 1921883cc2cf
-      title: Pressure
+      title: Y
       side: left
       spine_offset: 0.0
       color: '#1f77b4'
@@ -1284,7 +2852,7 @@ figures:
       marker: ''
       line_width: 1.8
       marker_size: 4.5
-      unit_preset: bar
+      unit_preset: raw
       scale_factor: 1.0
       offset: 0.0
       series_type: line
@@ -1545,7 +3113,7 @@ figures:
     legend_position: best
     show_grid: true
 - id: 821646e3d067
-  title: Massflow
+  title: Figure 11
   rows: 2
   cols: 1
   subplots:
@@ -2262,1237 +3830,6 @@ figures:
     legend_visible: true
     legend_position: upper right
     show_grid: true
-- id: cca670cf54e5
-  title: Wall Heat
-  rows: 2
-  cols: 1
-  subplots:
-  - id: 7c94d36c1d1d
-    title: ' Copy'
-    plot_type: line
-    x_signal: cylinder_theta_deg
-    x_title: Kurbelwinkel [deg]
-    x_unit_preset: raw
-    x_scale_factor: 1.0
-    x_offset: 0.0
-    x_limit_mode: manual
-    x_min: 0.0
-    x_max: 720.0
-    y_axes:
-    - id: 194302ec9ff0
-      title: Heat Transer Rate [W]
-      side: left
-      spine_offset: 0.0
-      color: '#111111'
-      visible: true
-      limit_mode: data
-      y_min: 0.0
-      y_max: 1.0
-      tick_step: 0.0
-      minor_tick_step: 0.0
-      major_grid: true
-      minor_grid: false
-    - id: 4ee5983857bd
-      title: Ventilhub [mm]
-      side: right
-      spine_offset: 0.0
-      color: '#1f77b4'
-      visible: true
-      limit_mode: data
-      y_min: 0.0
-      y_max: 1.0
-      tick_step: 0.0
-      minor_tick_step: 0.0
-      major_grid: true
-      minor_grid: false
-    - id: 6aa083fc7ba4
-      title: HTC
-      side: right
-      spine_offset: 0.07
-      color: '#d62728'
-      visible: true
-      limit_mode: data
-      y_min: 0.0
-      y_max: 1.0
-      tick_step: 0.0
-      minor_tick_step: 0.0
-      major_grid: true
-      minor_grid: false
-    series:
-    - id: 2b57e9ae3d2a
-      signal_key: cylinder_wall_heat_cycle_J
-      label: Wandwärme (kumuliert)
-      axis_id: 194302ec9ff0
-      visible: true
-      color: '#111111'
-      line_style: '-'
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1.0
-      offset: 0.0
-      series_type: line
-    - id: 3e480b5ad99d
-      signal_key: intake_valve_valve_lift_m
-      label: Einlasshub
-      axis_id: 4ee5983857bd
-      visible: true
-      color: '#0000ff'
-      line_style: --
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1000.0
-      offset: 0.0
-      series_type: line
-    - id: 2253c22c883d
-      signal_key: exhaust_valve_valve_lift_m
-      label: Auslasshub
-      axis_id: 4ee5983857bd
-      visible: true
-      color: '#ff0000'
-      line_style: --
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1000.0
-      offset: 0.0
-      series_type: line
-    - id: c9aaca2a2f05
-      signal_key: cylinder_wall_heat_W
-      label: Heat Transer Rate
-      axis_id: 194302ec9ff0
-      visible: true
-      color: '#9467bd'
-      line_style: '-'
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1.0
-      offset: 0.0
-      series_type: line
-    - id: 932c36e448a4
-      signal_key: cylinder_htc_W_per_m2K
-      label: cylinder_htc_W_per_m2K
-      axis_id: 6aa083fc7ba4
-      visible: true
-      color: '#ff7f0e'
-      line_style: '-'
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1.0
-      offset: 0.0
-      series_type: line
-    events:
-    - id: d17ae0335a65
-      x: 0.0
-      label: OT
-      color: '#667085'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 07fcf72837d3
-      x: 160.0
-      label: EVO
-      color: '#b42318'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 7caac8c5f0e3
-      x: 180.0
-      label: UT
-      color: '#667085'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 69ad300dc02e
-      x: 300.0
-      label: EVC
-      color: '#b42318'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: b3ccd25b100f
-      x: 350.0
-      label: SOC
-      color: '#f79009'
-      line_style: --
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 888ffd8df6ba
-      x: 360.0
-      label: OT
-      color: '#98a2b3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 96fbff7e9d39
-      x: 370.0
-      label: IVO
-      color: '#175cd3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: cb984d04e1b3
-      x: 405.0
-      label: EOC
-      color: '#f79009'
-      line_style: --
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: eb302c8ab918
-      x: 510.0
-      label: IVC
-      color: '#175cd3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 2a348ded56f1
-      x: 540.0
-      label: UT
-      color: '#98a2b3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    legend_visible: true
-    legend_position: best
-    show_grid: true
-  - id: df6e1f0a9cfc
-    title: ' Copy'
-    plot_type: line
-    x_signal: cylinder_theta_deg
-    x_title: Kurbelwinkel [deg]
-    x_unit_preset: raw
-    x_scale_factor: 1.0
-    x_offset: 0.0
-    x_limit_mode: manual
-    x_min: 0.0
-    x_max: 720.0
-    y_axes:
-    - id: 61a544421fe5
-      title: Wandwärme [J]
-      side: left
-      spine_offset: 0.0
-      color: '#111111'
-      visible: true
-      limit_mode: manual
-      y_min: -500.0
-      y_max: 100.0
-      tick_step: 0.0
-      minor_tick_step: 0.0
-      major_grid: true
-      minor_grid: false
-    - id: 0ddfd8bef113
-      title: Ventilhub [mm]
-      side: right
-      spine_offset: 0.0
-      color: '#1f77b4'
-      visible: true
-      limit_mode: data
-      y_min: 0.0
-      y_max: 1.0
-      tick_step: 0.0
-      minor_tick_step: 0.0
-      major_grid: false
-      minor_grid: false
-    series:
-    - id: 5845f8d960a3
-      signal_key: cylinder_wall_heat_cycle_J
-      label: Wandwärme (kumuliert)
-      axis_id: 61a544421fe5
-      visible: true
-      color: '#111111'
-      line_style: '-'
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1.0
-      offset: 0.0
-      series_type: line
-    - id: f0f9e0611057
-      signal_key: intake_valve_valve_lift_m
-      label: Einlasshub
-      axis_id: 0ddfd8bef113
-      visible: true
-      color: '#0000ff'
-      line_style: --
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1000.0
-      offset: 0.0
-      series_type: line
-    - id: 51df7eb621da
-      signal_key: exhaust_valve_valve_lift_m
-      label: Auslasshub
-      axis_id: 0ddfd8bef113
-      visible: true
-      color: '#ff0000'
-      line_style: --
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1000.0
-      offset: 0.0
-      series_type: line
-    events:
-    - id: 1f3d1ae0ca7c
-      x: 0.0
-      label: OT
-      color: '#667085'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 30b7697596eb
-      x: 160.0
-      label: EVO
-      color: '#b42318'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: e651ae4c45dc
-      x: 180.0
-      label: UT
-      color: '#667085'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 69dedf2d97ef
-      x: 300.0
-      label: EVC
-      color: '#b42318'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: f25f290c10b4
-      x: 350.0
-      label: SOC
-      color: '#f79009'
-      line_style: --
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 4c4710c24651
-      x: 360.0
-      label: OT
-      color: '#98a2b3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 006c2f5e1faf
-      x: 370.0
-      label: IVO
-      color: '#175cd3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: dcfa2f2e0be6
-      x: 405.0
-      label: EOC
-      color: '#f79009'
-      line_style: --
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 24a06b8155a0
-      x: 510.0
-      label: IVC
-      color: '#175cd3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 3f97a1dbe2b5
-      x: 540.0
-      label: UT
-      color: '#98a2b3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    legend_visible: true
-    legend_position: best
-    show_grid: true
-- id: 4ed2799d93b3
-  title: Zugeführte Energie
-  rows: 2
-  cols: 1
-  subplots:
-  - id: b1448b508e0f
-    title: Qzu
-    plot_type: line
-    x_signal: cylinder_theta_deg
-    x_title: Kurbelwinkel [deg]
-    x_unit_preset: raw
-    x_scale_factor: 1.0
-    x_offset: 0.0
-    x_limit_mode: manual
-    x_min: 0.0
-    x_max: 720.0
-    y_axes:
-    - id: ea99f296d28d
-      title: Ventilhub [mm]
-      side: right
-      spine_offset: 0.0
-      color: '#1f77b4'
-      visible: true
-      limit_mode: data
-      y_min: 0.0
-      y_max: 1.0
-      tick_step: 0.0
-      minor_tick_step: 0.0
-      major_grid: true
-      minor_grid: false
-    - id: 83283f3d3353
-      title: Add Energy Rate [W]
-      side: left
-      spine_offset: 0.07
-      color: '#000000'
-      visible: true
-      limit_mode: data
-      y_min: 0.0
-      y_max: 1.0
-      tick_step: 0.0
-      minor_tick_step: 0.0
-      major_grid: true
-      minor_grid: false
-    series:
-    - id: 4422ac47a41a
-      signal_key: intake_valve_valve_lift_m
-      label: Einlasshub
-      axis_id: ea99f296d28d
-      visible: true
-      color: '#0000ff'
-      line_style: --
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1000.0
-      offset: 0.0
-      series_type: line
-    - id: f5b9e6d47f1b
-      signal_key: exhaust_valve_valve_lift_m
-      label: Auslasshub
-      axis_id: ea99f296d28d
-      visible: true
-      color: '#ff0000'
-      line_style: --
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1000.0
-      offset: 0.0
-      series_type: line
-    - id: a0d544cae5c0
-      signal_key: cylinder_added_energy_W
-      label: Zugeführte Energy
-      axis_id: 83283f3d3353
-      visible: true
-      color: '#ff7f0e'
-      line_style: '-'
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1.0
-      offset: 0.0
-      series_type: line
-    events:
-    - id: 9222c42427b9
-      x: 0.0
-      label: OT
-      color: '#667085'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 1ef4f161382f
-      x: 160.0
-      label: EVO
-      color: '#b42318'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 26c32bed06b8
-      x: 180.0
-      label: UT
-      color: '#667085'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 45a9546b6505
-      x: 300.0
-      label: EVC
-      color: '#b42318'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 8d806245e9e4
-      x: 350.0
-      label: SOC
-      color: '#f79009'
-      line_style: --
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: f2958194f0a0
-      x: 360.0
-      label: OT
-      color: '#98a2b3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 7b64f149a5f6
-      x: 370.0
-      label: IVO
-      color: '#175cd3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 689a9cf63a28
-      x: 405.0
-      label: EOC
-      color: '#f79009'
-      line_style: --
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 80c80a0e7603
-      x: 510.0
-      label: IVC
-      color: '#175cd3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 5cddaffcf0f3
-      x: 540.0
-      label: UT
-      color: '#98a2b3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    legend_visible: true
-    legend_position: best
-    show_grid: true
-  - id: d78276003976
-    title: ' Copy Copy'
-    plot_type: line
-    x_signal: cylinder_theta_deg
-    x_title: Kurbelwinkel [deg]
-    x_unit_preset: raw
-    x_scale_factor: 1.0
-    x_offset: 0.0
-    x_limit_mode: manual
-    x_min: 0.0
-    x_max: 720.0
-    y_axes:
-    - id: 4bca9f5d4cae
-      title: Wandwärme [J]
-      side: left
-      spine_offset: 0.0
-      color: '#111111'
-      visible: true
-      limit_mode: data
-      y_min: -500.0
-      y_max: 100.0
-      tick_step: 0.0
-      minor_tick_step: 0.0
-      major_grid: true
-      minor_grid: false
-    - id: e8ce0c7f55dc
-      title: Ventilhub [mm]
-      side: right
-      spine_offset: 0.0
-      color: '#1f77b4'
-      visible: true
-      limit_mode: data
-      y_min: 0.0
-      y_max: 1.0
-      tick_step: 0.0
-      minor_tick_step: 0.0
-      major_grid: false
-      minor_grid: false
-    series:
-    - id: e9084c06fec5
-      signal_key: intake_valve_valve_lift_m
-      label: Einlasshub
-      axis_id: e8ce0c7f55dc
-      visible: true
-      color: '#0000ff'
-      line_style: --
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1000.0
-      offset: 0.0
-      series_type: line
-    - id: 0d0d747cea24
-      signal_key: exhaust_valve_valve_lift_m
-      label: Auslasshub
-      axis_id: e8ce0c7f55dc
-      visible: true
-      color: '#ff0000'
-      line_style: --
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1000.0
-      offset: 0.0
-      series_type: line
-    - id: 17a01d1cc489
-      signal_key: cylinder_added_energy_cycle_J
-      label: Added Energy
-      axis_id: 4bca9f5d4cae
-      visible: true
-      color: '#9467bd'
-      line_style: '-'
-      marker: ''
-      line_width: 1.8
-      marker_size: 4.5
-      unit_preset: raw
-      scale_factor: 1.0
-      offset: 0.0
-      series_type: line
-    events:
-    - id: 37fcde6f9805
-      x: 0.0
-      label: OT
-      color: '#667085'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 4c7b1b218f49
-      x: 160.0
-      label: EVO
-      color: '#b42318'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 61e16a392865
-      x: 180.0
-      label: UT
-      color: '#667085'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 0cbcead3c411
-      x: 300.0
-      label: EVC
-      color: '#b42318'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: d5e94ebdb755
-      x: 350.0
-      label: SOC
-      color: '#f79009'
-      line_style: --
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 7978b4526f16
-      x: 360.0
-      label: OT
-      color: '#98a2b3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 9e7ab59ac765
-      x: 370.0
-      label: IVO
-      color: '#175cd3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: dc40cec954f4
-      x: 405.0
-      label: EOC
-      color: '#f79009'
-      line_style: --
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 73997564a171
-      x: 510.0
-      label: IVC
-      color: '#175cd3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    - id: 8b14c6b69298
-      x: 540.0
-      label: UT
-      color: '#98a2b3'
-      line_style: ':'
-      line_width: 1.0
-      alpha: 0.9
-      visible: true
-      show_label: true
-      source: manual
-      source_note: ''
-      locked: false
-      event_type: custom
-      label_rotation: 90.0
-      label_font_size: 7.0
-      label_bg_color: '#ffffff'
-      label_bg_alpha: 0.8
-      label_border_color: none
-      label_y: 0.98
-      label_ha: right
-      label_va: top
-    legend_visible: true
-    legend_position: best
-    show_grid: true
 style:
   preset_name: Light Engineering
   background_color: '#ffffff'
@@ -3512,7 +3849,7 @@ style:
   legend_position: best
   tight_layout: true
 config_path: C:\Users\cbuehring\Desktop\Daten\python\projekte\0_Motorsim\0_MotorSim_V03\Projekte\A156A1-2V-REX-V09b.yaml
-signals_path: C:\Users\cbuehring\Desktop\Daten\python\projekte\0_Motorsim\0_MotorSim_V03\Projekte\thermo0d_signal_catalog.yaml
-preview_csv_path: C:\Users\cbuehring\Desktop\Daten\python\projekte\0_Motorsim\0_MotorSim_V03\Projekte\results\A156A1_WW02_Vibe_cyl_4t_last_cycle_uniform.csv
+signals_path: C:\Users\cbuehring\Desktop\Daten\python\projekte\0_Motorsim\0_MotorSim_V03\Projekte\thermo0d_signal_catalog.json
+preview_csv_path: C:\Users\cbuehring\Desktop\Daten\python\projekte\0_Motorsim\0_MotorSim_V03\Projekte\results\A156A1_cyl_4t_last_cycle_uniform.csv
 selected_cylinder: cylinder
 notes: ''

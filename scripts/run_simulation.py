@@ -37,6 +37,7 @@ SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
 SELECTED_PRESET = 'free_piston_a3'
 
 
+
 def _resolve_simulated_args(preset_name: str) -> list[str]:
     simulated_args = SIMULATED_ARG_PRESETS.get(preset_name)
     if simulated_args is None:

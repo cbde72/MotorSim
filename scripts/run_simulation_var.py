@@ -31,8 +31,7 @@ SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
     ],
     'variant_batch': [
         '--project', str(Path(DEFAULT_PROJECT)),
-        '--variants-di%tb
-        r', str(Path(DEFAULT_VARIANTS_DIR)),
+        '--variants-dir' , str(Path(DEFAULT_VARIANTS_DIR)),
         '--batch-variants',
         '--continue-on-error',
     ],

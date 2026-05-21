@@ -1,17 +1,15 @@
 versioning:
-  package_version: 7.1.93
+  package_version: 7.1.115
   config_schema_version: 5
   loaded_config_schema_version: 5
   migration_applied: false
-test_description:
-  Free-piston with Vibe heat release on the compression stroke, direct
+test_description: Free-piston with Vibe heat release on the compression stroke, direct
   added energy in J, hub scaling and controlled generator load near both dead centers
 modeling:
   architecture: free_piston
 free_piston:
   initial_conditions:
     x0_m: 0.054
-    # previous_auto_initial_state_from_last_compression_at_x0_m: v0_m_per_s: -12.0
     v0_m_per_s: -9.117254712261118
     combustion_state:
       burned_fraction_0to1: 0.0
@@ -27,32 +25,28 @@ free_piston:
     x_max_m: 0.10807
   friction:
     model: coulomb_viscous
-    fc_N: 80.0 # 2 x40
+    fc_N: 80.0
     cv_Ns_per_m: 0
   load:
     model: generator_controlled
     damping_Ns_per_m: 0.0
-    max_damping_Ns_per_m: 10000 #2 x 3000.0
-    control_zone_m: 0.010 #0.006 6 mm um beide Seiten O
-    #assist_velocity_threshold_m_per_s: 1.5
-    #assist_force_N: 350.0
+    max_damping_Ns_per_m: 10000
+    control_zone_m: 0.01
   scavenging:
-    # 0D-Spuelmodell fuer den Slot-Overlap: Transfer stroemt ein, Auslass stroemt gleichzeitig aus.
-    # Es korrigiert nur die Luft-/Restgas-Aufteilung, nicht Gesamtmasse oder Energie.
     enabled: true
     model: overlap_short_circuit_0d
-    scavenging_factor: 1.25            # Hoeher = mehr Restgas wird bei Overlap durch Frischgas verdraengt.
-    max_trapping_efficiency: 0.92      # Obergrenze fuer wirksames Frischgasfangen; begrenzt ideale Spuelung.
-    short_circuit_start_ratio: 0.70    # Ab mdot_transfer/mdot_exhaust groesser diesem Wert beginnt Frischgas-Kurzschluss.
-    short_circuit_slope: 0.35          # Breite des weichen Uebergangs zum maximalen Kurzschlussanteil.
-    max_short_circuit_fraction: 0.35   # Maximaler Anteil des Transfer-Frischgases, der direkt zum Auslass gehen darf.
-    min_residual_fraction: 0.03        # Restgas-Untergrenze; darunter wird keine weitere Abgasverdrängung erzwungen.
+    scavenging_factor: 1.25
+    max_trapping_efficiency: 0.92
+    short_circuit_start_ratio: 0.7
+    short_circuit_slope: 0.35
+    max_short_circuit_fraction: 0.35
+    min_residual_fraction: 0.03
 preprocessing:
   gas_properties:
     cp_J_per_kgK: 1005.0
     cv_J_per_kgK: 718.0
     R_J_per_kgK: 287.0
-    thermo_model: promo #promo #constant      # constant | promo
+    thermo_model: promo
   features:
     mass_flow: true
     wall_heat: true
@@ -63,334 +57,311 @@ preprocessing:
     cycle_type: 2t
     speed_rpm: 25.0
   volumes:
-    - name: cylinder_1
-      type: cylinder
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 121325.0
-      initial_pressure_Pa: 257686.2578843034
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 306.0
-      initial_temperature_K: 487.1451361449823
-      kinematics:
-        type: crank_slider
-        bore_m: 1.0745
-        stroke_m: 1.08
-        conrod_m: 1.12
-        compression_ratio: 50.0
-        phase_deg: 0.0
-      wall_heat:
-        model: woschni
-        variant: promo
-        wall_temperature_K: 450.0
-        wall_area_m2: 0.03
-        dp_mode: 'off'
-        multiplier: 15
-
-      combustion:
-        model: vibe
-        #start_mode: compression_hub
-        #start_hub_m: 0.08737 #0.0552
-        start_mode: hign_position #abstand von OT
-        hign_mm: 10.0
-        duration_mode: time
-        duration_ms: 6.0
-        #duration_hub_m: 0.0142
-        a: 6.9
-        m: 2.0
-        energy_coupling: none                         # Keine zusaetzliche Hubskalierung der freigesetzten Energie.
-        stroke_reference_m: 0.010807                  # Referenzhub fuer energy_coupling=stroke_ratio; bei none ohne Wirkung.
-        stroke_exponent: 0.01                         # Exponent der Hubskalierung; bei none ohne Wirkung.
-        fueling_mode: lambda_from_cylinder_mass_at_slot_close  # Kraftstoff aus gelatchter Zylinder-Luftmasse bei Slot-Schluss.
-        lambda_target: 1.0                            # Ziel-Lambda fuer die aus Luftmasse berechnete Kraftstoffmenge.
-        lhv_J_per_kg: 43000000.0                      # Unterer Heizwert des Kraftstoffs [J/kg].
-        afr_stoich_kg_air_per_kg_fuel: 14.5           # Stoechiometrisches Luft/Kraftstoff-Verhaeltnis [kg/kg].
-        combustion_efficiency_0to1: 1.0               # Anteil der Kraftstoffenergie, der als Waerme in den Zylinder geht.
-        slot_open_threshold_m2: 1.0e-07               # Ab dieser Slotflaeche gilt der Slot als offen; armt den Latch neu.
-        slot_closed_threshold_m2: 1.0e-12             # Unterhalb/gleich dieser Flaeche wird beim Kompressionshub gelatcht.
-        compression_velocity_threshold_m_per_s: 0.02  # Mindestgeschwindigkeit Richtung OT, damit Slot-Schluss gelatcht wird.
-
-        #start_mode: compression_hub
-        #start_hub_m: 0.004
-        #duration_mode: time
-        #duration_ms: 1.8
-        #duration_mode: compression_hub
-        #duration_hub_m: 0.006
-        #start_mode: angle
-        #start_deg: -10.0
-        #duration_mode: angle
-        #duration_deg: 25.0
-        #start_mode: hign_position
-        #hign_mm: 15.0
-      evaporation:
-        model: none
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
-      initial_burned_fraction_0to1: 0.26880184209044594
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
-      initial_burned_mass_percent: 26.880184209044593
-    - name: cylinder_2
-      type: cylinder
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 121325.0
-      initial_pressure_Pa: 542041.7401361301
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 306.0
-      initial_temperature_K: 1010.9070106970368
-      kinematics:
-        type: crank_slider
-        bore_m: 1.0745
-        stroke_m: 1.08
-        conrod_m: 1.12
-        compression_ratio: 50.0
-        phase_deg: 0.0
-      wall_heat:
-        model: woschni
-        variant: promo
-        wall_temperature_K: 450.0
-        wall_area_m2: 0.03
-        dp_mode: 'off'
-        multiplier: 15
-      combustion:
-        model: vibe
-        start_mode: hign_position
-        hign_mm: 20.0
-        duration_mode: time
-        duration_ms: 3.0
-        a: 6.9
-        m: 2.0
-        energy_coupling: none
-        stroke_reference_m: 0.010807
-        stroke_exponent: 0.01
-        fueling_mode: lambda_from_cylinder_mass_at_slot_close
-        lambda_target: 1.0
-        lhv_J_per_kg: 43000000.0
-        afr_stoich_kg_air_per_kg_fuel: 14.5
-        combustion_efficiency_0to1: 1.0
-        slot_open_threshold_m2: 1.0e-07
-        slot_closed_threshold_m2: 1.0e-12
-        compression_velocity_threshold_m_per_s: 0.02
-      evaporation:
-        model: none
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
-      initial_burned_fraction_0to1: 0.8712299779910716
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
-      initial_burned_mass_percent: 87.12299779910715
-    - name: compressor_1
-      type: bounce_chamber
-      model: gas_exchange
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 241325.0
-      initial_pressure_Pa: 101134.76663730493
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
-      initial_temperature_K: 299.424290135677
-      initial_burned_fraction_0to1: 0.0
-      initial_burned_mass_percent: 0.0
-      chamber_diameter_m: 0.07
-      chamber_length_m: 0.10807
-      compression_ratio: 16
-      polytropic_exponent: 1.3
-    - name: compressor_2
-      type: bounce_chamber
-      model: gas_exchange
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 241325.0
-      initial_pressure_Pa: 198464.6892500843
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
-      initial_temperature_K: 361.45685718326035
-      initial_burned_fraction_0to1: 0.0
-      initial_burned_mass_percent: 0.0
-      chamber_diameter_m: 0.07
-      chamber_length_m: 0.10807
-      compression_ratio: 16
-      polytropic_exponent: 1.3
-    - name: receiver_1
-      type: plenum
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 201325.0
-      initial_pressure_Pa: 134002.76562248185
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
-      initial_temperature_K: 345.65556573570336
-      fixed_volume_m3: 0.00048
-      wall_heat:
-        model: none
-      combustion:
-        model: none
-      evaporation:
-        model: none
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
-      initial_burned_fraction_0to1: 0.013388033957062654
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
-      initial_burned_mass_percent: 1.3388033957062653
-    - name: receiver_2
-      type: plenum
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 201325.0
-      initial_pressure_Pa: 149846.55096679396
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
-      initial_temperature_K: 366.9824892796944
-      fixed_volume_m3: 0.00048
-      wall_heat:
-        model: none
-      combustion:
-        model: none
-      evaporation:
-        model: none
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
-      initial_burned_fraction_0to1: 0.023555537179546386
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
-      initial_burned_mass_percent: 2.3555537179546384
-    - name: exhaust_plenum_1
-      type: plenum
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 110000.0
-      initial_pressure_Pa: 123188.4645178203
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
-      initial_temperature_K: 499.4320592240638
-      fixed_volume_m3: 0.00260279
-      wall_heat:
-        model: none
-      combustion:
-        model: none
-      evaporation:
-        model: none
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
-      initial_burned_fraction_0to1: 0.30316959683064754
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
-      initial_burned_mass_percent: 30.316959683064752
-    - name: exhaust_plenum_2
-      type: plenum
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_pressure_Pa: 110000.0
-      initial_pressure_Pa: 105762.06635913745
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_temperature_K: 300.0
-      initial_temperature_K: 497.89529443664713
-      fixed_volume_m3: 0.00260279
-      wall_heat:
-        model: none
-      combustion:
-        model: none
-      evaporation:
-        model: none
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_fraction_0to1: 0.0
-      initial_burned_fraction_0to1: 0.31810838102263905
-      # previous_auto_initial_state_from_last_compression_at_x0_m: initial_burned_mass_percent: 0.0
-      initial_burned_mass_percent: 31.810838102263904
-    - name: ambient_in
-      type: environment
-      pressure_Pa: 101325.0
-      temperature_K: 300.0
-    - name: ambient_out
-      type: environment
-      pressure_Pa: 101325.0
-      temperature_K: 300.0
+  - name: cylinder_1
+    type: cylinder
+    initial_pressure_Pa: 257686.2578843034
+    initial_temperature_K: 487.1451361449823
+    kinematics:
+      type: crank_slider
+      bore_m: 1.0745
+      stroke_m: 1.08
+      conrod_m: 1.12
+      compression_ratio: 50.0
+      phase_deg: 0.0
+    wall_heat:
+      model: woschni
+      variant: promo
+      wall_temperature_K: 450.0
+      wall_area_m2: 0.03
+      dp_mode: 'off'
+      multiplier: 15
+      reference_state_mode: none
+      phase_mode: legacy
+      c1: 2.28
+      c2: 0.00324
+      c3: 0.0
+      cucm: 0.0
+      swirl_number: 0.0
+      imep_bar: 0.0
+    combustion:
+      model: vibe
+      start_mode: hign_position
+      hign_mm: 10.0
+      duration_mode: time
+      duration_ms: 6.0
+      a: 6.9
+      m: 2.0
+      energy_coupling: none
+      stroke_reference_m: 0.010807
+      stroke_exponent: 0.01
+      fueling_mode: lambda_from_cylinder_mass_at_slot_close
+      lambda_target: 1.0
+      lhv_J_per_kg: 43000000.0
+      afr_stoich_kg_air_per_kg_fuel: 14.5
+      combustion_efficiency_0to1: 1.0
+      slot_open_threshold_m2: 1.0e-07
+      slot_closed_threshold_m2: 1.0e-12
+      compression_velocity_threshold_m_per_s: 0.02
+      angle_reference: absolute
+    evaporation:
+      model: none
+    initial_burned_fraction_0to1: 0.26880184209044594
+    initial_burned_mass_percent: 26.880184209044593
+  - name: cylinder_2
+    type: cylinder
+    initial_pressure_Pa: 542041.7401361301
+    initial_temperature_K: 1010.9070106970368
+    kinematics:
+      type: crank_slider
+      bore_m: 1.0745
+      stroke_m: 1.08
+      conrod_m: 1.12
+      compression_ratio: 50.0
+      phase_deg: 0.0
+    wall_heat:
+      model: woschni
+      variant: promo
+      wall_temperature_K: 450.0
+      wall_area_m2: 0.03
+      dp_mode: 'off'
+      multiplier: 15
+      reference_state_mode: none
+      phase_mode: legacy
+      c1: 2.28
+      c2: 0.00324
+      c3: 0.0
+      cucm: 0.0
+      swirl_number: 0.0
+      imep_bar: 0.0
+    combustion:
+      model: vibe
+      start_mode: hign_position
+      hign_mm: 20.0
+      duration_mode: time
+      duration_ms: 3.0
+      a: 6.9
+      m: 2.0
+      energy_coupling: none
+      stroke_reference_m: 0.010807
+      stroke_exponent: 0.01
+      fueling_mode: lambda_from_cylinder_mass_at_slot_close
+      lambda_target: 1.0
+      lhv_J_per_kg: 43000000.0
+      afr_stoich_kg_air_per_kg_fuel: 14.5
+      combustion_efficiency_0to1: 1.0
+      slot_open_threshold_m2: 1.0e-07
+      slot_closed_threshold_m2: 1.0e-12
+      compression_velocity_threshold_m_per_s: 0.02
+      angle_reference: absolute
+    evaporation:
+      model: none
+    initial_burned_fraction_0to1: 0.8712299779910716
+    initial_burned_mass_percent: 87.12299779910715
+  - name: compressor_1
+    type: bounce_chamber
+    model: gas_exchange
+    initial_pressure_Pa: 101134.76663730493
+    initial_temperature_K: 299.424290135677
+    initial_burned_fraction_0to1: 0.0
+    initial_burned_mass_percent: 0.0
+    chamber_diameter_m: 0.07
+    chamber_length_m: 0.10807
+    compression_ratio: 16
+    polytropic_exponent: 1.3
+    chamber_volume0_m3: null
+    p0_Pa: null
+  - name: compressor_2
+    type: bounce_chamber
+    model: gas_exchange
+    initial_pressure_Pa: 198464.6892500843
+    initial_temperature_K: 361.45685718326035
+    initial_burned_fraction_0to1: 0.0
+    initial_burned_mass_percent: 0.0
+    chamber_diameter_m: 0.07
+    chamber_length_m: 0.10807
+    compression_ratio: 16
+    polytropic_exponent: 1.3
+    chamber_volume0_m3: null
+    p0_Pa: null
+  - name: receiver_1
+    type: plenum
+    initial_pressure_Pa: 134002.76562248185
+    initial_temperature_K: 345.65556573570336
+    fixed_volume_m3: 0.00048
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+    initial_burned_fraction_0to1: 0.013388033957062654
+    initial_burned_mass_percent: 1.3388033957062653
+  - name: receiver_2
+    type: plenum
+    initial_pressure_Pa: 149846.55096679396
+    initial_temperature_K: 366.9824892796944
+    fixed_volume_m3: 0.00048
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+    initial_burned_fraction_0to1: 0.023555537179546386
+    initial_burned_mass_percent: 2.3555537179546384
+  - name: exhaust_plenum_1
+    type: plenum
+    initial_pressure_Pa: 123188.4645178203
+    initial_temperature_K: 499.4320592240638
+    fixed_volume_m3: 0.00260279
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+    initial_burned_fraction_0to1: 0.30316959683064754
+    initial_burned_mass_percent: 30.316959683064752
+  - name: exhaust_plenum_2
+    type: plenum
+    initial_pressure_Pa: 105762.06635913745
+    initial_temperature_K: 497.89529443664713
+    fixed_volume_m3: 0.00260279
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+    initial_burned_fraction_0to1: 0.31810838102263905
+    initial_burned_mass_percent: 31.810838102263904
+  - name: ambient_in
+    type: environment
+    pressure_Pa: 101325.0
+    temperature_K: 300.0
+  - name: ambient_out
+    type: environment
+    pressure_Pa: 101325.0
+    temperature_K: 300.0
   connections:
-    - name: compressor_1_in_cv
-      type: check_valve
-      from_volume: ambient_in
-      to_volume: compressor_1
-      diameter_mm: 55
-      discharge_coefficient: 0.82
-      cracking_pressure_Pa: 0.0
-    - name: compressor_1_out_cv
-      type: check_valve
-      from_volume: compressor_1
-      to_volume: receiver_1
-      diameter_mm: 55.3
-      discharge_coefficient: 0.82
-      cracking_pressure_Pa: 50000.0
-    - name: compressor_2_in_cv
-      type: check_valve
-      from_volume: ambient_in
-      to_volume: compressor_2
-      diameter_mm: 55
-      discharge_coefficient: 0.82
-      cracking_pressure_Pa: 0.0
-    - name: compressor_2_out_cv
-      type: check_valve
-      from_volume: compressor_2
-      to_volume: receiver_2
-      diameter_mm: 55.3
-      discharge_coefficient: 0.82
-      cracking_pressure_Pa: 50000.0
-    - name: transfer_slot_1
-      type: slot
-      from_volume: receiver_1
-      to_volume: cylinder_1
-      source_of_data: rectangle
-      opening_mode: by_distance
-      distance_from_tdc_mm: 92.07
-      opening_angle_deg: null
-      piston_height_if_crankcase_m: 0.0
-      entrance_angle_deg: 0.0
-      width_mm: 26.0
-      height_mm: 16.0
-      open_fillet_radius_m: 0.0
-      full_fillet_radius_m: 0.0
-      number_of_identical_holes: 6
-      discharge_coefficients:
-        mode: constant
-        forward_cd: 0.95
-        reverse_cd: 0.95
-    - name: transfer_slot_2
-      type: slot
-      from_volume: receiver_2
-      to_volume: cylinder_2
-      source_of_data: rectangle
-      opening_mode: by_distance
-      distance_from_tdc_mm: 92.07
-      opening_angle_deg: null
-      piston_height_if_crankcase_m: 0.0
-      entrance_angle_deg: 0.0
-      width_mm: 26.0
-      height_mm: 16.0
-      open_fillet_radius_m: 0.0
-      full_fillet_radius_m: 0.0
-      number_of_identical_holes: 6
-      discharge_coefficients:
-        mode: constant
-        forward_cd: 0.95
-        reverse_cd: 0.95
-    - name: exhaust_slot_1
-      type: slot
-      from_volume: cylinder_1
-      to_volume: exhaust_plenum_1
-      source_of_data: rectangle
-      opening_mode: by_distance
-      distance_from_tdc_mm: 90.6
-      opening_angle_deg: null
-      piston_height_if_crankcase_m: 0.0
-      entrance_angle_deg: 0.0
-      width_mm: 24
-      height_mm: 18
-      open_fillet_radius_m: 0.0
-      full_fillet_radius_m: 0.0
-      number_of_identical_holes: 6
-      discharge_coefficients:
-        mode: constant
-        forward_cd: 0.95
-        reverse_cd: 0.95
-    - name: exhaust_slot_2
-      type: slot
-      from_volume: cylinder_2
-      to_volume: exhaust_plenum_2
-      source_of_data: rectangle
-      opening_mode: by_distance
-      distance_from_tdc_mm: 90.6
-      opening_angle_deg: null
-      piston_height_if_crankcase_m: 0.0
-      entrance_angle_deg: 0.0
-      width_mm: 24
-      height_mm: 18
-      open_fillet_radius_m: 0.0
-      full_fillet_radius_m: 0.0
-      number_of_identical_holes: 6
-      discharge_coefficients:
-        mode: constant
-        forward_cd: 0.95
-        reverse_cd: 0.95
-    - name: exhaust_bleed_1
-      type: orifice
-      from_volume: exhaust_plenum_1
-      to_volume: ambient_out
-      diameter_mm: 14.0
-      forward_cd: 0.98
-      reverse_cd: 0.98
-    - name: exhaust_bleed_2
-      type: orifice
-      from_volume: exhaust_plenum_2
-      to_volume: ambient_out
-      diameter_mm: 14.0
-      forward_cd: 0.98
-      reverse_cd: 0.98
+  - name: compressor_1_in_cv
+    type: check_valve
+    from_volume: ambient_in
+    to_volume: compressor_1
+    diameter_mm: 55
+    discharge_coefficient: 0.82
+    cracking_pressure_Pa: 0.0
+  - name: compressor_1_out_cv
+    type: check_valve
+    from_volume: compressor_1
+    to_volume: receiver_1
+    diameter_mm: 55.3
+    discharge_coefficient: 0.82
+    cracking_pressure_Pa: 50000.0
+  - name: compressor_2_in_cv
+    type: check_valve
+    from_volume: ambient_in
+    to_volume: compressor_2
+    diameter_mm: 55
+    discharge_coefficient: 0.82
+    cracking_pressure_Pa: 0.0
+  - name: compressor_2_out_cv
+    type: check_valve
+    from_volume: compressor_2
+    to_volume: receiver_2
+    diameter_mm: 55.3
+    discharge_coefficient: 0.82
+    cracking_pressure_Pa: 50000.0
+  - name: transfer_slot_1
+    type: slot
+    from_volume: receiver_1
+    to_volume: cylinder_1
+    source_of_data: rectangle
+    opening_mode: by_distance
+    distance_from_tdc_mm: 92.07
+    opening_angle_deg: null
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 0.0
+    width_mm: 26.0
+    height_mm: 16.0
+    open_fillet_radius_m: 0.0
+    full_fillet_radius_m: 0.0
+    number_of_identical_holes: 6
+    discharge_coefficients:
+      mode: constant
+      forward_cd: 0.95
+      reverse_cd: 0.95
+  - name: transfer_slot_2
+    type: slot
+    from_volume: receiver_2
+    to_volume: cylinder_2
+    source_of_data: rectangle
+    opening_mode: by_distance
+    distance_from_tdc_mm: 92.07
+    opening_angle_deg: null
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 0.0
+    width_mm: 26.0
+    height_mm: 16.0
+    open_fillet_radius_m: 0.0
+    full_fillet_radius_m: 0.0
+    number_of_identical_holes: 6
+    discharge_coefficients:
+      mode: constant
+      forward_cd: 0.95
+      reverse_cd: 0.95
+  - name: exhaust_slot_1
+    type: slot
+    from_volume: cylinder_1
+    to_volume: exhaust_plenum_1
+    source_of_data: rectangle
+    opening_mode: by_distance
+    distance_from_tdc_mm: 90.6
+    opening_angle_deg: null
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 0.0
+    width_mm: 24
+    height_mm: 18
+    open_fillet_radius_m: 0.0
+    full_fillet_radius_m: 0.0
+    number_of_identical_holes: 6
+    discharge_coefficients:
+      mode: constant
+      forward_cd: 0.95
+      reverse_cd: 0.95
+  - name: exhaust_slot_2
+    type: slot
+    from_volume: cylinder_2
+    to_volume: exhaust_plenum_2
+    source_of_data: rectangle
+    opening_mode: by_distance
+    distance_from_tdc_mm: 90.6
+    opening_angle_deg: null
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 0.0
+    width_mm: 24
+    height_mm: 18
+    open_fillet_radius_m: 0.0
+    full_fillet_radius_m: 0.0
+    number_of_identical_holes: 6
+    discharge_coefficients:
+      mode: constant
+      forward_cd: 0.95
+      reverse_cd: 0.95
+  - name: exhaust_bleed_1
+    type: orifice
+    from_volume: exhaust_plenum_1
+    to_volume: ambient_out
+    diameter_mm: 14.0
+    forward_cd: 0.98
+    reverse_cd: 0.98
+  - name: exhaust_bleed_2
+    type: orifice
+    from_volume: exhaust_plenum_2
+    to_volume: ambient_out
+    diameter_mm: 14.0
+    forward_cd: 0.98
+    reverse_cd: 0.98
 simulation:
   dt_s: 1.0e-05
   total_cycles: 3
@@ -427,48 +398,36 @@ postprocessing:
     layouts:
       auto_create_defaults: true
       entries:
-        - enabled: true
-          path: plot-v11_hub.yaml
-          prefix: plot_v11_hub
-
-        - enabled: false
-          path: plot-v11_Energy.yaml
-          prefix: plot_fp_energy
-        
-        - enabled: true
-          path: plot-v11_fp4.yaml
-          prefix: plot_fp4
-
-        - enabled: false
-          path: plot-v11-fp_pressure.yaml
-          prefix: plot_fp_pressure
-
-        - enabled: true
-          path: plot-v11-fp_mass.yaml
-          prefix: plot_fp_mass
-        
-        - enabled: false
-          path: plot-v11-fp_flow.yaml
-          prefix: plot_fp_mass        
-
-        - enabled: false
-          path: plot-v11-fp_scavenging_check.yaml
-          prefix: plot_fp_scavenging_check
-
-        - enabled: false
-          path: plot-v11-fp_scavenging_lastcycle_zoom.yaml
-          prefix: plot_fp_scavenging_lastcycle
-
-        - enabled: false
-          path: plot-v11-fp_species_tracking_check.yaml
-          prefix: plot_fp_species_check
-
-        - enabled: false
-          path: plot-v11-fp_species_transport_detail.yaml
-          prefix: plot_fp_species_transport
-
-
-
+      - enabled: true
+        path: plot_CFG/plot-v11_hub.yaml
+        prefix: plot_v11_hub
+      - enabled: false
+        path: plot_CFG/plot-v11_Energy.yaml
+        prefix: plot_fp_energy
+      - enabled: true
+        path: plot_CFG/plot-v11_fp4.yaml
+        prefix: plot_fp4
+      - enabled: false
+        path: plot_CFG/plot-v11-fp_pressure.yaml
+        prefix: plot_fp_pressure
+      - enabled: true
+        path: plot_CFG/plot-v11-fp_mass.yaml
+        prefix: plot_fp_mass
+      - enabled: false
+        path: plot_CFG/plot-v11-fp_flow.yaml
+        prefix: plot_fp_mass
+      - enabled: false
+        path: plot_CFG/plot-v11-fp_scavenging_check.yaml
+        prefix: plot_fp_scavenging_check
+      - enabled: false
+        path: plot_CFG/plot-v11-fp_scavenging_lastcycle_zoom.yaml
+        prefix: plot_fp_scavenging_lastcycle
+      - enabled: false
+        path: plot_CFG/plot-v11-fp_species_tracking_check.yaml
+        prefix: plot_fp_species_check
+      - enabled: false
+        path: plot_CFG/plot-v11-fp_species_transport_detail.yaml
+        prefix: plot_fp_species_transport
     output_dir: results/plots
   console:
     run_summary:
@@ -479,4 +438,3 @@ postprocessing:
       enabled: false
     geometry:
       enabled: false
-

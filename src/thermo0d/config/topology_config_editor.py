@@ -159,6 +159,72 @@ def _normalize_initial_states_inplace(state: dict[str, Any]) -> None:
     sync_initial_states_inplace(state)
 
 
+def _sanitize_mode_dependent_fields_inplace(state: dict[str, Any]) -> None:
+    post = state.get("postprocessing")
+    if isinstance(post, dict):
+        sampling = post.get("sampling")
+        if isinstance(sampling, dict):
+            if sampling.get("mode") == "time":
+                sampling.pop("step_deg", None)
+            elif sampling.get("mode") == "crank_angle":
+                sampling.pop("step_s", None)
+
+    preprocessing = state.get("preprocessing")
+    if not isinstance(preprocessing, dict):
+        return
+
+    for vol in preprocessing.get("volumes", []):
+        if not isinstance(vol, dict):
+            continue
+        combustion = vol.get("combustion")
+        if not isinstance(combustion, dict) or combustion.get("model") != "vibe":
+            continue
+        start_mode = combustion.get("start_mode")
+        if start_mode == "angle":
+            combustion.pop("start_hub_m", None)
+            combustion.pop("hign_m", None)
+            combustion.pop("hign_mm", None)
+        elif start_mode == "compression_hub":
+            combustion.pop("start_deg", None)
+            combustion.pop("hign_m", None)
+            combustion.pop("hign_mm", None)
+        elif start_mode == "hign_position":
+            combustion.pop("start_deg", None)
+            combustion.pop("start_hub_m", None)
+
+        duration_mode = combustion.get("duration_mode")
+        if duration_mode is None:
+            if combustion.get("duration_s") is not None or combustion.get("duration_ms") is not None:
+                duration_mode = "time"
+            elif combustion.get("duration_hub_m") is not None:
+                duration_mode = "compression_hub"
+            else:
+                duration_mode = "angle"
+        if duration_mode == "angle":
+            combustion.pop("duration_hub_m", None)
+            combustion.pop("duration_s", None)
+            combustion.pop("duration_ms", None)
+        elif duration_mode == "compression_hub":
+            combustion.pop("duration_deg", None)
+            combustion.pop("duration_s", None)
+            combustion.pop("duration_ms", None)
+        elif duration_mode == "time":
+            combustion.pop("duration_deg", None)
+            combustion.pop("duration_hub_m", None)
+
+    for conn in preprocessing.get("connections", []):
+        if not isinstance(conn, dict):
+            continue
+        coeffs = conn.get("discharge_coefficients")
+        if not isinstance(coeffs, dict):
+            continue
+        if coeffs.get("mode") == "constant":
+            coeffs.pop("table_file", None)
+        elif coeffs.get("mode") == "table":
+            coeffs.pop("forward_cd", None)
+            coeffs.pop("reverse_cd", None)
+
+
 def _styled_message(parent: QWidget, title: str, text: str) -> None:
     show_information(parent, title, text)
 
@@ -1119,6 +1185,7 @@ class TopologyConfigEditor(QMainWindow):
         menu_style = self.menuBar().addMenu("Style")
 
         tb = QToolBar("Hauptwerkzeuge")
+        tb.setObjectName("toolbar_main")
         self.addToolBar(tb)
 
         self.act_new = QAction("Neu", self)
@@ -1564,6 +1631,7 @@ class TopologyConfigEditor(QMainWindow):
         state = _deepcopy_jsonable(self.state)
         state.pop("_layout", None)
         _sanitize_disabled_submodels_inplace(state)
+        _sanitize_mode_dependent_fields_inplace(state)
         _normalize_initial_states_inplace(state)
         for vol in state.get("preprocessing", {}).get("volumes", []):
             if isinstance(vol, dict) and vol.get("initial_pressure_Pa") is not None:

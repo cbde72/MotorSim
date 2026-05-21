@@ -1,8 +1,0 @@
-# Versionsstand dieser Konfigurationsdatei.
-# Dieser Block wird von den Editoren beim Laden geprüft und bei Bedarf aktualisiert.
-versioning:
-  package_version: '7.1.91'
-  config_schema_version: 5
-  loaded_config_schema_version: 4
-  migration_applied: true
-

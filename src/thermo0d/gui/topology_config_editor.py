@@ -73,15 +73,19 @@ from thermo0d.config.schema_meta import (
 from thermo0d.gui.dialogs import ask_question, get_open_file_name, get_save_file_name, get_text, show_information, show_warning, show_critical, show_foreground
 MIME_PALETTE = "application/x-thermo0d-topology-palette"
 NODE_SIZE = (170.0, 74.0)
-CONNECTION_NODE_SIZE = (112.0, 52.0)
-CONNECTION_TYPES = {"valve", "slot", "orifice"}
+CONNECTION_NODE_SIZE = (58.0, 34.0)
+CONNECTION_LABEL_WIDTH = 150.0
+CONNECTION_TYPES = {"valve", "slot", "orifice", "check_valve"}
+VOLUME_TYPES = {"cylinder", "plenum", "environment", "bounce_chamber"}
 TYPE_COLORS = {
     "cylinder": QColor("#2563eb"),
     "plenum": QColor("#0f766e"),
     "environment": QColor("#16a34a"),
+    "bounce_chamber": QColor("#0891b2"),
     "valve": QColor("#1d4ed8"),
     "slot": QColor("#b91c1c"),
     "orifice": QColor("#7c3aed"),
+    "check_valve": QColor("#c2410c"),
 }
 
 
@@ -159,6 +163,72 @@ def _normalize_initial_states_inplace(state: dict[str, Any]) -> None:
     sync_initial_states_inplace(state)
 
 
+def _sanitize_mode_dependent_fields_inplace(state: dict[str, Any]) -> None:
+    post = state.get("postprocessing")
+    if isinstance(post, dict):
+        sampling = post.get("sampling")
+        if isinstance(sampling, dict):
+            if sampling.get("mode") == "time":
+                sampling.pop("step_deg", None)
+            elif sampling.get("mode") == "crank_angle":
+                sampling.pop("step_s", None)
+
+    preprocessing = state.get("preprocessing")
+    if not isinstance(preprocessing, dict):
+        return
+
+    for vol in preprocessing.get("volumes", []):
+        if not isinstance(vol, dict):
+            continue
+        combustion = vol.get("combustion")
+        if not isinstance(combustion, dict) or combustion.get("model") != "vibe":
+            continue
+        start_mode = combustion.get("start_mode")
+        if start_mode == "angle":
+            combustion.pop("start_hub_m", None)
+            combustion.pop("hign_m", None)
+            combustion.pop("hign_mm", None)
+        elif start_mode == "compression_hub":
+            combustion.pop("start_deg", None)
+            combustion.pop("hign_m", None)
+            combustion.pop("hign_mm", None)
+        elif start_mode == "hign_position":
+            combustion.pop("start_deg", None)
+            combustion.pop("start_hub_m", None)
+
+        duration_mode = combustion.get("duration_mode")
+        if duration_mode is None:
+            if combustion.get("duration_s") is not None or combustion.get("duration_ms") is not None:
+                duration_mode = "time"
+            elif combustion.get("duration_hub_m") is not None:
+                duration_mode = "compression_hub"
+            else:
+                duration_mode = "angle"
+        if duration_mode == "angle":
+            combustion.pop("duration_hub_m", None)
+            combustion.pop("duration_s", None)
+            combustion.pop("duration_ms", None)
+        elif duration_mode == "compression_hub":
+            combustion.pop("duration_deg", None)
+            combustion.pop("duration_s", None)
+            combustion.pop("duration_ms", None)
+        elif duration_mode == "time":
+            combustion.pop("duration_deg", None)
+            combustion.pop("duration_hub_m", None)
+
+    for conn in preprocessing.get("connections", []):
+        if not isinstance(conn, dict):
+            continue
+        coeffs = conn.get("discharge_coefficients")
+        if not isinstance(coeffs, dict):
+            continue
+        if coeffs.get("mode") == "constant":
+            coeffs.pop("table_file", None)
+        elif coeffs.get("mode") == "table":
+            coeffs.pop("forward_cd", None)
+            coeffs.pop("reverse_cd", None)
+
+
 def _styled_message(parent: QWidget, title: str, text: str) -> None:
     show_information(parent, title, text)
 
@@ -193,7 +263,7 @@ class DiagramNodeItem(QGraphicsRectItem):
         self.setAcceptHoverEvents(True)
         self.title_item = QGraphicsTextItem(self.title, self)
         self.subtitle_item = QGraphicsTextItem(self.subtitle, self)
-        title_font = QFont("Segoe UI", 9 if self.item_type in CONNECTION_TYPES else 10)
+        title_font = QFont("Segoe UI", 8 if self.item_type in CONNECTION_TYPES else 10)
         title_font.setBold(True)
         self.title_item.setFont(title_font)
         self.title_item.setDefaultTextColor(Qt.GlobalColor.white)
@@ -210,10 +280,10 @@ class DiagramNodeItem(QGraphicsRectItem):
 
     def _layout_text(self) -> None:
         if self.item_type in CONNECTION_TYPES:
-            self.title_item.setPos(10.0, 6.0)
-            self.subtitle_item.setPos(10.0, 24.0)
-            self.title_item.setTextWidth(max(32.0, self.rect().width() - 20.0))
-            self.subtitle_item.setTextWidth(max(32.0, self.rect().width() - 20.0))
+            self.title_item.setPos(0.0, self.rect().height() + 3.0)
+            self.subtitle_item.setPos(0.0, self.rect().height() + 19.0)
+            self.title_item.setTextWidth(CONNECTION_LABEL_WIDTH)
+            self.subtitle_item.setTextWidth(CONNECTION_LABEL_WIDTH)
             return
         self.title_item.setPos(12.0, 8.0)
         self.subtitle_item.setPos(12.0, 34.0)
@@ -281,7 +351,7 @@ class DiagramNodeItem(QGraphicsRectItem):
     def mouseMoveEvent(self, event):
         if self._resizing:
             delta = event.pos() - self._resize_origin
-            min_w, min_h = (88.0, 44.0) if self.item_type in CONNECTION_TYPES else (120.0, 56.0)
+            min_w, min_h = (42.0, 26.0) if self.item_type in CONNECTION_TYPES else (120.0, 56.0)
             w = max(min_w, self._start_rect.width() + delta.x())
             h = max(min_h, self._start_rect.height() + delta.y())
             self.prepareGeometryChange()
@@ -317,7 +387,7 @@ class DiagramNodeItem(QGraphicsRectItem):
             painter.setPen(self.pen())
             painter.setBrush(self.brush())
             rr = self.rect()
-            radius = min(rr.height() * 0.5, 22.0)
+            radius = min(rr.height() * 0.45, 14.0)
             painter.drawRoundedRect(rr, radius, radius)
         else:
             super().paint(painter, option, widget)
@@ -434,9 +504,11 @@ class PaletteTree(QTreeWidget):
         cylinders.setData(0, Qt.ItemDataRole.UserRole, {"item_type": "cylinder"})
         plenums = QTreeWidgetItem(["Behälter"])
         plenums.setData(0, Qt.ItemDataRole.UserRole, {"item_type": "plenum"})
+        bounce_chambers = QTreeWidgetItem(["Bounce-Chambers"])
+        bounce_chambers.setData(0, Qt.ItemDataRole.UserRole, {"item_type": "bounce_chamber"})
         environments = QTreeWidgetItem(["Umgebungen"])
         environments.setData(0, Qt.ItemDataRole.UserRole, {"item_type": "environment"})
-        volumes.addChildren([cylinders, plenums, environments])
+        volumes.addChildren([cylinders, plenums, bounce_chambers, environments])
 
         throttles = QTreeWidgetItem(["Drosseln"])
         valves = QTreeWidgetItem(["Ventile"])
@@ -445,7 +517,9 @@ class PaletteTree(QTreeWidget):
         slots.setData(0, Qt.ItemDataRole.UserRole, {"item_type": "slot"})
         orifices = QTreeWidgetItem(["Drosseln / Orifices"])
         orifices.setData(0, Qt.ItemDataRole.UserRole, {"item_type": "orifice"})
-        throttles.addChildren([slots, valves, orifices])
+        check_valves = QTreeWidgetItem(["Rueckschlagventile"])
+        check_valves.setData(0, Qt.ItemDataRole.UserRole, {"item_type": "check_valve"})
+        throttles.addChildren([slots, valves, orifices, check_valves])
 
         self.addTopLevelItems([volumes, throttles])
 
@@ -480,7 +554,16 @@ class NodeListPanel(QWidget):
         layout.addWidget(self.search_edit)
 
         quick = QHBoxLayout()
-        for text_label, item_type in (("+ Zyl", "cylinder"), ("+ Beh", "plenum"), ("+ Umg", "environment"), ("+ Vent", "valve"), ("+ Slot", "slot"), ("+ Dros", "orifice")):
+        for text_label, item_type in (
+            ("+ Zyl", "cylinder"),
+            ("+ Beh", "plenum"),
+            ("+ Bou", "bounce_chamber"),
+            ("+ Umg", "environment"),
+            ("+ Vent", "valve"),
+            ("+ Slot", "slot"),
+            ("+ Dros", "orifice"),
+            ("+ Rueck", "check_valve"),
+        ):
             btn = QPushButton(text_label)
             btn.clicked.connect(lambda _=False, t=item_type: self.add_requested.emit(t))
             quick.addWidget(btn)
@@ -502,7 +585,7 @@ class NodeListPanel(QWidget):
                     "id": str(model.get("name", "")),
                     "type": str(model.get("type", "")),
                     "group": group_name,
-                    "subtitle": str(model.get("from_volume", "")) + (" → " + str(model.get("to_volume", "")) if model.get("type") in {"valve", "slot", "orifice"} else ""),
+                    "subtitle": str(model.get("from_volume", "")) + (" -> " + str(model.get("to_volume", "")) if model.get("type") in CONNECTION_TYPES else ""),
                 })
         self._rebuild()
         if selected_id:
@@ -631,6 +714,11 @@ class PropertyPanel(QWidget):
         spec.update(overrides)
         return spec
 
+    def _optional_alt_spec(self, key: str, **overrides: Any) -> dict[str, Any]:
+        spec = self._meta_spec(key, **overrides)
+        spec.pop("default", None)
+        return spec
+
     def _ensure_defaults_for_specs(self, specs: list[dict[str, Any]]) -> None:
         for spec in specs:
             key = spec.get("key")
@@ -645,18 +733,53 @@ class PropertyPanel(QWidget):
         if kind == "root":
             return self._root_specs(data)
         if item_type == "cylinder":
-            return self._cylinder_specs(data)
+            return self._with_remaining_specs(self._cylinder_specs(data), data)
         if item_type == "plenum":
-            return self._plenum_specs(data)
+            return self._with_remaining_specs(self._plenum_specs(data), data)
+        if item_type == "bounce_chamber":
+            return self._with_remaining_specs(self._bounce_chamber_specs(data), data)
         if item_type == "environment":
-            return self._environment_specs(data)
+            return self._with_remaining_specs(self._environment_specs(data), data)
         if item_type == "valve":
-            return self._valve_specs(data, volume_names)
+            return self._with_remaining_specs(self._valve_specs(data, volume_names), data)
         if item_type == "slot":
-            return self._slot_specs(data, volume_names)
+            return self._with_remaining_specs(self._slot_specs(data, volume_names), data)
         if item_type == "orifice":
-            return self._orifice_specs(data, volume_names)
+            return self._with_remaining_specs(self._orifice_specs(data, volume_names), data)
+        if item_type == "check_valve":
+            return self._with_remaining_specs(self._check_valve_specs(data, volume_names), data)
         return []
+
+    def _with_remaining_specs(self, specs: list[dict[str, Any]], data: dict[str, Any]) -> list[dict[str, Any]]:
+        existing = {str(spec.get("key", "")) for spec in specs}
+        result = list(specs)
+        for key, value in self._iter_editable_leaf_values(data):
+            if key in existing:
+                continue
+            result.append(self._meta_spec(key, label=key, type=self._kind_for_value(value)))
+            existing.add(key)
+        return result
+
+    def _iter_editable_leaf_values(self, data: dict[str, Any], prefix: str = ""):
+        for key, value in data.items():
+            dotted = f"{prefix}.{key}" if prefix else str(key)
+            if dotted == "type" or dotted.endswith(".type"):
+                continue
+            if isinstance(value, dict):
+                yield from self._iter_editable_leaf_values(value, dotted)
+            else:
+                yield dotted, value
+
+    def _kind_for_value(self, value: Any) -> str:
+        if isinstance(value, bool):
+            return "bool"
+        if isinstance(value, int) and not isinstance(value, bool):
+            return "int"
+        if isinstance(value, float) or value is None:
+            return "float"
+        if isinstance(value, (list, dict)):
+            return "yaml"
+        return "text"
 
     def _root_specs(self, data: dict[str, Any]) -> list[dict[str, Any]]:
         data.setdefault("simulation", {})
@@ -744,6 +867,10 @@ class PropertyPanel(QWidget):
                 self._meta_spec(f"{prefix}.m"),
                 self._meta_spec(f"{prefix}.fuel_mass_per_cycle_kg"),
                 self._meta_spec(f"{prefix}.lhv_J_per_kg"),
+                self._meta_spec(f"{prefix}.added_energy_per_cycle_J"),
+                self._meta_spec(f"{prefix}.energy_coupling"),
+                self._meta_spec(f"{prefix}.stroke_reference_m"),
+                self._meta_spec(f"{prefix}.stroke_exponent"),
             ]
             if include_angle_reference:
                 specs.append(self._meta_spec(f"{prefix}.angle_reference", choices=list(ANGLE_REFERENCES)))
@@ -800,6 +927,22 @@ class PropertyPanel(QWidget):
             self._meta_spec("temperature_K"),
         ]
 
+    def _bounce_chamber_specs(self, data: dict[str, Any]) -> list[dict[str, Any]]:
+        return [
+            self._meta_spec("name"),
+            self._meta_spec("model", type="choice", choices=["gas_spring", "gas_exchange"], default="gas_spring"),
+            self._meta_spec("initial_pressure_Pa"),
+            self._meta_spec("initial_temperature_K"),
+            self._meta_spec("initial_burned_fraction_0to1"),
+            self._meta_spec("initial_burned_mass_percent"),
+            self._meta_spec("chamber_diameter_m", type="float", default=0.0745, label="Bounce chamber diameter [m]"),
+            self._meta_spec("chamber_length_m", type="float", default=0.08, label="Bounce chamber length [m]"),
+            self._meta_spec("compression_ratio", type="float", default=2.5, label="Bounce compression ratio"),
+            self._meta_spec("chamber_volume0_m3", type="float", default=None, label="Legacy chamber V0 [m3]"),
+            self._meta_spec("p0_Pa", type="float", default=None, label="p0 [Pa]"),
+            self._meta_spec("polytropic_exponent", type="float", default=1.3, label="Polytropic exponent"),
+        ]
+
     def _valve_specs(self, data: dict[str, Any], volume_names: list[str]) -> list[dict[str, Any]]:
         return [
             self._meta_spec("name"),
@@ -822,11 +965,14 @@ class PropertyPanel(QWidget):
             self._meta_spec("source_of_data"),
             self._meta_spec("opening_mode"),
             self._meta_spec("distance_from_tdc_m"),
-            self._meta_spec("opening_angle_deg"),
+            self._optional_alt_spec("distance_from_tdc_mm"),
+            self._optional_alt_spec("opening_angle_deg"),
             self._meta_spec("piston_height_if_crankcase_m"),
             self._meta_spec("entrance_angle_deg"),
             self._meta_spec("width_m"),
+            self._optional_alt_spec("width_mm"),
             self._meta_spec("height_m"),
+            self._optional_alt_spec("height_mm"),
             self._meta_spec("open_fillet_radius_m"),
             self._meta_spec("full_fillet_radius_m"),
             self._meta_spec("number_of_identical_holes"),
@@ -842,8 +988,20 @@ class PropertyPanel(QWidget):
             self._meta_spec("from_volume", choices=volume_names),
             self._meta_spec("to_volume", choices=volume_names),
             self._meta_spec("area_m2"),
+            self._optional_alt_spec("diameter_mm"),
             self._meta_spec("forward_cd"),
             self._meta_spec("reverse_cd"),
+        ]
+
+    def _check_valve_specs(self, data: dict[str, Any], volume_names: list[str]) -> list[dict[str, Any]]:
+        return [
+            self._meta_spec("name"),
+            self._meta_spec("from_volume", choices=volume_names),
+            self._meta_spec("to_volume", choices=volume_names),
+            self._meta_spec("area_m2"),
+            self._optional_alt_spec("diameter_mm"),
+            self._meta_spec("discharge_coefficient", type="float", default=0.7, label="Discharge coefficient"),
+            self._meta_spec("cracking_pressure_Pa", type="float", default=0.0, label="Cracking pressure [Pa]"),
         ]
 
     def _add_field(self, spec: dict[str, Any]) -> None:
@@ -932,11 +1090,11 @@ class PropertyPanel(QWidget):
         text = widget.text().strip()
         try:
             if kind == "float":
-                value = 0.0 if text == "" else float(text.replace(",", "."))
-                widget.setText(str(value))
+                value = None if text == "" else float(text.replace(",", "."))
+                widget.setText("" if value is None else str(value))
             elif kind == "int":
-                value = 0 if text == "" else int(float(text.replace(",", ".")))
-                widget.setText(str(value))
+                value = None if text == "" else int(float(text.replace(",", ".")))
+                widget.setText("" if value is None else str(value))
             else:
                 value = text
         except ValueError:
@@ -952,11 +1110,7 @@ class PropertyPanel(QWidget):
         text = widget.toPlainText().strip()
         try:
             if kind == "yaml":
-                value = [] if text == "" else yaml.safe_load(text)
-                if value is None:
-                    value = []
-                if not isinstance(value, list):
-                    raise ValueError("YAML field requires a list value")
+                value = None if text == "" else yaml.safe_load(text)
                 normalized = _format_yaml_value(value)
                 if widget.toPlainText().strip() != normalized:
                     widget.blockSignals(True)
@@ -1119,6 +1273,7 @@ class TopologyConfigEditor(QMainWindow):
         menu_style = self.menuBar().addMenu("Style")
 
         tb = QToolBar("Hauptwerkzeuge")
+        tb.setObjectName("toolbar_main")
         self.addToolBar(tb)
 
         self.act_new = QAction("Neu", self)
@@ -1217,12 +1372,34 @@ class TopologyConfigEditor(QMainWindow):
         self.settings.setValue("window/state", self.saveState())
         if self.current_config_path:
             self.settings.setValue("last_config_path", str(self.current_config_path))
+            try:
+                self._write_layout_file()
+            except Exception as exc:
+                self.status.showMessage(f"Layout konnte nicht gespeichert werden: {exc}", 5000)
         super().closeEvent(event)
 
     def save_layout_state(self) -> None:
         self.settings.setValue("window/geometry", self.saveGeometry())
         self.settings.setValue("window/state", self.saveState())
+        self._write_layout_file()
         self.status.showMessage("Layout gespeichert", 2500)
+
+    def _capture_layout_state(self) -> dict[str, Any]:
+        nodes = self.state.setdefault("_layout", {}).setdefault("nodes", {})
+        for model_id, node in self.node_items.items():
+            nodes[model_id] = {
+                "x": float(node.pos().x()),
+                "y": float(node.pos().y()),
+                "w": float(node.rect().width()),
+                "h": float(node.rect().height()),
+            }
+        return {"nodes": nodes}
+
+    def _write_layout_file(self) -> None:
+        if not self.current_layout_path:
+            return
+        layout_payload = self._capture_layout_state()
+        self.current_layout_path.write_text(json.dumps(layout_payload, indent=2), encoding="utf-8")
 
     def reset_layout(self, announce: bool = True) -> None:
         self.removeDockWidget(self.dock_palette)
@@ -1305,7 +1482,7 @@ class TopologyConfigEditor(QMainWindow):
             new_name = f"{base_name}_{idx}"
             idx += 1
         clone["name"] = new_name
-        if clone.get("type") in {"cylinder", "plenum", "environment"}:
+        if clone.get("type") in VOLUME_TYPES:
             self.state["preprocessing"]["volumes"].append(clone)
         else:
             self.state["preprocessing"]["connections"].append(clone)
@@ -1323,7 +1500,7 @@ class TopologyConfigEditor(QMainWindow):
 
     def _start_connection_assignment(self, conn_id: str) -> None:
         conn = self._find_model(conn_id)
-        if conn is None or conn.get("type") not in {"valve", "slot", "orifice"}:
+        if conn is None or conn.get("type") not in CONNECTION_TYPES:
             return
         self.connect_steps = {"conn": conn_id, "from": None, "to": None}
         self.status.showMessage(f"Verbindung setzen: FROM-Volumen für {conn_id} wählen.", 5000)
@@ -1332,7 +1509,7 @@ class TopologyConfigEditor(QMainWindow):
         if self.connect_steps["conn"] is None:
             return False
         model = self._find_model(volume_id)
-        if model is None or model.get("type") not in {"cylinder", "plenum", "environment"}:
+        if model is None or model.get("type") not in VOLUME_TYPES:
             return False
         if self.connect_steps["from"] is None:
             self.connect_steps["from"] = volume_id
@@ -1370,9 +1547,9 @@ class TopologyConfigEditor(QMainWindow):
         menu.addSeparator()
 
         connection_action = None
-        if model.get("type") in {"valve", "slot", "orifice"}:
+        if model.get("type") in CONNECTION_TYPES:
             connection_action = menu.addAction("Verbindung setzen")
-        elif model.get("type") in {"cylinder", "plenum", "environment"} and self.connect_steps.get("conn"):
+        elif model.get("type") in VOLUME_TYPES and self.connect_steps.get("conn"):
             pending = str(self.connect_steps.get("conn"))
             label = "Verbindung setzen (als FROM)" if self.connect_steps.get("from") is None else "Verbindung setzen (als TO)"
             connection_action = menu.addAction(f"{label}: {pending}")
@@ -1394,7 +1571,7 @@ class TopologyConfigEditor(QMainWindow):
             self.status.showMessage(f"Auf {node.model_id} zentriert.", 2500)
             return
         if connection_action is not None and chosen == connection_action:
-            if model.get("type") in {"valve", "slot", "orifice"}:
+            if model.get("type") in CONNECTION_TYPES:
                 self._start_connection_assignment(node.model_id)
             else:
                 self._assign_connection_endpoint_from_volume(node.model_id)
@@ -1422,11 +1599,11 @@ class TopologyConfigEditor(QMainWindow):
         model = self._find_model(model_id)
         if model is None:
             return
-        if model["type"] in {"valve", "slot", "orifice"}:
+        if model["type"] in CONNECTION_TYPES:
             self._start_connection_assignment(model_id)
             self.status.showMessage(f"Strg-Verknüpfung: FROM-Volumen für {model['name']} wählen.")
             return
-        if model["type"] in {"cylinder", "plenum", "environment"} and self.connect_steps["conn"] is not None:
+        if model["type"] in VOLUME_TYPES and self.connect_steps["conn"] is not None:
             if self._assign_connection_endpoint_from_volume(model_id):
                 return
 
@@ -1554,9 +1731,7 @@ class TopologyConfigEditor(QMainWindow):
     def _write_config(self, path: Path) -> None:
         payload = self._export_state_without_layout()
         path.write_text(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8")
-        if self.current_layout_path:
-            layout_payload = {"nodes": self.state.get("_layout", {}).get("nodes", {})}
-            self.current_layout_path.write_text(json.dumps(layout_payload, indent=2), encoding="utf-8")
+        self._write_layout_file()
         self.settings.setValue("last_config_path", str(path))
         self.status.showMessage(f"Gespeichert: {path.name}", 4000)
 
@@ -1564,6 +1739,7 @@ class TopologyConfigEditor(QMainWindow):
         state = _deepcopy_jsonable(self.state)
         state.pop("_layout", None)
         _sanitize_disabled_submodels_inplace(state)
+        _sanitize_mode_dependent_fields_inplace(state)
         _normalize_initial_states_inplace(state)
         for vol in state.get("preprocessing", {}).get("volumes", []):
             if isinstance(vol, dict) and vol.get("initial_pressure_Pa") is not None:
@@ -1625,6 +1801,21 @@ class TopologyConfigEditor(QMainWindow):
                 "evaporation": {"model": "none"},
             }
             self.state["preprocessing"]["volumes"].append(model)
+        elif item_type == "bounce_chamber":
+            model = {
+                "name": _new_id("bounce"),
+                "type": "bounce_chamber",
+                "model": "gas_spring",
+                "initial_pressure_Pa": 1.5e5,
+                "initial_temperature_K": 300.0,
+                "initial_burned_fraction_0to1": 0.0,
+                "chamber_diameter_m": 0.07,
+                "chamber_length_m": 0.08,
+                "compression_ratio": 2.5,
+                "p0_Pa": None,
+                "polytropic_exponent": 1.3,
+            }
+            self.state["preprocessing"]["volumes"].append(model)
         elif item_type == "environment":
             model = {
                 "name": _new_id("env"),
@@ -1675,8 +1866,21 @@ class TopologyConfigEditor(QMainWindow):
                 "from_volume": "",
                 "to_volume": "",
                 "area_m2": 1.0e-4,
+                "diameter_mm": None,
                 "forward_cd": 0.7,
                 "reverse_cd": 0.7,
+            }
+            self.state["preprocessing"]["connections"].append(model)
+        elif item_type == "check_valve":
+            model = {
+                "name": _new_id("check"),
+                "type": "check_valve",
+                "from_volume": "",
+                "to_volume": "",
+                "area_m2": None,
+                "diameter_mm": 10.0,
+                "discharge_coefficient": 0.7,
+                "cracking_pressure_Pa": 0.0,
             }
             self.state["preprocessing"]["connections"].append(model)
         else:
@@ -1697,13 +1901,18 @@ class TopologyConfigEditor(QMainWindow):
         node.setPos(pos)
         self.scene.addItem(node)
         self.node_items[model["name"]] = node
-        self.state.setdefault("_layout", {}).setdefault("nodes", {})[model["name"]] = {"x": float(pos.x()), "y": float(pos.y())}
+        self.state.setdefault("_layout", {}).setdefault("nodes", {})[model["name"]] = {
+            "x": float(pos.x()),
+            "y": float(pos.y()),
+            "w": float(node.rect().width()),
+            "h": float(node.rect().height()),
+        }
 
     def _subtitle_for_model(self, model: dict[str, Any]) -> str:
         t = model.get("type", "")
-        if t in {"cylinder", "plenum", "environment"}:
+        if t in VOLUME_TYPES:
             return t.upper()
-        if t in {"valve", "slot", "orifice"}:
+        if t in CONNECTION_TYPES:
             src = model.get("from_volume", "?") or "?"
             dst = model.get("to_volume", "?") or "?"
             return f"{t.upper()}  {src} → {dst}"
@@ -1829,7 +2038,7 @@ class TopologyConfigEditor(QMainWindow):
         model = self._find_model(item.model_id)
         if model is None:
             return
-        if model["type"] in {"cylinder", "plenum", "environment"}:
+        if model["type"] in VOLUME_TYPES:
             self.state["preprocessing"]["volumes"] = [v for v in self.state["preprocessing"]["volumes"] if v["name"] != item.model_id]
             for conn in self.state["preprocessing"]["connections"]:
                 if conn.get("from_volume") == item.model_id:
