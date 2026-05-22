@@ -580,7 +580,7 @@ if __name__ == '__main__':
     project_root = this_file.parents[1] if this_file.parent.name == 'scripts' else this_file.parent
 # %%
 # %%
-    default_cfg = project_root / 'Projekte' / 'sweeps' / 'comb_start.yaml'
+    default_cfg = project_root / 'Projekte' / 'sweeps' / 'lambda_v15_1_5.yaml'
 
 
     print (default_cfg)

@@ -10,6 +10,7 @@ from thermo0d.model.free_piston.geometry import (
     bounce_volume_from_position,
     cylinder_distance_from_tdc,
     cylinder_volume_from_position,
+    free_piston_equivalent_linear_kinematics,
     free_piston_local_cycle_angle_deg,
     free_piston_local_cycle_angle_rate_deg_s,
     free_piston_reference_is_active,
@@ -169,8 +170,19 @@ def build_free_piston_rows(bundle, t: np.ndarray, y: np.ndarray) -> list[dict[st
         air_mass_kg = float(bundle.state_layout.air_mass_from_state(state_k, int(bundle.cylinder_indices[0])))
         liquid_fuel_mass_kg = float(bundle.state_layout.liquid_fuel_mass_from_state(state_k, int(bundle.cylinder_indices[0])))
         fuel_vapor_mass_kg = float(bundle.state_layout.fuel_vapor_mass_from_state(state_k, int(bundle.cylinder_indices[0])))
-        x_m = float(y[x_idx, k])
-        v_m_per_s = float(y[v_idx, k])
+        q = float(y[x_idx, k])
+        q_dot = float(y[v_idx, k])
+        x_m, v_m_per_s = free_piston_equivalent_linear_kinematics(
+            q,
+            q_dot,
+            1.0,
+            kinematics_type=str(getattr(fp, 'kinematics_type', 'linear') or 'linear'),
+            x_min_m=float(fp.x_min_m),
+            x_max_m=float(fp.x_max_m),
+            angle_min_rad=float(getattr(fp, 'rotary_angle_min_rad', 0.0) or 0.0),
+            angle_max_rad=float(getattr(fp, 'rotary_angle_max_rad', 0.0) or 0.0),
+            effective_radius_m=float(getattr(fp, 'rotary_effective_radius_m', 1.0) or 1.0),
+        )
         cylinder_distance_from_tdc_m = cylinder_distance_from_tdc(x_m, fp.x_min_m, fp.x_max_m)
         cylinder_volume_m3 = cylinder_volume_from_position(fp.clearance_volume_m3, fp.piston_area_m2, x_m, fp.x_min_m, fp.x_max_m)
         bounce_volume_m3 = bounce_volume_from_position(fp.bounce_chamber_volume0_m3, fp.bounce_area_m2, x_m, fp.x_min_m, fp.x_max_m)
@@ -222,6 +234,12 @@ def build_free_piston_rows(bundle, t: np.ndarray, y: np.ndarray) -> list[dict[st
         load_force_signed = float(load_info.force_signed_N)
         load_force = -load_force_signed
         force_net_N = force_gas_N + force_bounce_N + friction_force + load_force
+        if str(getattr(fp, 'kinematics_type', 'linear') or 'linear') == 'oscillating_rotary':
+            radius = max(float(getattr(fp, 'rotary_effective_radius_m', 1.0) or 1.0), 1.0e-18)
+            inertia = max(float(getattr(fp, 'rotary_inertia_kg_m2', fp.moving_mass_kg) or fp.moving_mass_kg), 1.0e-30)
+            equivalent_accel_m_per_s2 = force_net_N * radius * radius / inertia
+        else:
+            equivalent_accel_m_per_s2 = force_net_N / max(float(fp.moving_mass_kg), 1.0e-30)
         added_energy_W = _compute_cylinder_added_energy_W(
             bundle,
             float(t[k]),
@@ -274,6 +292,8 @@ def build_free_piston_rows(bundle, t: np.ndarray, y: np.ndarray) -> list[dict[st
             'free_piston_x_m': x_m,
             'free_piston_distance_from_tdc_m': cylinder_distance_from_tdc_m,
             'free_piston_v_m_per_s': v_m_per_s,
+            'free_piston_q': q,
+            'free_piston_q_dot': q_dot,
             'cylinder_volume_m3': cylinder_volume_m3,
             'bounce_volume_m3': bounce_volume_m3,
             'cylinder_pressure_Pa': cylinder_pressure_Pa,
@@ -294,6 +314,7 @@ def build_free_piston_rows(bundle, t: np.ndarray, y: np.ndarray) -> list[dict[st
             'free_piston_F_friction_N': friction_force,
             'free_piston_F_load_N': load_force,
             'free_piston_F_net_N': force_net_N,
+            'free_piston_a_m_per_s2': equivalent_accel_m_per_s2,
             'free_piston_generator_power_W': float(load_info.mechanical_power_W),
             'free_piston_generator_electrical_power_W': float(load_info.electrical_power_W),
             'free_piston_generator_damping_eff_Ns_per_m': float(load_info.effective_damping_Ns_per_m),

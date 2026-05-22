@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from thermo0d.config.constants import CombCol, CombDurationMode, CombStartMode, ConnCol, ConnectionType, FeatureCol, VolumeCol
-from thermo0d.model.free_piston.geometry import cylinder_distance_from_tdc, cylinder_volume_from_position, free_piston_is_compression_stroke, free_piston_local_cycle_angle_deg
+from thermo0d.model.free_piston.geometry import cylinder_distance_from_tdc, cylinder_volume_from_position, free_piston_equivalent_linear_kinematics, free_piston_is_compression_stroke, free_piston_local_cycle_angle_deg
 from thermo0d.model.free_piston.thermo import pressure_from_state
 from thermo0d.physics.kinematics import reference_theta_and_zero, wrap_angle_deg
 from thermo0d.physics.openings import connection_area_and_coefficients
@@ -179,9 +179,17 @@ def _local_piston_kinematics_for_volume(bundle, y_state: np.ndarray, volume_idx:
     else:
         q_m = float(y_state[int(mech_x[dof])])
         q_v_m_per_s = float(y_state[int(mech_v[dof])])
-    if sign < 0.0:
-        return float(fp.x_min_m + fp.x_max_m - q_m), float(-q_v_m_per_s)
-    return float(q_m), float(q_v_m_per_s)
+    return free_piston_equivalent_linear_kinematics(
+        q_m,
+        q_v_m_per_s,
+        sign,
+        kinematics_type=str(getattr(fp, 'kinematics_type', 'linear') or 'linear'),
+        x_min_m=float(fp.x_min_m),
+        x_max_m=float(fp.x_max_m),
+        angle_min_rad=float(getattr(fp, 'rotary_angle_min_rad', 0.0) or 0.0),
+        angle_max_rad=float(getattr(fp, 'rotary_angle_max_rad', 0.0) or 0.0),
+        effective_radius_m=float(getattr(fp, 'rotary_effective_radius_m', 1.0) or 1.0),
+    )
 
 
 def _arm_vapor_injector(fp, t_s: float, fuel_mass_kg: float, cylinder_idx: int | None = None) -> None:

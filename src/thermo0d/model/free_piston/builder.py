@@ -18,7 +18,7 @@ from thermo0d.input.builder_common import (
     build_postprocessing_options,
     build_simulation_options,
 )
-from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_volume_from_position
+from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_volume_from_position, free_piston_generalized_initial_state
 from thermo0d.physics.quellen_props import reduced_mixture_properties_from_temperature_quellen
 from thermo0d.model.free_piston.state_layout import build_free_piston_state_layout
 from thermo0d.model.free_piston.thermo import mass_from_pTV, specific_internal_energy_from_temperature
@@ -197,6 +197,30 @@ def _fp_piston_diameter_m(fp) -> float:
 
 def _fp_compression_ratio(fp) -> float:
     return float(fp.mechanics.derived_compression_ratio)
+
+
+def _fp_kinematics_type(fp) -> str:
+    return str(getattr(fp.mechanics, 'kinematics_type', 'linear') or 'linear')
+
+
+def _fp_rotary_angle_min_rad(fp) -> float:
+    return float(np.deg2rad(float(getattr(fp.mechanics, 'angle_min_deg', 0.0) or 0.0)))
+
+
+def _fp_rotary_angle_max_rad(fp) -> float:
+    return float(np.deg2rad(float(getattr(fp.mechanics, 'angle_max_deg', 0.0) or 0.0)))
+
+
+def _fp_rotary_effective_radius_m(fp) -> float:
+    if _fp_kinematics_type(fp) == 'oscillating_rotary':
+        return float(getattr(fp.mechanics, 'effective_radius_m'))
+    return 1.0
+
+
+def _fp_rotary_inertia_kg_m2(fp) -> float:
+    if _fp_kinematics_type(fp) == 'oscillating_rotary':
+        return float(getattr(fp.mechanics, 'rotary_inertia_kg_m2'))
+    return float(fp.mechanics.moving_mass_kg)
 
 
 def _fp_bounce_chamber_diameter_m(fp) -> float:
@@ -662,9 +686,17 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     x_idx, v_idx = state_layout.free_piston_indices()
     mechanical_x_indices = np.array([state_layout.free_piston_indices_for_dof(i)[0] for i in range(mechanical_dofs)], dtype=np.int64)
     mechanical_v_indices = np.array([state_layout.free_piston_indices_for_dof(i)[1] for i in range(mechanical_dofs)], dtype=np.int64)
+    q0, qv0 = free_piston_generalized_initial_state(
+        float(fp.initial_conditions.x0_m),
+        float(fp.initial_conditions.v0_m_per_s),
+        kinematics_type=_fp_kinematics_type(fp),
+        x_min_m=float(fp.mechanics.x_min_m),
+        angle_min_rad=_fp_rotary_angle_min_rad(fp),
+        effective_radius_m=_fp_rotary_effective_radius_m(fp),
+    )
     for dof in range(mechanical_dofs):
-        y_init[int(mechanical_x_indices[dof])] = float(fp.initial_conditions.x0_m)
-        y_init[int(mechanical_v_indices[dof])] = float(fp.initial_conditions.v0_m_per_s)
+        y_init[int(mechanical_x_indices[dof])] = float(q0)
+        y_init[int(mechanical_v_indices[dof])] = float(qv0)
 
     kin_matrix = np.zeros((0, 8), dtype=np.float64)
     wall_rows: list[np.ndarray] = []
@@ -851,6 +883,11 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         v0_m_per_s=float(fp.initial_conditions.v0_m_per_s),
         x_min_m=float(fp.mechanics.x_min_m),
         x_max_m=float(fp.mechanics.x_max_m),
+        kinematics_type=_fp_kinematics_type(fp),
+        rotary_angle_min_rad=_fp_rotary_angle_min_rad(fp),
+        rotary_angle_max_rad=_fp_rotary_angle_max_rad(fp),
+        rotary_effective_radius_m=_fp_rotary_effective_radius_m(fp),
+        rotary_inertia_kg_m2=_fp_rotary_inertia_kg_m2(fp),
         moving_mass_kg=float(fp.mechanics.moving_mass_kg),
         piston_diameter_m=_fp_piston_diameter_m(fp),
         compression_ratio=_fp_compression_ratio(fp),

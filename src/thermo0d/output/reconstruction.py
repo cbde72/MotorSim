@@ -9,7 +9,7 @@ from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode,
 from thermo0d.physics.flow import de_st_venant_wantzel_signed
 from thermo0d.physics.kinematics import cylinder_kinematic_state_from_time
 from thermo0d.model.free_piston.forces import compute_load_info
-from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_is_compression_stroke, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
+from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_equivalent_linear_kinematics, free_piston_is_compression_stroke, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
 try:
     from thermo0d.model.free_piston.combustion_latch import free_piston_combustion_enabled, free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector, replay_free_piston_combustion_latch_series, replay_free_piston_time_combustion_series
@@ -80,9 +80,17 @@ def _free_piston_local_kinematics(bundle, vol_idx: int, y_arr: np.ndarray, sampl
 
     q_m = float(y_arr[x_idx, sample_idx])
     q_v_m_per_s = float(y_arr[v_idx, sample_idx])
-    if sign >= 0.0:
-        return q_m, q_v_m_per_s
-    return float(fp.x_min_m + fp.x_max_m - q_m), -q_v_m_per_s
+    return free_piston_equivalent_linear_kinematics(
+        q_m,
+        q_v_m_per_s,
+        sign,
+        kinematics_type=str(getattr(fp, 'kinematics_type', 'linear') or 'linear'),
+        x_min_m=float(fp.x_min_m),
+        x_max_m=float(fp.x_max_m),
+        angle_min_rad=float(getattr(fp, 'rotary_angle_min_rad', 0.0) or 0.0),
+        angle_max_rad=float(getattr(fp, 'rotary_angle_max_rad', 0.0) or 0.0),
+        effective_radius_m=float(getattr(fp, 'rotary_effective_radius_m', 1.0) or 1.0),
+    )
 
 
 def _prefix_without_trailing_index(name: str) -> str | None:
@@ -570,9 +578,11 @@ class SignalReconstructionService:
                         fp = bundle.free_piston
                         x_idx = int(fp.x_state_index)
                         v_idx = int(fp.v_state_index)
-                        piston_x = float(y_arr[x_idx, k])
-                        piston_v = float(y_arr[v_idx, k])
+                        piston_q = float(y_arr[x_idx, k])
+                        piston_q_dot = float(y_arr[v_idx, k])
                         local_piston_x, local_piston_v = _free_piston_local_kinematics(bundle, i, y_arr, k)
+                        piston_x = local_piston_x
+                        piston_v = local_piston_v
                         piston_distance_from_tdc = cylinder_distance_from_tdc(local_piston_x, fp.x_min_m, fp.x_max_m)
                         volume = cylinder_volume_from_position(fp.clearance_volume_m3, fp.piston_area_m2, local_piston_x, fp.x_min_m, fp.x_max_m)
                         dvdt = cylinder_dvdt_from_velocity(fp.piston_area_m2, local_piston_v)
@@ -652,10 +662,18 @@ class SignalReconstructionService:
                         load_force_signed = float(load_info.force_signed_N)
                         load_force = -load_force_signed
                         force_net = force_gas + force_bounce + friction_force + load_force
+                        if str(getattr(fp, 'kinematics_type', 'linear') or 'linear') == 'oscillating_rotary':
+                            radius = max(float(getattr(fp, 'rotary_effective_radius_m', 1.0) or 1.0), 1.0e-18)
+                            inertia = max(float(getattr(fp, 'rotary_inertia_kg_m2', fp.moving_mass_kg) or fp.moving_mass_kg), 1.0e-30)
+                            equivalent_accel = force_net * radius * radius / inertia
+                        else:
+                            equivalent_accel = force_net / max(float(fp.moving_mass_kg), 1.0e-30)
                         cls._ensure_float_column(columns, 'free_piston_x_m', n_samples)[k] = piston_x
                         cls._ensure_float_column(columns, 'free_piston_distance_from_tdc_m', n_samples)[k] = cylinder_distance_from_tdc(piston_x, fp.x_min_m, fp.x_max_m)
                         cls._ensure_float_column(columns, 'free_piston_v_m_per_s', n_samples)[k] = piston_v
-                        cls._ensure_float_column(columns, 'free_piston_a_m_per_s2', n_samples)[k] = force_net / max(float(fp.moving_mass_kg), 1.0e-30)
+                        cls._ensure_float_column(columns, 'free_piston_q', n_samples)[k] = piston_q
+                        cls._ensure_float_column(columns, 'free_piston_q_dot', n_samples)[k] = piston_q_dot
+                        cls._ensure_float_column(columns, 'free_piston_a_m_per_s2', n_samples)[k] = equivalent_accel
                         cls._ensure_float_column(columns, 'bounce_volume_m3', n_samples)[k] = bounce_volume
                         cls._ensure_float_column(columns, 'bounce_pressure_Pa', n_samples)[k] = bounce_pressure
                         cls._ensure_float_column(columns, 'free_piston_F_gas_N', n_samples)[k] = force_gas
@@ -814,8 +832,9 @@ class SignalReconstructionService:
                 fp = bundle.free_piston
                 x_idx = int(fp.x_state_index)
                 v_idx = int(fp.v_state_index)
-                piston_x = float(y_arr[x_idx, k])
-                piston_v = float(y_arr[v_idx, k])
+                piston_q = float(y_arr[x_idx, k])
+                piston_q_dot = float(y_arr[v_idx, k])
+                piston_x, piston_v = _free_piston_local_kinematics(bundle, primary_cyl_idx, y_arr, k)
                 force_gas = 0.0
                 force_bounce = 0.0
                 primary_dof = 0
@@ -858,10 +877,18 @@ class SignalReconstructionService:
                 )
                 load_force = -float(load_info.force_signed_N)
                 force_net = force_gas + force_bounce + friction_force + load_force
+                if str(getattr(fp, 'kinematics_type', 'linear') or 'linear') == 'oscillating_rotary':
+                    radius = max(float(getattr(fp, 'rotary_effective_radius_m', 1.0) or 1.0), 1.0e-18)
+                    inertia = max(float(getattr(fp, 'rotary_inertia_kg_m2', fp.moving_mass_kg) or fp.moving_mass_kg), 1.0e-30)
+                    equivalent_accel = force_net * radius * radius / inertia
+                else:
+                    equivalent_accel = force_net / max(float(fp.moving_mass_kg), 1.0e-30)
                 cls._ensure_float_column(columns, 'free_piston_x_m', n_samples)[k] = piston_x
                 cls._ensure_float_column(columns, 'free_piston_distance_from_tdc_m', n_samples)[k] = cylinder_distance_from_tdc(piston_x, fp.x_min_m, fp.x_max_m)
                 cls._ensure_float_column(columns, 'free_piston_v_m_per_s', n_samples)[k] = piston_v
-                cls._ensure_float_column(columns, 'free_piston_a_m_per_s2', n_samples)[k] = force_net / max(float(fp.moving_mass_kg), 1.0e-30)
+                cls._ensure_float_column(columns, 'free_piston_q', n_samples)[k] = piston_q
+                cls._ensure_float_column(columns, 'free_piston_q_dot', n_samples)[k] = piston_q_dot
+                cls._ensure_float_column(columns, 'free_piston_a_m_per_s2', n_samples)[k] = equivalent_accel
                 if bounce_idx >= 0:
                     cls._ensure_float_column(columns, 'bounce_volume_m3', n_samples)[k] = float(volume_by_vol[bounce_idx])
                     cls._ensure_float_column(columns, 'bounce_pressure_Pa', n_samples)[k] = float(pressure_by_vol[bounce_idx])

@@ -995,6 +995,7 @@ class FreePistonInitialConditionsConfig(StrictBaseModel):
 
 
 class FreePistonMechanicsConfig(StrictBaseModel):
+    kinematics_type: Literal["linear", "oscillating_rotary"] = "linear"
     moving_mass_kg: StrictFloat
     piston_diameter_m: StrictFloat | None = None
     compression_ratio: StrictFloat | None = None
@@ -1002,6 +1003,10 @@ class FreePistonMechanicsConfig(StrictBaseModel):
     clearance_volume_m3: StrictFloat | None = None
     x_min_m: StrictFloat
     x_max_m: StrictFloat
+    angle_min_deg: StrictFloat | None = None
+    angle_max_deg: StrictFloat | None = None
+    effective_radius_m: StrictFloat | None = None
+    rotary_inertia_kg_m2: StrictFloat | None = None
 
     @property
     def nominal_stroke_m(self) -> float:
@@ -1042,6 +1047,15 @@ class FreePistonMechanicsConfig(StrictBaseModel):
             raise ValueError("moving_mass_kg must be > 0")
         if self.x_max_m <= self.x_min_m:
             raise ValueError("x_max_m must be > x_min_m")
+        if self.kinematics_type == "oscillating_rotary":
+            if self.angle_min_deg is None or self.angle_max_deg is None:
+                raise ValueError("oscillating_rotary requires angle_min_deg and angle_max_deg")
+            if self.angle_max_deg <= self.angle_min_deg:
+                raise ValueError("angle_max_deg must be > angle_min_deg for oscillating_rotary")
+            if self.effective_radius_m is None or self.effective_radius_m <= 0.0:
+                raise ValueError("oscillating_rotary requires effective_radius_m > 0")
+            if self.rotary_inertia_kg_m2 is None or self.rotary_inertia_kg_m2 <= 0.0:
+                raise ValueError("oscillating_rotary requires rotary_inertia_kg_m2 > 0")
 
         has_new = self.piston_diameter_m is not None or self.compression_ratio is not None
         has_old = self.piston_area_m2 is not None or self.clearance_volume_m3 is not None

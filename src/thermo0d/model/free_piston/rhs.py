@@ -6,7 +6,7 @@ import numpy as np
 
 from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnectionType, FeatureCol, VolumeCol, VolumeType
 from thermo0d.model.free_piston.forces import compute_load_info
-from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
+from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_equivalent_linear_kinematics, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
 from thermo0d.model.free_piston.combustion_latch import free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector
 from thermo0d.physics.flow import de_st_venant_wantzel_signed
@@ -187,7 +187,11 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     volume_mechanical_sign = getattr(fp, 'volume_mechanical_sign', np.zeros(int(bundle.vol_matrix.shape[0]), dtype=np.float64))
     x_min_m = fp.x_min_m
     x_max_m = fp.x_max_m
+    kinematics_type = str(getattr(fp, 'kinematics_type', 'linear') or 'linear')
+    rotary_radius_m = float(getattr(fp, 'rotary_effective_radius_m', 1.0) or 1.0)
     moving_mass_kg = fp.moving_mass_kg
+    generalized_load_scale = rotary_radius_m if kinematics_type == 'oscillating_rotary' else 1.0
+    generalized_inertia = float(getattr(fp, 'rotary_inertia_kg_m2', moving_mass_kg)) if kinematics_type == 'oscillating_rotary' else moving_mass_kg
     piston_area_m2 = fp.piston_area_m2
     clearance_volume_m3 = fp.clearance_volume_m3
     bounce_chamber_volume0_m3 = fp.bounce_chamber_volume0_m3
@@ -250,8 +254,17 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
 
     bounce_idx = _stateful_bounce_index(bundle)
 
-    x_m = float(y[x_idx])
-    v_m_per_s = float(y[v_idx])
+    x_m, v_m_per_s = free_piston_equivalent_linear_kinematics(
+        float(y[x_idx]),
+        float(y[v_idx]),
+        1.0,
+        kinematics_type=kinematics_type,
+        x_min_m=x_min_m,
+        x_max_m=x_max_m,
+        angle_min_rad=float(getattr(fp, 'rotary_angle_min_rad', 0.0) or 0.0),
+        angle_max_rad=float(getattr(fp, 'rotary_angle_max_rad', 0.0) or 0.0),
+        effective_radius_m=rotary_radius_m,
+    )
     cylinder_mass_kg = float(bundle.state_layout.gas_mass_from_state(y, cylinder_idx))
     cylinder_internal_energy_J = float(y[cyl_U_idx])
     cylinder_distance_from_tdc_m = cylinder_distance_from_tdc(x_m, x_min_m, x_max_m)
@@ -315,8 +328,17 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
         if mech_dof >= 0:
             q_m = float(y[int(mechanical_x_indices[mech_dof])])
             q_v_m_per_s = float(y[int(mechanical_v_indices[mech_dof])])
-            x_eff_m = q_m if mech_sign >= 0.0 else float(x_min_m + x_max_m - q_m)
-            v_eff_m_per_s = q_v_m_per_s if mech_sign >= 0.0 else -q_v_m_per_s
+            x_eff_m, v_eff_m_per_s = free_piston_equivalent_linear_kinematics(
+                q_m,
+                q_v_m_per_s,
+                mech_sign,
+                kinematics_type=kinematics_type,
+                x_min_m=x_min_m,
+                x_max_m=x_max_m,
+                angle_min_rad=float(getattr(fp, 'rotary_angle_min_rad', 0.0) or 0.0),
+                angle_max_rad=float(getattr(fp, 'rotary_angle_max_rad', 0.0) or 0.0),
+                effective_radius_m=rotary_radius_m,
+            )
         else:
             x_eff_m = x_m
             v_eff_m_per_s = v_m_per_s
@@ -761,8 +783,19 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     for dof in range(mechanical_dofs):
         q_idx = int(mechanical_x_indices[dof])
         qv_idx = int(mechanical_v_indices[dof])
-        q_m = float(y[q_idx])
-        q_v_m_per_s = float(y[qv_idx])
+        q = float(y[q_idx])
+        q_dot = float(y[qv_idx])
+        q_m, q_v_m_per_s = free_piston_equivalent_linear_kinematics(
+            q,
+            q_dot,
+            1.0,
+            kinematics_type=kinematics_type,
+            x_min_m=x_min_m,
+            x_max_m=x_max_m,
+            angle_min_rad=float(getattr(fp, 'rotary_angle_min_rad', 0.0) or 0.0),
+            angle_max_rad=float(getattr(fp, 'rotary_angle_max_rad', 0.0) or 0.0),
+            effective_radius_m=rotary_radius_m,
+        )
         force_gas_N = 0.0
         force_bounce_N = 0.0
         for i in range(n_vol):
@@ -797,6 +830,6 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
         )
         force_load_N = -float(load_info.force_signed_N)
         force_net_N = force_gas_N + force_bounce_N + force_friction_N + force_load_N
-        dy_dt[q_idx] = q_v_m_per_s
-        dy_dt[qv_idx] = float(force_net_N / moving_mass_kg)
+        dy_dt[q_idx] = q_dot
+        dy_dt[qv_idx] = float((force_net_N * generalized_load_scale) / generalized_inertia)
     return dy_dt

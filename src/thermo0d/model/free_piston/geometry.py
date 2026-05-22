@@ -109,6 +109,61 @@ def cylinder_dvdt_from_velocity(piston_area_m2: float, v_m_per_s: float) -> floa
     return float(piston_area_m2 * v_m_per_s)
 
 
+def free_piston_equivalent_linear_kinematics(
+    q: float,
+    q_dot: float,
+    sign: float,
+    *,
+    kinematics_type: str = 'linear',
+    x_min_m: float,
+    x_max_m: float,
+    angle_min_rad: float = 0.0,
+    angle_max_rad: float = 0.0,
+    effective_radius_m: float = 1.0,
+) -> tuple[float, float]:
+    """Return the linear-equivalent piston position and velocity for a DOF.
+
+    The existing free-piston thermodynamics, slots and combustion models consume
+    a linear travel from TDC.  For an oscillating rotary piston the mechanical
+    state is phi/omega, but the gas side still sees the equivalent arc travel
+    r * phi.
+    """
+    if str(kinematics_type) == 'oscillating_rotary':
+        phi = float(q)
+        omega = float(q_dot)
+        if float(sign) < 0.0:
+            phi = float(angle_min_rad + angle_max_rad - phi)
+            omega = -omega
+        radius = max(float(effective_radius_m), 1.0e-18)
+        x_m = float(x_min_m + radius * (phi - float(angle_min_rad)))
+        v_m_per_s = float(radius * omega)
+        return x_m, v_m_per_s
+
+    q_m = float(q)
+    q_v_m_per_s = float(q_dot)
+    if float(sign) < 0.0:
+        return float(x_min_m + x_max_m - q_m), float(-q_v_m_per_s)
+    return q_m, q_v_m_per_s
+
+
+def free_piston_generalized_initial_state(
+    x0_m: float,
+    v0_m_per_s: float,
+    *,
+    kinematics_type: str = 'linear',
+    x_min_m: float,
+    angle_min_rad: float = 0.0,
+    effective_radius_m: float = 1.0,
+) -> tuple[float, float]:
+    if str(kinematics_type) == 'oscillating_rotary':
+        radius = max(float(effective_radius_m), 1.0e-18)
+        return (
+            float(angle_min_rad + (float(x0_m) - float(x_min_m)) / radius),
+            float(float(v0_m_per_s) / radius),
+        )
+    return float(x0_m), float(v0_m_per_s)
+
+
 def bounce_volume_from_position(chamber_volume0_m3: float, bounce_area_m2: float, x_m: float, x_min_m: float, x_max_m: float) -> float:
     """Return bounce chamber volume running opposite to the cylinder volume.
 

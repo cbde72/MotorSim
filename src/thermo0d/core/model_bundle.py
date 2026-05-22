@@ -25,6 +25,11 @@ class FreePistonModelData:
     v0_m_per_s: float
     x_min_m: float
     x_max_m: float
+    kinematics_type: str
+    rotary_angle_min_rad: float
+    rotary_angle_max_rad: float
+    rotary_effective_radius_m: float
+    rotary_inertia_kg_m2: float
     moving_mass_kg: float
     piston_diameter_m: float
     compression_ratio: float

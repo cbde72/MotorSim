@@ -95,8 +95,13 @@ FIELD_META: dict[str, FieldMeta] = {
 
     "free_piston.mechanics.piston_diameter_m": FieldMeta("Piston diameter [m]", "float", default=0.0745, help_text="Kolbendurchmesser des Freikolbens. Daraus wird intern die wirksame Kolbenfläche berechnet.", section="free_piston"),
     "free_piston.mechanics.compression_ratio": FieldMeta("Compression ratio", "float", default=10.0, help_text="Geometrisches Verdichtungsverhältnis des Freikolbenzylinders. Daraus wird intern das Restvolumen berechnet.", section="free_piston"),
+    "free_piston.mechanics.kinematics_type": FieldMeta("FP kinematics type", "enum", default="linear", help_text="Mechanikmodus des Freikolbens: linear oder oscillating_rotary. Linear bleibt der kompatible Standard.", section="free_piston"),
     "free_piston.mechanics.x_min_m": FieldMeta("x_min [m]", "float", default=0.0, help_text="Obere Totpunktlage / minimale Kolbenposition des Freikolbens.", section="free_piston"),
     "free_piston.mechanics.x_max_m": FieldMeta("x_max [m]", "float", default=0.08, help_text="Untere Totpunktlage / maximale Kolbenposition des Freikolbens.", section="free_piston"),
+    "free_piston.mechanics.angle_min_deg": FieldMeta("Angle min [deg]", "float", default=-9.0, help_text="Nur fuer oscillating_rotary: minimale Winkellage.", section="free_piston"),
+    "free_piston.mechanics.angle_max_deg": FieldMeta("Angle max [deg]", "float", default=9.0, help_text="Nur fuer oscillating_rotary: maximale Winkellage.", section="free_piston"),
+    "free_piston.mechanics.effective_radius_m": FieldMeta("Effective radius [m]", "float", default=0.05, help_text="Nur fuer oscillating_rotary: Wirkradius zur Umrechnung phi/omega in aequivalenten Hub und Geschwindigkeit.", section="free_piston"),
+    "free_piston.mechanics.rotary_inertia_kg_m2": FieldMeta("Rotary inertia [kg m2]", "float", default=0.01, help_text="Nur fuer oscillating_rotary: Massentraegheitsmoment des schwingenden Rotors.", section="free_piston"),
     "free_piston.bounce.chamber_diameter_m": FieldMeta("Bounce chamber diameter [m]", "float", default=0.0745, help_text="Innendurchmesser des Bounce-Raums. Zusammen mit chamber_length_m ergibt sich das Bounce-Hubvolumen.", section="free_piston"),
     "free_piston.bounce.chamber_length_m": FieldMeta("Bounce chamber length [m]", "float", default=0.08, help_text="Wirksame Bounce-Hublänge. Zusammen mit chamber_diameter_m ergibt sich das Bounce-Hubvolumen.", section="free_piston"),
     "free_piston.bounce.compression_ratio": FieldMeta("Bounce compression ratio", "float", default=2.5, help_text="Verdichtungsverhältnis des Bounce-Raums. Daraus werden Vmin bei UT und Vmax bei OT aus dem Bounce-Hubvolumen abgeleitet.", section="free_piston"),
