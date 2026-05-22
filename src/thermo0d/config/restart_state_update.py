@@ -83,6 +83,17 @@ def _parse_volume_defs_from_yaml_text(text: str) -> list[tuple[str, str]]:
     preprocessing = raw.get("preprocessing")
     if not isinstance(preprocessing, dict):
         return []
+    submodel_volume_types: dict[str, str] = {}
+    submodels = preprocessing.get("submodels")
+    if isinstance(submodels, dict):
+        submodel_volumes = submodels.get("volumes")
+        if isinstance(submodel_volumes, dict):
+            for ref_name, ref_payload in submodel_volumes.items():
+                if not isinstance(ref_payload, dict):
+                    continue
+                ref_type = str(ref_payload.get("type") or "").strip()
+                if ref_type:
+                    submodel_volume_types[str(ref_name).strip()] = ref_type
     volumes = preprocessing.get("volumes")
     if not isinstance(volumes, list):
         return []
@@ -92,6 +103,9 @@ def _parse_volume_defs_from_yaml_text(text: str) -> list[tuple[str, str]]:
             continue
         name = str(vol.get("name") or "").strip()
         vtype = str(vol.get("type") or "").strip()
+        if not vtype:
+            ref_name = str(vol.get("ref") or "").strip()
+            vtype = submodel_volume_types.get(ref_name, "")
         if name:
             out.append((name, vtype))
     return out

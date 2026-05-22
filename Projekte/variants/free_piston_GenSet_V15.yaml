@@ -9,8 +9,8 @@ modeling:
 free_piston:
   initial_conditions:
     x0_m: 0.054                                                                                                                                                               # Startposition des Freikolbens in m.
-    # previous_auto_initial_state_from_last_compression_at_x0_m: v0_m_per_s: -5.130036024060039
-    v0_m_per_s: -5.037844182273213                                                                                                                                            # Startgeschwindigkeit des Freikolbens in m/s.
+    # previous_auto_initial_state_from_last_compression_at_x0_m: v0_m_per_s: -5.1363259172878575
+    v0_m_per_s: -5.130036024060039                                                                                                                                            # Startgeschwindigkeit des Freikolbens in m/s.
     combustion_state:
       burned_fraction_0to1: 0.0                                                                                                                                               # Verbrannter Massenanteil als Bruchteil 0..1.
       released_energy_J: 0.0                                                                                                                                                  # Bereits freigesetzte Verbrennungsenergie beim Start.
@@ -70,7 +70,7 @@ preprocessing:
         wall_heat:
           ref: woschni_promo_wall                                                                                                                                             # Referenz auf zentral definiertes Submodel.
         combustion:
-          ref: vibe_lambda_slot                                                                                                                                               # Referenz auf zentral definiertes Submodel.
+          ref: hcci_diesel_default                                                                                                                                               # Referenz auf zentral definiertes Submodel.
         evaporation:
           model: none                                                                                                                                                         # Auswahl des jeweiligen Teilmodells.
       compressor_bounce:
@@ -159,16 +159,16 @@ preprocessing:
         slot_open_threshold_m2: 1.0e-07                                                                                                                                       # Flaechenschwelle fuer Schlitz offen.
         slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
         compression_velocity_threshold_m_per_s: 0.02                                                                                                                          # Mindest-Kompressionsgeschwindigkeit fuer Latch.
-        tau_A_s: 2.5e-06                                                                                                                                                      # Vorzeitfaktor der HCCI-Zuendverzugszeit.
+        tau_A_s: 1.0e-07                                                                                                                                                      # Vorzeitfaktor der HCCI-Zuendverzugszeit.
         tau_pressure_exponent: 1.2                                                                                                                                            # Druckexponent der HCCI-Zuendverzugszeit.
-        tau_activation_temperature_K: 15000.0                                                                                                                                 # Aktivierungstemperatur des HCCI-Zuendmodells.
+        tau_activation_temperature_K: 6000.0                                                                                                                                  # Aktivierungstemperatur des HCCI-Zuendmodells.
         tau_reference_pressure_Pa: 1000000.0                                                                                                                                  # Referenzdruck fuer HCCI-Zuendverzug.
         tau_reference_lambda: 1.4                                                                                                                                             # Referenz-Lambda fuer HCCI-Zuendverzug.
         lambda_slowdown_exponent: 0.7                                                                                                                                         # Lambda-Abmagerungsfaktor fuer HCCI-Verzug.
         residual_slowdown_factor: 1.5                                                                                                                                         # Verlangsamung durch Restgasanteil.
-        start_temperature_min_K: 780.0                                                                                                                                        # Mindesttemperatur fuer HCCI-SOC.
-        start_pressure_min_Pa: 2000000.0                                                                                                                                      # Mindestdruck fuer HCCI-SOC.
-        max_ignition_delay_s: 0.02                                                                                                                                            # Maximal erlaubter HCCI-Zuendverzug.
+        start_temperature_min_K: 500.0                                                                                                                                        # Mindesttemperatur fuer HCCI-SOC.
+        start_pressure_min_Pa: 500000.0                                                                                                                                       # Mindestdruck fuer HCCI-SOC.
+        max_ignition_delay_s: 0.003                                                                                                                                           # Maximal erlaubter HCCI-Zuendverzug.
     connections:
       compressor_in_check_valve:
         type: check_valve                                                                                                                                                     # Typ des Volumens, der Verbindung oder Kinematik.
@@ -321,10 +321,10 @@ simulation:
 postprocessing:
   auto_update_initial_conditions: false                                                                                                                                        # Schreibt Startwerte aus letztem Lauf zurueck.
   csv_enabled: true                                                                                                                                                           # Aktiviert Haupt-CSV-Ausgabe.
-  csv_path: results/free_piston_GenSet_V14.csv                                                                                                                                # Pfad der Haupt-CSV relativ zum Projekt.
+  csv_path: results/free_piston_GenSet_V15.csv                                                                                                                                # Pfad der Haupt-CSV relativ zum Projekt.
   csv_separator: ;                                                                                                                                                            # Trennzeichen der CSV-Datei.
   excel_enabled: false                                                                                                                                                        # Aktiviert Excel-Ausgabe.
-  excel_path: results/free_piston_GenSet_V14.xlsx                                                                                                                             # Pfad der Excel-Datei relativ zum Projekt.
+  excel_path: results/free_piston_GenSet_V15.xlsx                                                                                                                             # Pfad der Excel-Datei relativ zum Projekt.
   sampling:
     mode: time                                                                                                                                                                # Auswahl des lokalen Modus.
     step_s: 0.0001                                                                                                                                                            # Zeitliche Ausgabeschrittweite.
@@ -348,7 +348,7 @@ postprocessing:
       - enabled: true                                                                                                                                                         # Schaltet diesen Block aktiv oder inaktiv.
         path: plot_CFG/plot-v11_hub.yaml                                                                                                                                      # Pfad zur Plot-Layout-Datei.
         prefix: plot_v11_hub                                                                                                                                                  # Dateipraefix fuer erzeugte Plot-Ausgaben.
-      - enabled: false                                                                                                                                                        # Schaltet diesen Block aktiv oder inaktiv.
+      - enabled: true                                                                                                                                                        # Schaltet diesen Block aktiv oder inaktiv.
         path: plot_CFG/plot-v11_Energy.yaml                                                                                                                                   # Pfad zur Plot-Layout-Datei.
         prefix: plot_fp_energy                                                                                                                                                # Dateipraefix fuer erzeugte Plot-Ausgaben.
       - enabled: true                                                                                                                                                         # Schaltet diesen Block aktiv oder inaktiv.

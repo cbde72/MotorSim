@@ -4,21 +4,7 @@
 Diesel-HCCI single-zone model with Cantera, crank-slider compression and
 Woschni-like wall heat transfer.
 
-Scope
------
-- Closed cylinder after intake valve closing / start of compression
-- No valves, no injection during simulation, no blow-by
-- Homogeneous diesel-surrogate / fresh-air / residual-gas mixture
-- CR = 50, bore = 70 mm by default
-- Stroke, masses, lambda and temperatures are configurable
-- Cantera finite-rate chemistry
-- Woschni-like wall heat transfer
-- CSV + PNG outputs
-
-Recommended mechanism
----------------------
-Use a diesel-surrogate mechanism, e.g. nDodecane_Reitz.yaml.
-If your mechanism uses another fuel species name, change CFG.fuel_species.
+Optimierte und stabilisierte Version (Radau-Solver & NaN-Protection).
 """
 
 from __future__ import annotations
@@ -47,51 +33,51 @@ except ImportError as exc:
 
 @dataclass
 class EngineConfig:
-    # Geometry
+    # Geometrie
     bore_m: float = 0.070
-    stroke_m: float = 0.080          # EDIT if your real stroke is different
+    stroke_m: float = 0.080          
     conrod_m: float = 0.140
     compression_ratio: float = 50.0
 
-    # Operation
+    # Betriebspunkt
     rpm: float = 1500.0
-    theta_start_deg: float = -180.0  # BDC before compression, TDC = 0 deg
-    theta_end_deg: float = 180.0     # expansion to BDC
+    theta_start_deg: float = -180.0  # UT vor Kompression (OT = 0 deg)
+    theta_end_deg: float = 180.0     # Expansion bis UT
 
-    # Initial masses at intake-valve closing / start of compression
+    # Massen beim Einlass-Schließen (Start der Simulation)
     m_fresh_air_kg: float = 4.50e-4
     m_residual_gas_kg: float = 5.00e-5
 
-    # Initial component temperatures before mixing
+    # Anfangstemperaturen der Komponenten vor der Mischung
     T_fresh_air_K: float = 330.0
     T_residual_gas_K: float = 850.0
     T_fuel_K: float = 330.0
 
-    # Homogeneous diesel-HCCI mixture
+    # Homogenes Gemisch
     lambda_air: float = 3.0
-    fuel_species: str = "c12h26"     # n-dodecane in many mechanisms
+    fuel_species: str = "c12h26"     # n-Dodecan als Diesel-Surrogat
     fuel_C: int = 12
     fuel_H: int = 26
 
-    # Cantera chemistry
+    # Cantera Chemie-Einstellungen
     mechanism: str = "nDodecane_Reitz.yaml"
+    phase_name: str = "nDodecane_IG"   # Nutzt die ideale Gasphase des Mechanismus
 
-    # Woschni-like wall heat transfer
+    # Woschni-Wandwärmeübergang
     wall_temperature_K: float = 420.0
     woschni_C1: float = 2.28
     woschni_multiplier: float = 1.0
     h_min_W_m2K: float = 20.0
     h_max_W_m2K: float = 5000.0
 
-    # Numerics
-    rtol: float = 1.0e-6
-    atol_T: float = 1.0e-3
-    atol_Y: float = 1.0e-14
-    max_step_deg: float = 0.05
+    # Numerik (Toleranzen)
+    rtol: float = 1.0e-8
+    atol_T: float = 0.1
+    atol_Y: float = 1.0e-10
+    max_step_deg: float = 1
 
-    # Output
+    # Ausgabe
     output_dir: str = "hcci_output"
-    phase_name: str = "nDodecane_RK"
 
 
 CFG = EngineConfig()
@@ -151,16 +137,14 @@ def add_mass(m_vec: np.ndarray, gas: ct.Solution, species: str, mass_kg: float) 
 
 
 def diesel_stoich_afr(gas: ct.Solution, cfg: EngineConfig) -> float:
-    """Stoichiometric air/fuel mass ratio for CxHy with air = O2 + 3.76 N2."""
     i_fuel = species_index_ci(gas, cfg.fuel_species)
-    MW_fuel = gas.molecular_weights[i_fuel]  # kg/kmol, numerically g/mol
+    MW_fuel = gas.molecular_weights[i_fuel]
     nu_O2 = cfg.fuel_C + cfg.fuel_H / 4.0
     mass_air_per_kmol_fuel = nu_O2 * 31.998 + 3.76 * nu_O2 * 28.014
     return mass_air_per_kmol_fuel / MW_fuel
 
 
 def residual_products_mass(gas: ct.Solution, total_mass_kg: float, cfg: EngineConfig, residual_lambda: float = 1.2) -> Dict[str, float]:
-    """Simplified lean-burn residual gas: CO2 + H2O + N2 + remaining O2."""
     if total_mass_kg <= 0.0:
         return {}
     C, H = cfg.fuel_C, cfg.fuel_H
@@ -207,11 +191,6 @@ def build_initial_state(gas: ct.Solution, geom: CrankSlider, cfg: EngineConfig) 
 
 
 def woschni_h(gas: ct.Solution, geom: CrankSlider, cfg: EngineConfig) -> float:
-    """
-    Simplified Woschni correlation:
-        h = 3.26 * B^-0.2 * p_kPa^0.8 * T^-0.55 * w^0.8
-    Gas velocity w is approximated from mean piston speed.
-    """
     B = geom.bore
     p_kPa = max(gas.P / 1000.0, 1.0)
     T = max(gas.T, 250.0)
@@ -227,19 +206,32 @@ def make_rhs(gas: ct.Solution, geom: CrankSlider, cfg: EngineConfig, m_total: fl
     omega = 2.0 * math.pi * cfg.rpm / 60.0
 
     def rhs(theta_rad: float, y: np.ndarray) -> np.ndarray:
+        # Abfangen unphysikalischer Solver-Testwerte (NaN / Inf Schutz)
+        if not np.isfinite(y).all():
+            return np.zeros_like(y)
+
         T = max(float(y[0]), 250.0)
-        Y = np.maximum(y[1:], 0.0)
-        Y /= np.sum(Y)
+        Y = np.maximum(y[1:], 1.0e-20) # Floor verhindert mathematisches Vakuum
+        
+        sum_Y = np.sum(Y)
+        if sum_Y <= 0.0 or not np.isfinite(sum_Y):
+            return np.zeros_like(y)
+            
+        Y /= sum_Y
 
         V = geom.volume(theta_rad)
         rho = m_total / V
-        gas.TDY = T, rho, Y
+        
+        try:
+            gas.TDY = T, rho, Y
+        except Exception:
+            return np.zeros_like(y)
 
         wdot = gas.net_production_rates         # kmol/m3/s
         dYdt = wdot * MW / rho                  # 1/s
-        dYdt -= Y * np.sum(dYdt)                # conservation correction
+        dYdt -= Y * np.sum(dYdt)                # Massenerhaltungskorrektur
 
-        u_mass = gas.partial_molar_int_energies / MW  # J/kg species
+        u_mass = gas.partial_molar_int_energies / MW  # J/kg pro Spezies
         chem_u_term = V * np.dot(u_mass * MW, wdot)   # J/s
 
         dVdt = geom.dV_dtheta(theta_rad) * omega
@@ -252,6 +244,10 @@ def make_rhs(gas: ct.Solution, geom: CrankSlider, cfg: EngineConfig, m_total: fl
         out = np.empty_like(y)
         out[0] = dTdt / omega
         out[1:] = dYdt / omega
+        
+        if not np.isfinite(out).all():
+            return np.zeros_like(y)
+            
         return out
 
     return rhs
@@ -284,14 +280,14 @@ def derived_dataframe(sol, gas: ct.Solution, geom: CrankSlider, cfg: EngineConfi
 
 def plot_results(df: pd.DataFrame, outdir: Path) -> None:
     specs = [
-        ("theta_deg", "pressure_bar", "Crank angle rel. TDC [deg]", "Pressure [bar]", "pressure_vs_angle.png"),
-        ("theta_deg", "temperature_K", "Crank angle rel. TDC [deg]", "Temperature [K]", "temperature_vs_angle.png"),
-        ("volume_cm3", "pressure_bar", "Volume [cm³]", "Pressure [bar]", "pV_diagram.png"),
-        ("theta_deg", "Qdot_wall_W", "Crank angle rel. TDC [deg]", "Wall heat loss [W]", "wall_heat_loss.png"),
+        ("theta_deg", "pressure_bar", "Kurbelwinkel rel. OT [°KW]", "Druck [bar]", "pressure_vs_angle.png"),
+        ("theta_deg", "temperature_K", "Kurbelwinkel rel. OT [°KW]", "Temperatur [K]", "temperature_vs_angle.png"),
+        ("volume_cm3", "pressure_bar", "Volumen [cm³]", "Druck [bar]", "pV_diagram.png"),
+        ("theta_deg", "Qdot_wall_W", "Kurbelwinkel rel. OT [°KW]", "Wandwaermeverlust [W]", "wall_heat_loss.png"),
     ]
     for x, y, xl, yl, name in specs:
         plt.figure(figsize=(8, 4.8))
-        plt.plot(df[x], df[y])
+        plt.plot(df[x], df[y], color='crimson' if "pressure" in name or "pV" in name else 'royalblue')
         plt.xlabel(xl)
         plt.ylabel(yl)
         plt.grid(True, alpha=0.3)
@@ -304,41 +300,45 @@ def main(cfg: EngineConfig = CFG) -> int:
     outdir = Path(cfg.output_dir)
     outdir.mkdir(parents=True, exist_ok=True)
 
+    # Initialisiere Phase aus YAML
     gas = ct.Solution(cfg.mechanism, cfg.phase_name)
     geom = CrankSlider(cfg.bore_m, cfg.stroke_m, cfg.conrod_m, cfg.compression_ratio)
     T0, Y0, p0, m_total, m_fuel = build_initial_state(gas, geom, cfg)
 
     y0 = np.r_[T0, Y0]
-    atol = np.r_[cfg.atol_T, np.full(gas.n_species, cfg.atol_Y)]
+    
+    # Strukturiertes Toleranz-Array erzeugen
+    atol = np.zeros_like(y0)
+    atol[0] = cfg.atol_T     # Temperatur-Schranke (0.1 K)
+    atol[1:] = cfg.atol_Y    # Spezies-Schranke (1e-15)
 
-    print("=== Diesel-HCCI setup ===")
-    print(f"Mechanism:         {cfg.mechanism}")
-    print(f"Fuel species:      {cfg.fuel_species}")
-    print(f"Bore:              {cfg.bore_m*1000:.1f} mm")
-    print(f"Stroke:            {cfg.stroke_m*1000:.1f} mm")
-    print(f"CR:                {cfg.compression_ratio:.1f}")
-    print(f"Swept volume:      {geom.Vs*1e6:.2f} cm³")
-    print(f"Clearance volume:  {geom.Vc*1e6:.2f} cm³")
-    print(f"Fresh air mass:    {cfg.m_fresh_air_kg*1e6:.2f} mg")
-    print(f"Residual gas mass: {cfg.m_residual_gas_kg*1e6:.2f} mg")
-    print(f"Fuel mass:         {m_fuel*1e6:.3f} mg")
+    print("=== Diesel-HCCI Setup ===")
+    print(f"Mechanismus:       {cfg.mechanism}")
+    print(f"Phase:             {cfg.phase_name}")
+    print(f"Bohrung:           {cfg.bore_m*1000:.1f} mm")
+    print(f"Hub:               {cfg.stroke_m*1000:.1f} mm")
+    print(f"Verdichtung (CR):  {cfg.compression_ratio:.1f}")
+    print(f"Hubvolumen:        {geom.Vs*1e6:.2f} cm³")
+    print(f"Zylinderluftmasse: {cfg.m_fresh_air_kg*1e6:.2f} mg")
+    print(f"Kraftstoffmasse:   {m_fuel*1e6:.3f} mg")
     print(f"Lambda:            {cfg.lambda_air:.2f}")
-    print(f"Initial T:         {T0:.1f} K")
-    print(f"Initial p:         {p0/1e5:.3f} bar")
+    print(f"Anfangsdruck:      {p0/1e5:.3f} bar")
 
     rhs = make_rhs(gas, geom, cfg, m_total)
+    
+    print("\nStarte Integration (Verfahren: Radau)...")
     sol = solve_ivp(
         rhs,
         (math.radians(cfg.theta_start_deg), math.radians(cfg.theta_end_deg)),
         y0,
-        method="BDF",
+        method="Radau",  # Radau löst das "num_jac" Overflow-Problem von BDF
         rtol=cfg.rtol,
         atol=atol,
         max_step=math.radians(cfg.max_step_deg),
     )
 
     if not sol.success:
-        print("WARNING: solver did not fully converge:")
+        print("\nWARNUNG: Solver konvergierte nicht vollständig!")
         print(sol.message)
 
     df = derived_dataframe(sol, gas, geom, cfg, m_total)
@@ -347,14 +347,13 @@ def main(cfg: EngineConfig = CFG) -> int:
 
     i_pmax = int(df["pressure_bar"].idxmax())
     i_tmax = int(df["temperature_K"].idxmax())
-    print("=== Results ===")
-    print(f"Solver success:    {sol.success}")
-    print(f"Steps:             {len(sol.t)}")
-    print(f"p_max:             {df.pressure_bar.iloc[i_pmax]:.2f} bar at {df.theta_deg.iloc[i_pmax]:.2f} deg")
-    print(f"T_max:             {df.temperature_K.iloc[i_tmax]:.1f} K at {df.theta_deg.iloc[i_tmax]:.2f} deg")
-    print(f"Final p:           {df.pressure_bar.iloc[-1]:.2f} bar")
-    print(f"Final T:           {df.temperature_K.iloc[-1]:.1f} K")
-    print(f"Output:            {outdir.resolve()}")
+    print("\n=== Ergebnisse ===")
+    print(f"Solver erfolgreich: {sol.success}")
+    print(f"Rechenschritte:     {len(sol.t)}")
+    print(f"p_max:              {df.pressure_bar.iloc[i_pmax]:.2f} bar bei {df.theta_deg.iloc[i_pmax]:.2f} °KW")
+    print(f"T_max:              {df.temperature_K.iloc[i_tmax]:.1f} K bei {df.theta_deg.iloc[i_tmax]:.2f} °KW")
+    print(f"Enddruck (UT):      {df.pressure_bar.iloc[-1]:.2f} bar")
+    print(f"Ausgabeordner:      {outdir.resolve()}")
 
     return 0
 

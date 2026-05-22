@@ -325,7 +325,13 @@ def _air_mass_from_state_vec(y: np.ndarray, volume_index: int) -> float:
 
 @nb.njit(cache=True)
 def _residual_mass_from_state_vec(y: np.ndarray, volume_index: int) -> float:
-    return _burned_mass_from_state_vec(y, volume_index)
+    burned = _burned_mass_from_state_vec(y, volume_index)
+    residual = y[_base_index(volume_index) + 4]
+    if residual <= 0.0:
+        return 0.0
+    if residual >= burned:
+        return burned
+    return residual
 
 
 @nb.njit(cache=True)
@@ -719,7 +725,6 @@ def rhs_thermo_numba(
                         qdot_comb = fuel_consumption_rate * lhv
                         dy[energy_idx] = dy[energy_idx] - pdv_power + qdot_wall + qdot_comb - qdot_evap
                         dy[burned_idx] += burn_rate
-                        dy[residual_idx] += burn_rate
                         dy[air_idx] -= air_consumption_rate
 
     return dy

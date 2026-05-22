@@ -108,6 +108,12 @@ class FreePistonModelData:
     runtime_injector_target_fuel_mass_kg: float = 0.0
     runtime_injector_injected_mass_kg: float = 0.0
     runtime_injector_rate_kg_per_s: float = 0.0
+    runtime_injector_active_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    runtime_injector_time_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_injector_end_time_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_injector_target_fuel_by_vol_kg: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_injector_injected_by_vol_kg: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_injector_rate_by_vol_kg_per_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     runtime_slotclose_charge_active: bool = False
     runtime_slotclose_charge_time_s: float = 0.0
     runtime_slotclose_charge_end_time_s: float = 0.0
@@ -152,6 +158,10 @@ class FreePistonModelData:
     runtime_scavenging_exhaust_out_kg_per_s: float = 0.0
     runtime_scavenging_burned_correction_kg_per_s: float = 0.0
     runtime_scavenging_short_circuit_fraction: float = 0.0
+    runtime_scavenging_transfer_in_by_vol_kg_per_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_scavenging_exhaust_out_by_vol_kg_per_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_scavenging_burned_correction_by_vol_kg_per_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_scavenging_short_circuit_fraction_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
 
 @dataclass(slots=True)
 class PlotLayoutEntryOptions:
@@ -227,5 +237,6 @@ class ModelBundle:
     environment_temperatures_K: np.ndarray | None = None
     combustion_fuel_mass_by_vol: np.ndarray | None = None
     combustion_afr_stoich_by_vol: np.ndarray | None = None
+    combustion_lambda_target_by_vol: np.ndarray | None = None
     combustion_efficiency_by_vol: np.ndarray | None = None
     combustion_lhv_by_vol: np.ndarray | None = None

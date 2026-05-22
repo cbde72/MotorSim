@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -8,8 +9,8 @@ import pytest
 from thermo0d.config.models import load_config
 from thermo0d.input.model_builder import build_model_bundle
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_dvdt_from_velocity, cylinder_volume_from_position
-from thermo0d.model.free_piston.combustion_latch import update_free_piston_combustion_latch_state
-from thermo0d.model.free_piston.rhs import compute_free_piston_rhs
+from thermo0d.model.free_piston.combustion_latch import compute_lambda_energy_from_cylinder_mass, update_free_piston_combustion_latch_state
+from thermo0d.model.free_piston.rhs import _apply_overlap_scavenging_correction, compute_free_piston_rhs
 from thermo0d.model.free_piston.simulator import simulate_free_piston
 from thermo0d.model.free_piston.thermo import mass_from_pTV, pressure_from_state, specific_internal_energy_from_temperature, temperature_from_state
 
@@ -103,3 +104,92 @@ def test_free_piston_v12_latches_each_cylinder_against_its_own_slots() -> None:
     assert int(fp.runtime_latch_valid_by_vol[cyl1]) == 1
     assert float(fp.runtime_latched_energy_by_vol_J[cyl1]) > 0.0
     assert int(fp.runtime_latch_valid_by_vol[cyl2]) == 0
+
+
+def test_overlap_scavenging_correction_can_apply_to_each_cylinder() -> None:
+    class FP:
+        scavenging_enabled = True
+        scavenging_model = 'overlap_short_circuit_0d'
+        scavenging_factor = 1.25
+        scavenging_max_trapping_efficiency = 0.92
+        scavenging_short_circuit_start_ratio = 0.70
+        scavenging_short_circuit_slope = 0.35
+        scavenging_max_short_circuit_fraction = 0.35
+        scavenging_min_residual_fraction = 0.03
+        runtime_scavenging_transfer_in_kg_per_s = 0.0
+        runtime_scavenging_exhaust_out_kg_per_s = 0.0
+        runtime_scavenging_burned_correction_kg_per_s = 0.0
+        runtime_scavenging_short_circuit_fraction = 0.0
+        runtime_scavenging_transfer_in_by_vol_kg_per_s = np.zeros(2, dtype=np.float64)
+        runtime_scavenging_exhaust_out_by_vol_kg_per_s = np.zeros(2, dtype=np.float64)
+        runtime_scavenging_burned_correction_by_vol_kg_per_s = np.zeros(2, dtype=np.float64)
+        runtime_scavenging_short_circuit_fraction_by_vol = np.zeros(2, dtype=np.float64)
+
+    dy = np.zeros(8, dtype=np.float64)
+    y = np.zeros(8, dtype=np.float64)
+    mass_indices = np.array([0, 1], dtype=np.int32)
+    burned_indices = np.array([2, 3], dtype=np.int32)
+    air_indices = np.array([4, 5], dtype=np.int32)
+    residual_indices = np.array([6, 7], dtype=np.int32)
+    environment_is_fixed = np.zeros(2, dtype=np.int64)
+    y[mass_indices] = 1.0
+    y[burned_indices] = 0.5
+    y[air_indices] = 0.5
+    y[residual_indices] = 0.5
+
+    _apply_overlap_scavenging_correction(
+        dy,
+        FP,
+        0,
+        y,
+        mass_indices,
+        burned_indices,
+        air_indices,
+        residual_indices,
+        environment_is_fixed,
+        transfer_in_rate_kg_per_s=0.2,
+        transfer_air_in_rate_kg_per_s=0.2,
+        exhaust_out_by_vol_kg_per_s=np.array([0.0, 0.1]),
+    )
+    _apply_overlap_scavenging_correction(
+        dy,
+        FP,
+        1,
+        y,
+        mass_indices,
+        burned_indices,
+        air_indices,
+        residual_indices,
+        environment_is_fixed,
+        transfer_in_rate_kg_per_s=0.2,
+        transfer_air_in_rate_kg_per_s=0.2,
+        exhaust_out_by_vol_kg_per_s=np.array([0.1, 0.0]),
+    )
+
+    assert dy[air_indices[0]] != pytest.approx(0.0)
+    assert dy[air_indices[1]] != pytest.approx(0.0)
+    assert FP.runtime_scavenging_transfer_in_by_vol_kg_per_s.tolist() == pytest.approx([0.2, 0.2])
+    assert np.count_nonzero(FP.runtime_scavenging_burned_correction_by_vol_kg_per_s) == 2
+
+
+def test_slot_close_lambda_energy_uses_cylinder_specific_combustion_values() -> None:
+    bundle = SimpleNamespace(
+        free_piston=SimpleNamespace(
+            combustion_lambda_target=1.0,
+            combustion_afr_stoich_kg_air_per_kg_fuel=10.0,
+            combustion_efficiency_0to1=1.0,
+            combustion_lhv_J_per_kg=100.0,
+        ),
+        combustion_lambda_target_by_vol=np.array([1.0, 2.0], dtype=np.float64),
+        combustion_afr_stoich_by_vol=np.array([10.0, 20.0], dtype=np.float64),
+        combustion_efficiency_by_vol=np.array([1.0, 0.5], dtype=np.float64),
+        combustion_lhv_by_vol=np.array([100.0, 200.0], dtype=np.float64),
+    )
+
+    fuel_0, energy_0 = compute_lambda_energy_from_cylinder_mass(0.1, bundle, 0)
+    fuel_1, energy_1 = compute_lambda_energy_from_cylinder_mass(0.1, bundle, 1)
+
+    assert fuel_0 == pytest.approx(0.1 / (1.0 * 10.0))
+    assert energy_0 == pytest.approx(fuel_0 * 100.0)
+    assert fuel_1 == pytest.approx(0.1 / (2.0 * 20.0))
+    assert energy_1 == pytest.approx(fuel_1 * 200.0 * 0.5)

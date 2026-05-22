@@ -481,18 +481,40 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
     eff_cr = _slot_closure_effective_compression_ratio()
     real_cr = float(np.max(V_m3[seg]) / np.min(V_m3[seg])) if np.min(V_m3[seg]) > 1.0e-18 else None
     mass_at_intake_close_mg = None
+    air_mass_at_intake_close_mg = None
+    residual_mass_at_intake_close_mg = None
+    theta_at_intake_close_deg = None
     fp = getattr(bundle, "free_piston", None)
     slot_closed_threshold_m2 = max(float(getattr(fp, "combustion_slot_closed_threshold_m2", 1.0e-9) or 1.0e-9), 0.0)
     for row in segment_rows:
-        slot_area_m2 = _last_finite_value([row], ["free_piston_slot_area_sum_m2"])
+        slot_area_m2 = _last_finite_value([row], [
+            f"{cyl_name}_slot_area_sum_m2",
+            "cylinder_slot_area_sum_m2",
+            "free_piston_slot_area_sum_m2",
+        ])
         if slot_area_m2 is None:
-            slot_area_mm2 = _last_finite_value([row], ["free_piston_slot_area_sum_mm2"])
+            slot_area_mm2 = _last_finite_value([row], [
+                f"{cyl_name}_slot_area_sum_mm2",
+                "cylinder_slot_area_sum_mm2",
+                "free_piston_slot_area_sum_mm2",
+            ])
             slot_area_m2 = slot_area_mm2 * 1.0e-6 if slot_area_mm2 is not None else None
         if slot_area_m2 is None or slot_area_m2 > slot_closed_threshold_m2:
             continue
+        theta_at_intake_close_deg = _last_finite_value([row], [
+            f"{cyl_name}_theta_deg",
+            "cylinder_theta_deg",
+            "free_piston_crank_angle_deg",
+        ])
         cylinder_mass_kg = _last_finite_value([row], [f"{cyl_name}_m_kg", "cylinder_m_kg"])
         if cylinder_mass_kg is not None:
             mass_at_intake_close_mg = cylinder_mass_kg * 1.0e6
+        air_mass_kg = _last_finite_value([row], [f"{cyl_name}_m_air_kg", "cylinder_m_air_kg"])
+        if air_mass_kg is not None:
+            air_mass_at_intake_close_mg = air_mass_kg * 1.0e6
+        residual_mass_kg = _last_finite_value([row], [f"{cyl_name}_m_residual_kg", "cylinder_m_residual_kg"])
+        if residual_mass_kg is not None:
+            residual_mass_at_intake_close_mg = residual_mass_kg * 1.0e6
         break
 
     restgas_row = None
@@ -549,7 +571,10 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
         f"Zugef. Energie: {_format_value(added_energy_J, 'J')}",
         f"Wandwaermeverluste: {_format_value(wall_heat_loss_J, 'J')}",
         f"pmax: {_format_value(pmax_bar, 'bar')}",
-        f"Masse Einlassschluss: {_format_value(mass_at_intake_close_mg, 'mg')}",
+        f"Winkel Einlassschluss: {_format_value(theta_at_intake_close_deg, 'deg', 1)}",
+        f"Frischluft Einlassschluss: {_format_value(air_mass_at_intake_close_mg, 'mg')}",
+        f"Gesamtmasse Einlassschluss: {_format_value(mass_at_intake_close_mg, 'mg')}",
+        f"Restgas Einlassschluss: {_format_value(residual_mass_at_intake_close_mg, 'mg')}",
         f"Verdichtung geom.: {_format_value(geom_cr, '-', 1)}",
         f"Verdichtung eff.: {_format_value(eff_cr, '-', 1)}",
         f"Verdichtung real: {_format_value(real_cr, '-', 1)}",

@@ -801,6 +801,75 @@ class SignalReconstructionService:
                     theta_local[k] = float(theta_deg)
                     theta_global[k] = float(theta_deg)
 
+            if getattr(bundle, 'architecture', 'classic') == 'free_piston' and getattr(bundle, 'free_piston', None) is not None and primary_cyl_idx >= 0:
+                fp = bundle.free_piston
+                x_idx = int(fp.x_state_index)
+                v_idx = int(fp.v_state_index)
+                piston_x = float(y_arr[x_idx, k])
+                piston_v = float(y_arr[v_idx, k])
+                force_gas = 0.0
+                force_bounce = 0.0
+                primary_dof = 0
+                volume_mechanical_dof = getattr(fp, 'volume_mechanical_dof', np.full(n_vol, -1, dtype=np.int64))
+                volume_mechanical_sign = getattr(fp, 'volume_mechanical_sign', np.zeros(n_vol, dtype=np.float64))
+                if primary_cyl_idx < int(len(volume_mechanical_dof)):
+                    primary_dof = int(volume_mechanical_dof[primary_cyl_idx])
+                for mech_i in range(n_vol):
+                    if mech_i >= int(len(volume_mechanical_dof)) or int(volume_mechanical_dof[mech_i]) != primary_dof:
+                        continue
+                    sign_i = float(volume_mechanical_sign[mech_i]) if mech_i < int(len(volume_mechanical_sign)) else 0.0
+                    mech_type = int(vol_matrix[mech_i, VolumeCol.TYPE])
+                    if mech_type == VolumeType.CYLINDER:
+                        force_gas += sign_i * float(pressure_by_vol[mech_i]) * float(fp.piston_area_m2)
+                    elif mech_type == VolumeType.BOUNCE_CHAMBER:
+                        force_bounce += -sign_i * float(pressure_by_vol[mech_i]) * float(fp.bounce_area_m2)
+                if abs(piston_v) < 1.0e-15:
+                    friction_force = 0.0
+                else:
+                    friction_force = -(fp.friction_fc_N * np.copysign(1.0, piston_v) + fp.friction_cv_Ns_per_m * piston_v)
+                load_info = compute_load_info(
+                    fp.load_model,
+                    fp.load_damping_Ns_per_m,
+                    piston_v,
+                    x_m=piston_x,
+                    x_min_m=fp.x_min_m,
+                    x_max_m=fp.x_max_m,
+                    max_damping_Ns_per_m=fp.load_max_damping_Ns_per_m,
+                    control_zone_m=fp.load_control_zone_m,
+                    power_target_W=fp.load_power_target_W,
+                    efficiency_0to1=fp.load_efficiency_0to1,
+                    min_velocity_m_per_s=fp.load_min_velocity_m_per_s,
+                    assist_velocity_threshold_m_per_s=fp.load_assist_velocity_threshold_m_per_s,
+                    assist_force_N=fp.load_assist_force_N,
+                    target_margin_m=fp.load_target_margin_m,
+                    hard_margin_m=fp.load_hard_margin_m,
+                    stop_kp=fp.load_stop_kp,
+                    moving_mass_kg=fp.moving_mass_kg,
+                    max_force_N=fp.load_max_force_N,
+                )
+                load_force = -float(load_info.force_signed_N)
+                force_net = force_gas + force_bounce + friction_force + load_force
+                cls._ensure_float_column(columns, 'free_piston_x_m', n_samples)[k] = piston_x
+                cls._ensure_float_column(columns, 'free_piston_distance_from_tdc_m', n_samples)[k] = cylinder_distance_from_tdc(piston_x, fp.x_min_m, fp.x_max_m)
+                cls._ensure_float_column(columns, 'free_piston_v_m_per_s', n_samples)[k] = piston_v
+                cls._ensure_float_column(columns, 'free_piston_a_m_per_s2', n_samples)[k] = force_net / max(float(fp.moving_mass_kg), 1.0e-30)
+                if bounce_idx >= 0:
+                    cls._ensure_float_column(columns, 'bounce_volume_m3', n_samples)[k] = float(volume_by_vol[bounce_idx])
+                    cls._ensure_float_column(columns, 'bounce_pressure_Pa', n_samples)[k] = float(pressure_by_vol[bounce_idx])
+                cls._ensure_float_column(columns, 'free_piston_F_gas_N', n_samples)[k] = force_gas
+                cls._ensure_float_column(columns, 'free_piston_F_bounce_N', n_samples)[k] = force_bounce
+                cls._ensure_float_column(columns, 'free_piston_F_friction_N', n_samples)[k] = friction_force
+                cls._ensure_float_column(columns, 'free_piston_F_load_N', n_samples)[k] = load_force
+                cls._ensure_float_column(columns, 'free_piston_F_net_N', n_samples)[k] = force_net
+                cls._ensure_float_column(columns, 'free_piston_generator_power_W', n_samples)[k] = float(load_info.mechanical_power_W)
+                cls._ensure_float_column(columns, 'free_piston_generator_electrical_power_W', n_samples)[k] = float(load_info.electrical_power_W)
+                cls._ensure_float_column(columns, 'free_piston_generator_damping_eff_Ns_per_m', n_samples)[k] = float(load_info.effective_damping_Ns_per_m)
+                cls._ensure_float_column(columns, 'free_piston_generator_force_base_N', n_samples)[k] = float(load_info.base_force_N)
+                cls._ensure_float_column(columns, 'free_piston_generator_force_power_N', n_samples)[k] = float(load_info.power_force_N)
+                cls._ensure_float_column(columns, 'free_piston_generator_force_stop_N', n_samples)[k] = float(load_info.stop_force_N)
+                cls._ensure_float_column(columns, 'free_piston_generator_distance_to_stop_m', n_samples)[k] = float(load_info.distance_to_stop_m)
+                cls._ensure_float_column(columns, 'free_piston_generator_midstroke_weight', n_samples)[k] = float(load_info.midstroke_weight_0to1)
+
             for j in range(n_conn):
                 conn = conn_matrix[j]
                 conn_name = connection_names[j]
@@ -1030,7 +1099,8 @@ class SignalReconstructionService:
                     air_mass_kg = float(cyl_latched_air_hist[k])
                     fuel_mass_kg = float(cyl_latched_fuel_hist[k])
                     energy_latched_J = float(cyl_latched_energy_hist[k])
-                    lambda_value = _lambda_from_air_and_fuel(air_mass_kg, fuel_mass_kg, getattr(fp, 'combustion_afr_stoich_kg_air_per_kg_fuel', 0.0))
+                    afr_latched = float(bundle.combustion_afr_stoich_by_vol[i]) if getattr(bundle, 'combustion_afr_stoich_by_vol', None) is not None and i < int(bundle.combustion_afr_stoich_by_vol.shape[0]) else float(getattr(fp, 'combustion_afr_stoich_kg_air_per_kg_fuel', 0.0) or 0.0)
+                    lambda_value = _lambda_from_air_and_fuel(air_mass_kg, fuel_mass_kg, afr_latched)
                     cls._ensure_float_column(columns, f'{name}_combustion_air_mass_latched_kg', n_samples)[k] = air_mass_kg
                     cls._ensure_float_column(columns, f'{name}_combustion_fuel_mass_latched_kg', n_samples)[k] = fuel_mass_kg
                     cls._ensure_float_column(columns, f'{name}_combustion_energy_latched_J', n_samples)[k] = energy_latched_J

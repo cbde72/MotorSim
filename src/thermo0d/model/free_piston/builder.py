@@ -473,6 +473,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     environment_is_fixed, environment_pressures_pa, environment_temperatures_K = build_environment_buffers(n_vol)
     combustion_fuel_mass_by_vol = np.zeros(n_vol, dtype=np.float64)
     combustion_afr_stoich_by_vol = np.full(n_vol, 14.5, dtype=np.float64)
+    combustion_lambda_target_by_vol = np.zeros(n_vol, dtype=np.float64)
     combustion_efficiency_by_vol = np.ones(n_vol, dtype=np.float64)
     combustion_lhv_by_vol = np.zeros(n_vol, dtype=np.float64)
     hcci_enabled_by_vol = np.zeros(n_vol, dtype=np.int64)
@@ -704,6 +705,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
                 comb_lhv = 1.0
         combustion_fuel_mass_by_vol[int(cyl_i)] = comb_fuel_mass
         combustion_afr_stoich_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5)
+        combustion_lambda_target_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'lambda_target', 0.0) or 0.0)
         combustion_efficiency_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'combustion_efficiency_0to1', 1.0) or 1.0)
         combustion_lhv_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'lhv_J_per_kg', 0.0) or 0.0)
         if is_hcci_diesel:
@@ -907,6 +909,16 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         hcci_start_temperature_min_by_vol_K=hcci_start_temperature_min_by_vol_K,
         hcci_start_pressure_min_by_vol_Pa=hcci_start_pressure_min_by_vol_Pa,
         hcci_max_ignition_delay_by_vol_s=hcci_max_ignition_delay_by_vol_s,
+        runtime_scavenging_transfer_in_by_vol_kg_per_s=np.zeros(n_vol, dtype=np.float64),
+        runtime_scavenging_exhaust_out_by_vol_kg_per_s=np.zeros(n_vol, dtype=np.float64),
+        runtime_scavenging_burned_correction_by_vol_kg_per_s=np.zeros(n_vol, dtype=np.float64),
+        runtime_scavenging_short_circuit_fraction_by_vol=np.zeros(n_vol, dtype=np.float64),
+        runtime_injector_active_by_vol=np.zeros(n_vol, dtype=np.int64),
+        runtime_injector_time_by_vol_s=np.zeros(n_vol, dtype=np.float64),
+        runtime_injector_end_time_by_vol_s=np.zeros(n_vol, dtype=np.float64),
+        runtime_injector_target_fuel_by_vol_kg=np.zeros(n_vol, dtype=np.float64),
+        runtime_injector_injected_by_vol_kg=np.zeros(n_vol, dtype=np.float64),
+        runtime_injector_rate_by_vol_kg_per_s=np.zeros(n_vol, dtype=np.float64),
     )
 
     bundle = ModelBundle(
@@ -944,6 +956,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         environment_temperatures_K=environment_temperatures_K,
         combustion_fuel_mass_by_vol=combustion_fuel_mass_by_vol,
         combustion_afr_stoich_by_vol=combustion_afr_stoich_by_vol,
+        combustion_lambda_target_by_vol=combustion_lambda_target_by_vol,
         combustion_efficiency_by_vol=combustion_efficiency_by_vol,
         combustion_lhv_by_vol=combustion_lhv_by_vol,
     )

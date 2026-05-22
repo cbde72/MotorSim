@@ -104,6 +104,11 @@ def _apply_overlap_scavenging_correction(
     fp.runtime_scavenging_exhaust_out_kg_per_s = float(exhaust_out_rate_kg_per_s)
     fp.runtime_scavenging_burned_correction_kg_per_s = 0.0
     fp.runtime_scavenging_short_circuit_fraction = 0.0
+    if int(getattr(getattr(fp, 'runtime_scavenging_transfer_in_by_vol_kg_per_s', np.zeros(0)), 'shape', (0,))[0]) > cylinder_idx:
+        fp.runtime_scavenging_transfer_in_by_vol_kg_per_s[cylinder_idx] = float(transfer_in_rate_kg_per_s)
+        fp.runtime_scavenging_exhaust_out_by_vol_kg_per_s[cylinder_idx] = float(exhaust_out_rate_kg_per_s)
+        fp.runtime_scavenging_burned_correction_by_vol_kg_per_s[cylinder_idx] = 0.0
+        fp.runtime_scavenging_short_circuit_fraction_by_vol[cylinder_idx] = 0.0
     if not bool(getattr(fp, 'scavenging_enabled', False)):
         return
     if str(getattr(fp, 'scavenging_model', 'overlap_short_circuit_0d')) != 'overlap_short_circuit_0d':
@@ -140,6 +145,8 @@ def _apply_overlap_scavenging_correction(
     burned_correction_rate = scavenged_extra_burned_rate - short_circuit_air_rate
     if abs(burned_correction_rate) <= 1.0e-18:
         fp.runtime_scavenging_short_circuit_fraction = float(short_fraction)
+        if int(getattr(getattr(fp, 'runtime_scavenging_short_circuit_fraction_by_vol', np.zeros(0)), 'shape', (0,))[0]) > cylinder_idx:
+            fp.runtime_scavenging_short_circuit_fraction_by_vol[cylinder_idx] = float(short_fraction)
         return
 
     dy_dt[burned_indices[cylinder_idx]] -= burned_correction_rate
@@ -159,6 +166,9 @@ def _apply_overlap_scavenging_correction(
 
     fp.runtime_scavenging_burned_correction_kg_per_s = float(burned_correction_rate)
     fp.runtime_scavenging_short_circuit_fraction = float(short_fraction)
+    if int(getattr(getattr(fp, 'runtime_scavenging_burned_correction_by_vol_kg_per_s', np.zeros(0)), 'shape', (0,))[0]) > cylinder_idx:
+        fp.runtime_scavenging_burned_correction_by_vol_kg_per_s[cylinder_idx] = float(burned_correction_rate)
+        fp.runtime_scavenging_short_circuit_fraction_by_vol[cylinder_idx] = float(short_fraction)
 
 
 def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
@@ -191,6 +201,10 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     runtime_injector_time_s = fp.runtime_injector_time_s if hasattr(fp, 'runtime_injector_time_s') else 0.0
     runtime_injector_end_time_s = fp.runtime_injector_end_time_s if hasattr(fp, 'runtime_injector_end_time_s') else 0.0
     runtime_injector_rate_kg_per_s = fp.runtime_injector_rate_kg_per_s if hasattr(fp, 'runtime_injector_rate_kg_per_s') else 0.0
+    runtime_injector_active_by_vol = getattr(fp, 'runtime_injector_active_by_vol', np.zeros(0, dtype=np.int64))
+    runtime_injector_time_by_vol_s = getattr(fp, 'runtime_injector_time_by_vol_s', np.zeros(0, dtype=np.float64))
+    runtime_injector_end_time_by_vol_s = getattr(fp, 'runtime_injector_end_time_by_vol_s', np.zeros(0, dtype=np.float64))
+    runtime_injector_rate_by_vol_kg_per_s = getattr(fp, 'runtime_injector_rate_by_vol_kg_per_s', np.zeros(0, dtype=np.float64))
     runtime_slotclose_charge_active = fp.runtime_slotclose_charge_active if hasattr(fp, 'runtime_slotclose_charge_active') else False
     runtime_slotclose_charge_time_s = fp.runtime_slotclose_charge_time_s if hasattr(fp, 'runtime_slotclose_charge_time_s') else 0.0
     runtime_slotclose_charge_end_time_s = fp.runtime_slotclose_charge_end_time_s if hasattr(fp, 'runtime_slotclose_charge_end_time_s') else 0.0
@@ -214,6 +228,11 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
         fp.runtime_scavenging_exhaust_out_kg_per_s = 0.0
         fp.runtime_scavenging_burned_correction_kg_per_s = 0.0
         fp.runtime_scavenging_short_circuit_fraction = 0.0
+    if int(getattr(getattr(fp, 'runtime_scavenging_transfer_in_by_vol_kg_per_s', np.zeros(0)), 'shape', (0,))[0]) >= int(bundle.vol_matrix.shape[0]):
+        fp.runtime_scavenging_transfer_in_by_vol_kg_per_s.fill(0.0)
+        fp.runtime_scavenging_exhaust_out_by_vol_kg_per_s.fill(0.0)
+        fp.runtime_scavenging_burned_correction_by_vol_kg_per_s.fill(0.0)
+        fp.runtime_scavenging_short_circuit_fraction_by_vol.fill(0.0)
 
     cylinder_idx = int(bundle.cylinder_indices[0])
     cyl_m_idx = int(bundle.state_layout.mass_index(cylinder_idx))
@@ -263,9 +282,10 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     dtheta_local_dt_by_vol = np.zeros(n_vol, dtype=np.float64)
     cycle_deg_by_vol = np.full(n_vol, float(bundle.cycle_deg), dtype=np.float64)
     mdot_in_by_vol = np.zeros(n_vol, dtype=np.float64)
-    scav_transfer_in_rate_kg_per_s = 0.0
-    scav_transfer_air_in_rate_kg_per_s = 0.0
-    scav_exhaust_out_by_vol_kg_per_s = np.zeros(n_vol, dtype=np.float64)
+    cylinder_index_set = {int(idx) for idx in getattr(bundle, 'cylinder_indices', [])}
+    scav_transfer_in_by_cyl_kg_per_s = np.zeros(n_vol, dtype=np.float64)
+    scav_transfer_air_in_by_cyl_kg_per_s = np.zeros(n_vol, dtype=np.float64)
+    scav_exhaust_out_by_cyl_to_vol_kg_per_s = np.zeros((n_vol, n_vol), dtype=np.float64)
 
     environment_is_fixed = bundle.environment_is_fixed if bundle.environment_is_fixed is not None else np.zeros(n_vol, dtype=np.int64)
     environment_pressures_pa = bundle.environment_pressures_pa if bundle.environment_pressures_pa is not None else np.zeros(n_vol, dtype=np.float64)
@@ -444,11 +464,11 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                     dy_dt[air_indices[right]] += air_transfer
                     dy_dt[residual_indices[right]] += residual_transfer
                 if conn_type == int(ConnectionType.SLOT):
-                    if right == cylinder_idx and left != cylinder_idx:
-                        scav_transfer_in_rate_kg_per_s += float(mdot)
-                        scav_transfer_air_in_rate_kg_per_s += float(air_transfer)
-                    elif left == cylinder_idx and right != cylinder_idx:
-                        scav_exhaust_out_by_vol_kg_per_s[right] += float(mdot)
+                    if right in cylinder_index_set and left != right:
+                        scav_transfer_in_by_cyl_kg_per_s[right] += float(mdot)
+                        scav_transfer_air_in_by_cyl_kg_per_s[right] += float(air_transfer)
+                    elif left in cylinder_index_set and right != left:
+                        scav_exhaust_out_by_cyl_to_vol_kg_per_s[left, right] += float(mdot)
             else:
                 upstream_burned_fraction, upstream_air_fraction, upstream_residual_fraction = _upstream_species_fractions(bundle.state_layout, y, right, environment_is_fixed)
                 burned_transfer = (-mdot) * upstream_burned_fraction
@@ -463,41 +483,71 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                     dy_dt[air_indices[right]] -= air_transfer
                     dy_dt[residual_indices[right]] -= residual_transfer
                 if conn_type == int(ConnectionType.SLOT):
-                    if left == cylinder_idx and right != cylinder_idx:
-                        scav_transfer_in_rate_kg_per_s += float(-mdot)
-                        scav_transfer_air_in_rate_kg_per_s += float(air_transfer)
-                    elif right == cylinder_idx and left != cylinder_idx:
-                        scav_exhaust_out_by_vol_kg_per_s[left] += float(-mdot)
+                    if left in cylinder_index_set and right != left:
+                        scav_transfer_in_by_cyl_kg_per_s[left] += float(-mdot)
+                        scav_transfer_air_in_by_cyl_kg_per_s[left] += float(air_transfer)
+                    elif right in cylinder_index_set and left != right:
+                        scav_exhaust_out_by_cyl_to_vol_kg_per_s[right, left] += float(-mdot)
 
             if int(bundle.vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot < 0.0:
                 mdot_in_by_vol[left] += -mdot
             if int(bundle.vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot > 0.0:
                 mdot_in_by_vol[right] += mdot
 
-        _apply_overlap_scavenging_correction(
-            dy_dt,
-            fp,
-            cylinder_idx,
-            y,
-            mass_indices,
-            burned_indices,
-            air_indices,
-            residual_indices,
-            environment_is_fixed,
-            float(scav_transfer_in_rate_kg_per_s),
-            float(scav_transfer_air_in_rate_kg_per_s),
-            scav_exhaust_out_by_vol_kg_per_s,
-        )
+        for cyl_i in bundle.cylinder_indices:
+            cyl = int(cyl_i)
+            _apply_overlap_scavenging_correction(
+                dy_dt,
+                fp,
+                cyl,
+                y,
+                mass_indices,
+                burned_indices,
+                air_indices,
+                residual_indices,
+                environment_is_fixed,
+                float(scav_transfer_in_by_cyl_kg_per_s[cyl]),
+                float(scav_transfer_air_in_by_cyl_kg_per_s[cyl]),
+                scav_exhaust_out_by_cyl_to_vol_kg_per_s[cyl],
+            )
+        if int(getattr(getattr(fp, 'runtime_scavenging_transfer_in_by_vol_kg_per_s', np.zeros(0)), 'shape', (0,))[0]) >= n_vol:
+            fp.runtime_scavenging_transfer_in_kg_per_s = float(np.sum(fp.runtime_scavenging_transfer_in_by_vol_kg_per_s))
+            fp.runtime_scavenging_exhaust_out_kg_per_s = float(np.sum(fp.runtime_scavenging_exhaust_out_by_vol_kg_per_s))
+            fp.runtime_scavenging_burned_correction_kg_per_s = float(np.sum(fp.runtime_scavenging_burned_correction_by_vol_kg_per_s))
+            fp.runtime_scavenging_short_circuit_fraction = float(np.max(fp.runtime_scavenging_short_circuit_fraction_by_vol)) if n_vol > 0 else 0.0
 
-    if (
-        free_piston_uses_vapor_injector(bundle)
-        and bool(runtime_injector_active)
-        and float(runtime_injector_rate_kg_per_s) > 0.0
-        and float(t_s) >= float(runtime_injector_time_s) - 1.0e-15
-        and float(t_s) < float(runtime_injector_end_time_s) - 1.0e-15
-    ):
-        dy_dt[mass_indices[cylinder_idx]] += float(runtime_injector_rate_kg_per_s)
-        mdot_in_by_vol[cylinder_idx] += float(runtime_injector_rate_kg_per_s)
+    if free_piston_uses_vapor_injector(bundle):
+        used_by_vol_injector = False
+        if int(getattr(runtime_injector_active_by_vol, 'shape', (0,))[0]) >= n_vol:
+            used_by_vol_injector = True
+            for cyl_i in bundle.cylinder_indices:
+                cyl = int(cyl_i)
+                injector_rate = float(runtime_injector_rate_by_vol_kg_per_s[cyl])
+                if (
+                    bool(runtime_injector_active_by_vol[cyl])
+                    and injector_rate > 0.0
+                    and float(t_s) >= float(runtime_injector_time_by_vol_s[cyl]) - 1.0e-15
+                    and float(t_s) < float(runtime_injector_end_time_by_vol_s[cyl]) - 1.0e-15
+                ):
+                    dy_dt[mass_indices[cyl]] += injector_rate
+                    cylinder_mass_kg = float(bundle.state_layout.gas_mass_from_state(y, cyl))
+                    cylinder_energy_J = float(y[energy_indices[cyl]])
+                    if cylinder_mass_kg > 1.0e-18:
+                        dy_dt[energy_indices[cyl]] += injector_rate * max(cylinder_energy_J / cylinder_mass_kg, 0.0)
+                    mdot_in_by_vol[cyl] += injector_rate
+        if (
+            not used_by_vol_injector
+            and bool(runtime_injector_active)
+            and float(runtime_injector_rate_kg_per_s) > 0.0
+            and float(t_s) >= float(runtime_injector_time_s) - 1.0e-15
+            and float(t_s) < float(runtime_injector_end_time_s) - 1.0e-15
+        ):
+            dy_dt[mass_indices[cylinder_idx]] += float(runtime_injector_rate_kg_per_s)
+            cylinder_mass_kg = float(bundle.state_layout.gas_mass_from_state(y, cylinder_idx))
+            cylinder_energy_J = float(y[energy_indices[cylinder_idx]])
+            if cylinder_mass_kg > 1.0e-18:
+                dy_dt[energy_indices[cylinder_idx]] += float(runtime_injector_rate_kg_per_s) * max(cylinder_energy_J / cylinder_mass_kg, 0.0)
+            mdot_in_by_vol[cylinder_idx] += float(runtime_injector_rate_kg_per_s)
 
     if free_piston_uses_slot_closure_lambda(bundle):
         used_by_vol_charge = False
@@ -643,9 +693,13 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             xb = 0.0
             dxb_dt = 0.0
             if use_time_vibe:
+                if int(getattr(runtime_soc_time_by_vol_s, 'shape', (0,))[0]) > i:
+                    soc_time_for_conversion_s = float(runtime_soc_time_by_vol_s[i])
+                else:
+                    soc_time_for_conversion_s = float(runtime_soc_time_s)
                 xb, dxb_dt = vibe_time_fraction_and_rate(
                     t_s,
-                    float(runtime_soc_time_s),
+                    soc_time_for_conversion_s,
                     float(comb_row[CombCol.DURATION_DEG]),
                     float(comb_row[CombCol.A]),
                     float(comb_row[CombCol.M]),
@@ -691,7 +745,6 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                     burned_production_rate = fuel_burn_rate + air_consumption_rate
                     dy_dt[air_indices[i]] -= air_consumption_rate
                     dy_dt[burned_indices[i]] += burned_production_rate
-                    dy_dt[residual_indices[i]] += burned_production_rate
                     qdot_comb = fuel_burn_rate * lhv * comb_eff
                     dy_dt[energy_indices[i]] = dy_dt[energy_indices[i]] - pdv_power + qdot_wall + qdot_comb - qdot_evap
                     if i == cylinder_idx and hasattr(fp, 'runtime_combustion_fuel_burn_rate_kg_per_s'):

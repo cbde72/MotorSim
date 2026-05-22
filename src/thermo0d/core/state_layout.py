@@ -85,10 +85,17 @@ class StateLayout:
         return air
 
     def residual_mass_from_state(self, y, volume_index: int) -> float:
-        return self.burned_mass_from_state(y, volume_index)
+        burned = self.burned_mass_from_state(y, volume_index)
+        residual = float(y[self.residual_mass_index(volume_index)])
+        if residual <= 0.0:
+            return 0.0
+        if residual >= burned:
+            return burned
+        return residual
 
     def fresh_burned_mass_from_state(self, y, volume_index: int) -> float:
-        return 0.0
+        fresh = self.burned_mass_from_state(y, volume_index) - self.residual_mass_from_state(y, volume_index)
+        return fresh if fresh > 0.0 else 0.0
 
     def liquid_fuel_mass_from_state(self, y, volume_index: int) -> float:
         liquid = float(y[self.liquid_fuel_mass_index(volume_index)])

@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from thermo0d.config.models import load_config
+from thermo0d.config.restart_state_update import _parse_volume_defs_from_yaml_text
 from thermo0d.config_versioning import migrate_config_data
 
 
@@ -175,6 +176,18 @@ def test_unknown_volume_ref_fails_clearly() -> None:
                 },
             }
         )
+
+
+def test_restart_state_volume_defs_resolve_ref_types() -> None:
+    text = Path('Projekte/variants/free_piston_GenSet_V14.yaml').read_text(encoding='utf-8')
+    volume_defs = dict(_parse_volume_defs_from_yaml_text(text))
+
+    assert volume_defs['cylinder_1'] == 'cylinder'
+    assert volume_defs['cylinder_2'] == 'cylinder'
+    assert volume_defs['compressor_1'] == 'bounce_chamber'
+    assert volume_defs['compressor_2'] == 'bounce_chamber'
+    assert volume_defs['receiver_1'] == 'plenum'
+    assert volume_defs['receiver_2'] == 'plenum'
 
 
 def test_connection_refs_resolve_to_central_definitions() -> None:
