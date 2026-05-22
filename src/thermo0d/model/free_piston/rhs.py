@@ -8,7 +8,7 @@ from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode,
 from thermo0d.model.free_piston.forces import compute_load_info
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
-from thermo0d.model.free_piston.combustion_latch import free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector
+from thermo0d.model.free_piston.combustion_latch import free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector
 from thermo0d.physics.flow import de_st_venant_wantzel_signed
 from thermo0d.physics.combustion import combustion_duration_mode_from_row, vibe_fraction_and_rate, vibe_heat_release_rate_with_total_energy, vibe_time_fraction_and_rate, vibe_time_heat_release_rate_with_total_energy
 from thermo0d.physics.openings import connection_area_and_coefficients
@@ -120,6 +120,7 @@ def _apply_overlap_scavenging_correction(
     if cylinder_mass_kg <= 1.0e-18:
         return
     base_burned_fraction = max(0.0, min(1.0, float(y[burned_indices[cylinder_idx]]) / cylinder_mass_kg))
+    base_residual_fraction = max(0.0, min(base_burned_fraction, float(y[residual_indices[cylinder_idx]]) / cylinder_mass_kg))
     base_air_fraction = max(0.0, min(1.0 - base_burned_fraction, float(y[air_indices[cylinder_idx]]) / cylinder_mass_kg))
     if base_air_fraction <= 1.0e-15 and base_burned_fraction <= 1.0e-15:
         return
@@ -135,10 +136,11 @@ def _apply_overlap_scavenging_correction(
 
     normal_exhaust_air_rate = exhaust_out_rate_kg_per_s * base_air_fraction
     normal_exhaust_burned_rate = exhaust_out_rate_kg_per_s * base_burned_fraction
+    normal_exhaust_residual_rate = exhaust_out_rate_kg_per_s * base_residual_fraction
     min_residual_fraction = max(0.0, min(1.0, float(getattr(fp, 'scavenging_min_residual_fraction', 0.03))))
-    residual_drive = max(base_burned_fraction - min_residual_fraction, 0.0) / max(1.0 - min_residual_fraction, 1.0e-12)
+    residual_drive = max(base_residual_fraction - min_residual_fraction, 0.0) / max(1.0 - min_residual_fraction, 1.0e-12)
     scavenged_extra_burned_rate = eta_scav * (1.0 - short_fraction) * transfer_in_rate_kg_per_s * residual_drive
-    scavenged_extra_burned_rate = min(scavenged_extra_burned_rate, normal_exhaust_air_rate)
+    scavenged_extra_burned_rate = min(scavenged_extra_burned_rate, normal_exhaust_air_rate, normal_exhaust_residual_rate)
     short_circuit_air_rate = short_fraction * min(max(transfer_air_in_rate_kg_per_s, 0.0), exhaust_out_rate_kg_per_s)
     short_circuit_air_rate = min(short_circuit_air_rate, normal_exhaust_burned_rate + scavenged_extra_burned_rate)
 
@@ -151,7 +153,7 @@ def _apply_overlap_scavenging_correction(
 
     dy_dt[burned_indices[cylinder_idx]] -= burned_correction_rate
     dy_dt[air_indices[cylinder_idx]] += burned_correction_rate
-    residual_correction_rate = burned_correction_rate
+    residual_correction_rate = min(scavenged_extra_burned_rate, normal_exhaust_residual_rate) - min(short_circuit_air_rate, normal_exhaust_residual_rate + scavenged_extra_burned_rate)
     dy_dt[residual_indices[cylinder_idx]] -= residual_correction_rate
     for vol_idx in range(int(exhaust_out_by_vol_kg_per_s.shape[0])):
         out_rate = float(exhaust_out_by_vol_kg_per_s[vol_idx])
@@ -605,11 +607,11 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
         duration_mode = int(CombDurationMode.ANGLE)
         if comb_idx >= 0:
             duration_mode = int(combustion_duration_mode_from_row(bundle.comb_matrix[comb_idx]))
-        use_slot_closure_lambda = (
+        use_latched_fuel_combustion = (
             vol_type == VolumeType.CYLINDER
             and comb_enabled == 1
             and comb_idx >= 0
-            and free_piston_uses_slot_closure_lambda(bundle)
+            and free_piston_cylinder_uses_latched_fuel(bundle, i)
         )
         use_time_vibe = (
             vol_type == VolumeType.CYLINDER
@@ -623,7 +625,7 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             comb_idx,
             int(vol_row[VolumeCol.EVAP_ROW]),
             1 if bundle.feature_flags.size > F_WALL and int(bundle.feature_flags[F_WALL]) == 1 else 0,
-            0 if (use_slot_closure_lambda or use_time_vibe) else comb_enabled,
+            0 if (use_latched_fuel_combustion or use_time_vibe) else comb_enabled,
             1 if bundle.feature_flags.size > F_EVAP and int(bundle.feature_flags[F_EVAP]) == 1 else 0,
             1 if bundle.feature_flags.size > F_PV and int(bundle.feature_flags[F_PV]) == 1 else 0,
             bundle.wall_matrix,
@@ -659,7 +661,7 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                 float(comb_row[CombCol.M]),
                 q_total_active_J,
             )
-        elif use_slot_closure_lambda:
+        elif use_latched_fuel_combustion:
             comb_row = bundle.comb_matrix[comb_idx]
             if int(getattr(runtime_latch_valid_by_vol, 'shape', (0,))[0]) > i:
                 q_total_latched_J = float(runtime_latched_energy_by_vol_J[i]) if bool(runtime_latch_valid_by_vol[i]) else 0.0

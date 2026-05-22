@@ -80,6 +80,7 @@ class FreePistonModelData:
     volume_mechanical_dof: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
     volume_mechanical_sign: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     combustion_fueling_mode: str = 'fixed_energy'
+    combustion_fueling_mode_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
     combustion_lambda_target: float = 0.0
     combustion_afr_stoich_kg_air_per_kg_fuel: float = 14.5
     combustion_efficiency_0to1: float = 1.0
@@ -88,6 +89,10 @@ class FreePistonModelData:
     combustion_slot_closed_threshold_m2: float = 1.0e-9
     combustion_compression_velocity_threshold_m_per_s: float = 0.02
     injector_duration_s: float = 0.0
+    combustion_slot_open_threshold_by_vol_m2: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    combustion_slot_closed_threshold_by_vol_m2: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    combustion_compression_velocity_threshold_by_vol_m_per_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    injector_duration_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     combustion_comb_idx: int = -1
     combustion_cylinder_slot_conn_indices: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
     runtime_slots_were_open: bool = False

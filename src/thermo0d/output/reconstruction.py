@@ -12,10 +12,12 @@ from thermo0d.model.free_piston.forces import compute_load_info
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_is_compression_stroke, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
 try:
-    from thermo0d.model.free_piston.combustion_latch import free_piston_combustion_enabled, free_piston_uses_slot_closure_lambda, replay_free_piston_combustion_latch_series, replay_free_piston_time_combustion_series
+    from thermo0d.model.free_piston.combustion_latch import free_piston_combustion_enabled, free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector, replay_free_piston_combustion_latch_series, replay_free_piston_time_combustion_series
 except Exception:  # pragma: no cover - compatibility for project states without latch patch
     free_piston_combustion_enabled = None
+    free_piston_cylinder_uses_latched_fuel = None
     free_piston_uses_slot_closure_lambda = None
+    free_piston_uses_vapor_injector = None
     replay_free_piston_combustion_latch_series = None
     replay_free_piston_time_combustion_series = None
 try:
@@ -213,7 +215,7 @@ def _smoothstep01(value: float) -> float:
     return x * x * (3.0 - 2.0 * x)
 
 
-def _scavenging_overlap_diagnostics(fp, cylinder_mass_kg: float, cylinder_air_kg: float, cylinder_burned_kg: float, transfer_in_rate_kg_per_s: float, transfer_air_in_rate_kg_per_s: float, exhaust_out_rate_kg_per_s: float) -> tuple[float, float, float]:
+def _scavenging_overlap_diagnostics(fp, cylinder_mass_kg: float, cylinder_air_kg: float, cylinder_burned_kg: float, cylinder_residual_kg: float, transfer_in_rate_kg_per_s: float, transfer_air_in_rate_kg_per_s: float, exhaust_out_rate_kg_per_s: float) -> tuple[float, float, float]:
     if fp is None or not bool(getattr(fp, 'scavenging_enabled', False)):
         return 0.0, 0.0, 0.0
     if str(getattr(fp, 'scavenging_model', 'overlap_short_circuit_0d')) != 'overlap_short_circuit_0d':
@@ -221,6 +223,7 @@ def _scavenging_overlap_diagnostics(fp, cylinder_mass_kg: float, cylinder_air_kg
     if cylinder_mass_kg <= 1.0e-18 or transfer_in_rate_kg_per_s <= 1.0e-18 or exhaust_out_rate_kg_per_s <= 1.0e-18:
         return 0.0, 0.0, 0.0
     base_burned_fraction = max(0.0, min(1.0, cylinder_burned_kg / cylinder_mass_kg))
+    base_residual_fraction = max(0.0, min(base_burned_fraction, cylinder_residual_kg / cylinder_mass_kg))
     base_air_fraction = max(0.0, min(1.0 - base_burned_fraction, cylinder_air_kg / cylinder_mass_kg))
     ratio = transfer_in_rate_kg_per_s / max(exhaust_out_rate_kg_per_s, 1.0e-18)
     eta_scav = 1.0 - math.exp(-max(float(getattr(fp, 'scavenging_factor', 1.25)), 0.0) * ratio)
@@ -232,11 +235,13 @@ def _scavenging_overlap_diagnostics(fp, cylinder_mass_kg: float, cylinder_air_kg
     short_fraction = max(0.0, min(1.0, short_fraction))
     normal_exhaust_air_rate = exhaust_out_rate_kg_per_s * base_air_fraction
     normal_exhaust_burned_rate = exhaust_out_rate_kg_per_s * base_burned_fraction
+    normal_exhaust_residual_rate = exhaust_out_rate_kg_per_s * base_residual_fraction
     min_residual_fraction = max(0.0, min(1.0, float(getattr(fp, 'scavenging_min_residual_fraction', 0.03))))
-    residual_drive = max(base_burned_fraction - min_residual_fraction, 0.0) / max(1.0 - min_residual_fraction, 1.0e-12)
+    residual_drive = max(base_residual_fraction - min_residual_fraction, 0.0) / max(1.0 - min_residual_fraction, 1.0e-12)
     scavenged_extra_burned_rate = min(
         eta_scav * (1.0 - short_fraction) * transfer_in_rate_kg_per_s * residual_drive,
         normal_exhaust_air_rate,
+        normal_exhaust_residual_rate,
     )
     short_circuit_air_rate = min(
         short_fraction * min(max(transfer_air_in_rate_kg_per_s, 0.0), exhaust_out_rate_kg_per_s),
@@ -431,17 +436,19 @@ class SignalReconstructionService:
         primary_cyl_idx = int(bundle.cylinder_indices[0]) if getattr(bundle, 'cylinder_indices', None) else -1
         bounce_idx = _stateful_bounce_index(bundle)
         fp = getattr(bundle, 'free_piston', None)
-        use_fp_slot_lambda = (
+        use_fp_latched_fuel = (
             getattr(bundle, 'architecture', 'classic') == 'free_piston'
             and fp is not None
             and primary_cyl_idx >= 0
             and free_piston_combustion_enabled is not None
             and bool(free_piston_combustion_enabled(bundle))
-            and free_piston_uses_slot_closure_lambda is not None
-            and bool(free_piston_uses_slot_closure_lambda(bundle))
+            and (
+                (free_piston_uses_slot_closure_lambda is not None and bool(free_piston_uses_slot_closure_lambda(bundle)))
+                or (free_piston_uses_vapor_injector is not None and bool(free_piston_uses_vapor_injector(bundle)))
+            )
         )
         latched_air_hist, latched_fuel_hist, latched_energy_hist, slot_area_hist = _replay_free_piston_combustion_history(bundle, y_arr)
-        time_vibe_energy_hist = latched_energy_hist if use_fp_slot_lambda else None
+        time_vibe_energy_hist = latched_energy_hist if use_fp_latched_fuel else None
         if replay_free_piston_time_combustion_series is not None:
             soc_time_hist, soc_energy_hist, soc_active_hist = replay_free_piston_time_combustion_series(bundle, t_arr, y_arr, time_vibe_energy_hist)
         else:
@@ -450,9 +457,11 @@ class SignalReconstructionService:
             soc_active_hist = np.zeros(n_samples, dtype=np.float64)
         cylinder_latch_histories: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
         cylinder_soc_histories: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
-        if use_fp_slot_lambda:
+        if use_fp_latched_fuel:
             for cyl_idx in getattr(bundle, 'cylinder_indices', []) or []:
                 cyl = int(cyl_idx)
+                if free_piston_cylinder_uses_latched_fuel is not None and not bool(free_piston_cylinder_uses_latched_fuel(bundle, cyl)):
+                    continue
                 latch_hist = _replay_free_piston_combustion_history_for_cylinder(bundle, y_arr, cyl)
                 cylinder_latch_histories[cyl] = latch_hist
                 cylinder_soc_histories[cyl] = _replay_free_piston_time_combustion_for_cylinder(bundle, t_arr, y_arr, latch_hist[2], cyl)
@@ -575,7 +584,7 @@ class SignalReconstructionService:
                         compression_active_by_vol[i] = 1 if free_piston_is_compression_stroke(local_piston_v, local_piston_x, fp.x_min_m, fp.x_max_m) else 0
                         lambda_air_mass = air_mass
                         lambda_fuel_mass = fuel_vapor_mass
-                        if use_fp_slot_lambda and i in cylinder_latch_histories and float(cylinder_latch_histories[i][1][k]) > 0.0:
+                        if use_fp_latched_fuel and i in cylinder_latch_histories and float(cylinder_latch_histories[i][1][k]) > 0.0:
                             lambda_air_mass = float(cylinder_latch_histories[i][0][k])
                             fuel_mass_eff = float(cylinder_latch_histories[i][1][k])
                             lambda_fuel_mass = fuel_mass_eff
@@ -1046,7 +1055,7 @@ class SignalReconstructionService:
                             float(comb_row[CombCol.M]),
                             float(cyl_soc_energy_hist[k]),
                         )
-                    elif use_fp_slot_lambda:
+                    elif use_fp_latched_fuel:
                         if free_piston_reference_is_active(int(comb_row[CombCol.REF_TYPE]), float(piston_x_by_vol[i]), float(piston_v_by_vol[i]), fp.x_min_m, fp.x_max_m):
                             added_energy_w = vibe_heat_release_rate_with_total_energy(
                                 theta_deg_by_vol[i],
@@ -1085,6 +1094,7 @@ class SignalReconstructionService:
                         cyl_mass_kg,
                         cyl_air_kg,
                         cyl_burned_kg,
+                        float(y_arr[int(state_layout.residual_mass_index(i)), k]),
                         float(scav_transfer_in[i]),
                         float(scav_transfer_air_in[i]),
                         float(scav_exhaust_out[i]),
@@ -1094,7 +1104,7 @@ class SignalReconstructionService:
                     cls._ensure_float_column(columns, f'{name}_scavenging_burned_correction_kg_per_s', n_samples)[k] = burned_correction
                     cls._ensure_float_column(columns, f'{name}_scavenging_short_circuit_fraction', n_samples)[k] = short_fraction
                     cls._ensure_float_column(columns, f'{name}_scavenging_efficiency_0to1', n_samples)[k] = eta_scav
-                if use_fp_slot_lambda and i in cylinder_latch_histories:
+                if use_fp_latched_fuel and i in cylinder_latch_histories:
                     cyl_latched_air_hist, cyl_latched_fuel_hist, cyl_latched_energy_hist, cyl_slot_area_hist = cylinder_latch_histories[i]
                     air_mass_kg = float(cyl_latched_air_hist[k])
                     fuel_mass_kg = float(cyl_latched_fuel_hist[k])

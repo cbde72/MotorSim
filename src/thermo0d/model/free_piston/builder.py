@@ -476,6 +476,11 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     combustion_lambda_target_by_vol = np.zeros(n_vol, dtype=np.float64)
     combustion_efficiency_by_vol = np.ones(n_vol, dtype=np.float64)
     combustion_lhv_by_vol = np.zeros(n_vol, dtype=np.float64)
+    combustion_fueling_mode_by_vol = np.zeros(n_vol, dtype=np.int64)
+    combustion_slot_open_threshold_by_vol_m2 = np.full(n_vol, 1.0e-7, dtype=np.float64)
+    combustion_slot_closed_threshold_by_vol_m2 = np.full(n_vol, 1.0e-9, dtype=np.float64)
+    combustion_compression_velocity_threshold_by_vol_m_per_s = np.full(n_vol, 0.02, dtype=np.float64)
+    injector_duration_by_vol_s = np.zeros(n_vol, dtype=np.float64)
     hcci_enabled_by_vol = np.zeros(n_vol, dtype=np.int64)
     hcci_tau_A_by_vol_s = np.zeros(n_vol, dtype=np.float64)
     hcci_pressure_exponent_by_vol = np.zeros(n_vol, dtype=np.float64)
@@ -708,6 +713,19 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         combustion_lambda_target_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'lambda_target', 0.0) or 0.0)
         combustion_efficiency_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'combustion_efficiency_0to1', 1.0) or 1.0)
         combustion_lhv_by_vol[int(cyl_i)] = float(getattr(combustion_cfg_local, 'lhv_J_per_kg', 0.0) or 0.0)
+        fueling_mode_name = str(getattr(combustion_cfg_local, 'fueling_mode', 'fixed_energy') or 'fixed_energy')
+        if fueling_mode_name == 'lambda_from_cylinder_mass_at_slot_close':
+            combustion_fueling_mode_by_vol[int(cyl_i)] = 1
+        elif fueling_mode_name == 'lambda_from_cylinder_air_at_slot_close_vapor_injector':
+            combustion_fueling_mode_by_vol[int(cyl_i)] = 2
+        combustion_slot_open_threshold_by_vol_m2[int(cyl_i)] = float(getattr(combustion_cfg_local, 'slot_open_threshold_m2', 1.0e-7) or 1.0e-7)
+        combustion_slot_closed_threshold_by_vol_m2[int(cyl_i)] = float(getattr(combustion_cfg_local, 'slot_closed_threshold_m2', 1.0e-9) or 1.0e-9)
+        combustion_compression_velocity_threshold_by_vol_m_per_s[int(cyl_i)] = float(getattr(combustion_cfg_local, 'compression_velocity_threshold_m_per_s', 0.02) or 0.02)
+        injector_duration_by_vol_s[int(cyl_i)] = (
+            float(getattr(combustion_cfg_local, 'injection_duration_s', 0.0) or 0.0)
+            if getattr(combustion_cfg_local, 'injection_duration_s', None) is not None
+            else float(getattr(combustion_cfg_local, 'injection_duration_ms', 0.0) or 0.0) * 1.0e-3
+        )
         if is_hcci_diesel:
             start_deg = 0.0
             duration_value = float(combustion_cfg_local.duration_s) if combustion_cfg_local.duration_s is not None else float(combustion_cfg_local.duration_ms) * 1.0e-3
@@ -888,6 +906,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         volume_mechanical_dof=volume_mechanical_dof,
         volume_mechanical_sign=volume_mechanical_sign,
         combustion_fueling_mode=str(getattr(combustion_cfg, 'fueling_mode', 'fixed_energy') or 'fixed_energy'),
+        combustion_fueling_mode_by_vol=combustion_fueling_mode_by_vol,
         combustion_lambda_target=float(getattr(combustion_cfg, 'lambda_target', 0.0) or 0.0),
         combustion_afr_stoich_kg_air_per_kg_fuel=float(getattr(combustion_cfg, 'afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5),
         combustion_efficiency_0to1=float(getattr(combustion_cfg, 'combustion_efficiency_0to1', 1.0) or 1.0),
@@ -896,6 +915,10 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         combustion_slot_closed_threshold_m2=float(getattr(combustion_cfg, 'slot_closed_threshold_m2', 1.0e-9) or 1.0e-9),
         combustion_compression_velocity_threshold_m_per_s=float(getattr(combustion_cfg, 'compression_velocity_threshold_m_per_s', 0.02) or 0.02),
         injector_duration_s=(float(getattr(combustion_cfg, 'injection_duration_s', 0.0) or 0.0) if getattr(combustion_cfg, 'injection_duration_s', None) is not None else float(getattr(combustion_cfg, 'injection_duration_ms', 0.0) or 0.0) * 1.0e-3),
+        combustion_slot_open_threshold_by_vol_m2=combustion_slot_open_threshold_by_vol_m2,
+        combustion_slot_closed_threshold_by_vol_m2=combustion_slot_closed_threshold_by_vol_m2,
+        combustion_compression_velocity_threshold_by_vol_m_per_s=combustion_compression_velocity_threshold_by_vol_m_per_s,
+        injector_duration_by_vol_s=injector_duration_by_vol_s,
         combustion_comb_idx=int(vol_matrix[cyl_idx, VolumeCol.COMB_ROW]),
         combustion_cylinder_slot_conn_indices=cylinder_slot_conn_indices,
         hcci_enabled_by_vol=hcci_enabled_by_vol,

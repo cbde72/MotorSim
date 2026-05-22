@@ -17,7 +17,7 @@ from thermo0d.compute.analysis import CycleIndexCalculator, CycleSummaryCalculat
 from thermo0d.compute.solvers import SolverFactory
 from thermo0d.output.console import ConsoleCycleReporter
 from thermo0d.physics.rhs import RHSWrapper
-from thermo0d.model.free_piston.combustion_latch import free_piston_uses_slot_closure_lambda, free_piston_uses_time_vibe, update_free_piston_combustion_latch_state
+from thermo0d.model.free_piston.combustion_latch import free_piston_uses_slot_closure_lambda, free_piston_uses_time_vibe, free_piston_uses_vapor_injector, update_free_piston_combustion_latch_state
 
 
 @dataclass(slots=True)
@@ -131,7 +131,7 @@ def _compose_step_callbacks(*callbacks):
 def _build_free_piston_runtime_callback(bundle):
     if getattr(bundle, 'architecture', 'classic') != 'free_piston':
         return None
-    if not (free_piston_uses_slot_closure_lambda(bundle) or free_piston_uses_time_vibe(bundle)):
+    if not (free_piston_uses_slot_closure_lambda(bundle) or free_piston_uses_vapor_injector(bundle) or free_piston_uses_time_vibe(bundle)):
         return None
 
     def step_callback(step_idx: int, t_hist: np.ndarray, y_hist: np.ndarray) -> None:
@@ -144,7 +144,7 @@ def _build_free_piston_runtime_callback(bundle):
 def _build_free_piston_accepted_step_callback(bundle):
     if getattr(bundle, 'architecture', 'classic') != 'free_piston':
         return None
-    if not (free_piston_uses_slot_closure_lambda(bundle) or free_piston_uses_time_vibe(bundle)):
+    if not (free_piston_uses_slot_closure_lambda(bundle) or free_piston_uses_vapor_injector(bundle) or free_piston_uses_time_vibe(bundle)):
         return None
 
     def accepted_step_callback(t_s: float, y_state: np.ndarray) -> None:

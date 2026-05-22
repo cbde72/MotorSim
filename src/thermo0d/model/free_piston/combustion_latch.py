@@ -12,6 +12,57 @@ from thermo0d.physics.quellen_props import lambda_from_air_and_fuel_mass, proper
 
 
 F_COMB = int(FeatureCol.COMBUSTION)
+FUELING_FIXED = 0
+FUELING_SLOT_CLOSE = 1
+FUELING_VAPOR_INJECTOR = 2
+
+
+def _fueling_mode_for_cylinder(bundle, cylinder_idx: int) -> int:
+    fp = getattr(bundle, 'free_piston', None)
+    if fp is None:
+        return FUELING_FIXED
+    by_vol = getattr(fp, 'combustion_fueling_mode_by_vol', np.zeros(0, dtype=np.int64))
+    cyl = int(cylinder_idx)
+    if cyl >= 0 and cyl < int(getattr(by_vol, 'shape', (0,))[0]):
+        return int(by_vol[cyl])
+    mode = str(getattr(fp, 'combustion_fueling_mode', 'fixed_energy'))
+    if mode == 'lambda_from_cylinder_mass_at_slot_close':
+        return FUELING_SLOT_CLOSE
+    if mode == 'lambda_from_cylinder_air_at_slot_close_vapor_injector':
+        return FUELING_VAPOR_INJECTOR
+    return FUELING_FIXED
+
+
+def _cylinder_uses_slot_closure_lambda(bundle, cylinder_idx: int) -> bool:
+    return _fueling_mode_for_cylinder(bundle, int(cylinder_idx)) == FUELING_SLOT_CLOSE
+
+
+def _cylinder_uses_vapor_injector(bundle, cylinder_idx: int) -> bool:
+    return _fueling_mode_for_cylinder(bundle, int(cylinder_idx)) == FUELING_VAPOR_INJECTOR
+
+
+def _slot_open_threshold_m2(fp, cylinder_idx: int) -> float:
+    by_vol = getattr(fp, 'combustion_slot_open_threshold_by_vol_m2', np.zeros(0, dtype=np.float64))
+    cyl = int(cylinder_idx)
+    if cyl < int(getattr(by_vol, 'shape', (0,))[0]) and float(by_vol[cyl]) >= 0.0:
+        return float(by_vol[cyl])
+    return float(getattr(fp, 'combustion_slot_open_threshold_m2', 1.0e-7) or 1.0e-7)
+
+
+def _slot_closed_threshold_m2(fp, cylinder_idx: int) -> float:
+    by_vol = getattr(fp, 'combustion_slot_closed_threshold_by_vol_m2', np.zeros(0, dtype=np.float64))
+    cyl = int(cylinder_idx)
+    if cyl < int(getattr(by_vol, 'shape', (0,))[0]) and float(by_vol[cyl]) >= 0.0:
+        return float(by_vol[cyl])
+    return float(getattr(fp, 'combustion_slot_closed_threshold_m2', 1.0e-9) or 1.0e-9)
+
+
+def _compression_velocity_threshold_m_per_s(fp, cylinder_idx: int) -> float:
+    by_vol = getattr(fp, 'combustion_compression_velocity_threshold_by_vol_m_per_s', np.zeros(0, dtype=np.float64))
+    cyl = int(cylinder_idx)
+    if cyl < int(getattr(by_vol, 'shape', (0,))[0]) and float(by_vol[cyl]) >= 0.0:
+        return float(by_vol[cyl])
+    return float(getattr(fp, 'combustion_compression_velocity_threshold_m_per_s', 0.02) or 0.02)
 
 
 def free_piston_combustion_enabled(bundle) -> bool:
@@ -23,14 +74,27 @@ def free_piston_uses_slot_closure_lambda(bundle) -> bool:
     if not free_piston_combustion_enabled(bundle):
         return False
     fp = getattr(bundle, 'free_piston', None)
-    return fp is not None and str(getattr(fp, 'combustion_fueling_mode', 'fixed_energy')) == 'lambda_from_cylinder_mass_at_slot_close' and int(getattr(fp, 'combustion_comb_idx', -1)) >= 0
+    if fp is None:
+        return False
+    return any(_cylinder_uses_slot_closure_lambda(bundle, int(cyl)) and _comb_idx_for_cylinder(bundle, int(cyl)) >= 0 for cyl in getattr(bundle, 'cylinder_indices', []))
 
 
 def free_piston_uses_vapor_injector(bundle) -> bool:
     if not free_piston_combustion_enabled(bundle):
         return False
     fp = getattr(bundle, 'free_piston', None)
-    return fp is not None and str(getattr(fp, 'combustion_fueling_mode', 'fixed_energy')) == 'lambda_from_cylinder_air_at_slot_close_vapor_injector' and int(getattr(fp, 'combustion_comb_idx', -1)) >= 0
+    if fp is None:
+        return False
+    return any(_cylinder_uses_vapor_injector(bundle, int(cyl)) and _comb_idx_for_cylinder(bundle, int(cyl)) >= 0 for cyl in getattr(bundle, 'cylinder_indices', []))
+
+
+def free_piston_cylinder_uses_latched_fuel(bundle, cylinder_idx: int) -> bool:
+    if not free_piston_combustion_enabled(bundle):
+        return False
+    cyl = int(cylinder_idx)
+    if _comb_idx_for_cylinder(bundle, cyl) < 0:
+        return False
+    return _cylinder_uses_slot_closure_lambda(bundle, cyl) or _cylinder_uses_vapor_injector(bundle, cyl)
 
 
 def free_piston_uses_hcci_diesel(bundle) -> bool:
@@ -122,6 +186,11 @@ def _local_piston_kinematics_for_volume(bundle, y_state: np.ndarray, volume_idx:
 
 def _arm_vapor_injector(fp, t_s: float, fuel_mass_kg: float, cylinder_idx: int | None = None) -> None:
     duration_s = float(getattr(fp, 'injector_duration_s', 0.0) or 0.0)
+    if cylinder_idx is not None:
+        by_vol = getattr(fp, 'injector_duration_by_vol_s', np.zeros(0, dtype=np.float64))
+        cyl = int(cylinder_idx)
+        if cyl < int(getattr(by_vol, 'shape', (0,))[0]) and float(by_vol[cyl]) > 0.0:
+            duration_s = float(by_vol[cyl])
     if duration_s <= 0.0 or fuel_mass_kg <= 0.0:
         fp.runtime_injector_active = False
         fp.runtime_injector_time_s = float(t_s)
@@ -277,11 +346,12 @@ def _current_combustion_energy_J(bundle, cylinder_idx: int | None = None) -> flo
     fp = bundle.free_piston
     if fp is None:
         return 0.0
-    if free_piston_uses_slot_closure_lambda(bundle):
-        if cylinder_idx is not None:
+    if cylinder_idx is not None:
+        idx = int(cylinder_idx)
+        if free_piston_cylinder_uses_latched_fuel(bundle, idx):
             _ensure_runtime_arrays(bundle)
-            idx = int(cylinder_idx)
             return float(fp.runtime_latched_energy_by_vol_J[idx]) if bool(fp.runtime_latch_valid_by_vol[idx]) else 0.0
+    elif free_piston_uses_slot_closure_lambda(bundle) or free_piston_uses_vapor_injector(bundle):
         return float(fp.runtime_latched_energy_J) if bool(fp.runtime_latch_valid) else 0.0
     if cylinder_idx is None:
         if int(getattr(fp, 'combustion_comb_idx', -1)) < 0:
@@ -423,6 +493,7 @@ def _update_hcci_diesel_autoignition_state(bundle, t_s: float, y_state: np.ndarr
         energy = float(y_state[int(bundle.state_layout.energy_index(cyl))])
         air_mass = float(bundle.state_layout.air_mass_from_state(y_state, cyl))
         burned_mass = float(bundle.state_layout.burned_mass_from_state(y_state, cyl))
+        residual_mass = float(bundle.state_layout.residual_mass_from_state(y_state, cyl))
         fuel_mass = float(fp.runtime_latched_fuel_mass_by_vol_kg[cyl]) if bool(fp.runtime_latch_valid_by_vol[cyl]) else float(bundle.state_layout.fuel_vapor_mass_from_state(y_state, cyl))
         if mass <= 1.0e-18 or air_mass <= 1.0e-18 or fuel_mass <= 1.0e-18:
             continue
@@ -446,7 +517,7 @@ def _update_hcci_diesel_autoignition_state(bundle, t_s: float, y_state: np.ndarr
         pressure_factor = (max(float(fp.hcci_reference_pressure_by_vol_Pa[cyl]), 1.0) / max(pressure_Pa, 1.0)) ** float(fp.hcci_pressure_exponent_by_vol[cyl])
         temp_factor = float(np.exp(float(fp.hcci_activation_temperature_by_vol_K[cyl]) / max(temp_K, 1.0)))
         lambda_factor = (max(lam, 1.0e-12) / max(float(fp.hcci_reference_lambda_by_vol[cyl]), 1.0e-12)) ** float(fp.hcci_lambda_slowdown_exponent_by_vol[cyl])
-        residual_fraction = max(min(burned_mass / max(mass, 1.0e-18), 1.0), 0.0)
+        residual_fraction = max(min(residual_mass / max(mass, 1.0e-18), 1.0), 0.0)
         residual_factor = 1.0 + (float(fp.hcci_residual_slowdown_factor_by_vol[cyl]) - 1.0) * residual_fraction
         tau_s = max(float(fp.hcci_tau_A_by_vol_s[cyl]) * pressure_factor * temp_factor * lambda_factor * residual_factor, 1.0e-9)
         tau_s = min(tau_s, float(fp.hcci_max_ignition_delay_by_vol_s[cyl]))
@@ -520,6 +591,7 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
             energy = float(y[int(bundle.state_layout.energy_index(cyl_idx)), k])
             air_mass = float(bundle.state_layout.air_mass_from_state(y[:, k], cyl_idx))
             burned_mass = float(bundle.state_layout.burned_mass_from_state(y[:, k], cyl_idx))
+            residual_mass = float(bundle.state_layout.residual_mass_from_state(y[:, k], cyl_idx))
             lhv = float(bundle.combustion_lhv_by_vol[cyl_idx]) if getattr(bundle, 'combustion_lhv_by_vol', None) is not None and cyl_idx < int(bundle.combustion_lhv_by_vol.shape[0]) else float(getattr(fp, 'combustion_lhv_J_per_kg', 0.0) or 0.0)
             comb_eff = float(bundle.combustion_efficiency_by_vol[cyl_idx]) if getattr(bundle, 'combustion_efficiency_by_vol', None) is not None and cyl_idx < int(bundle.combustion_efficiency_by_vol.shape[0]) else float(getattr(fp, 'combustion_efficiency_0to1', 1.0) or 1.0)
             fuel_mass = q_total_J / max(lhv * comb_eff, 1.0e-18)
@@ -543,7 +615,7 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
             pressure_factor = (max(float(fp.hcci_reference_pressure_by_vol_Pa[cyl_idx]), 1.0) / max(pressure_Pa, 1.0)) ** float(fp.hcci_pressure_exponent_by_vol[cyl_idx])
             temp_factor = float(np.exp(float(fp.hcci_activation_temperature_by_vol_K[cyl_idx]) / max(temp_K, 1.0)))
             lambda_factor = (max(lam, 1.0e-12) / max(float(fp.hcci_reference_lambda_by_vol[cyl_idx]), 1.0e-12)) ** float(fp.hcci_lambda_slowdown_exponent_by_vol[cyl_idx])
-            residual_fraction = max(min(burned_mass / max(mass, 1.0e-18), 1.0), 0.0)
+            residual_fraction = max(min(residual_mass / max(mass, 1.0e-18), 1.0), 0.0)
             residual_factor = 1.0 + (float(fp.hcci_residual_slowdown_factor_by_vol[cyl_idx]) - 1.0) * residual_fraction
             tau_s = max(float(fp.hcci_tau_A_by_vol_s[cyl_idx]) * pressure_factor * temp_factor * lambda_factor * residual_factor, 1.0e-9)
             tau_s = min(tau_s, float(fp.hcci_max_ignition_delay_by_vol_s[cyl_idx]))
@@ -686,14 +758,14 @@ def bootstrap_free_piston_combustion_latch(bundle) -> None:
     y0 = bundle.y_init
     for cyl_idx in getattr(bundle, 'cylinder_indices', []):
         cyl = int(cyl_idx)
-        if _comb_idx_for_cylinder(bundle, cyl) < 0:
+        if not free_piston_cylinder_uses_latched_fuel(bundle, cyl):
             continue
         x_m, v_m_per_s = _local_piston_kinematics_for_volume(bundle, y0, cyl)
         area_sum_m2 = _cylinder_slot_area_sum_m2(bundle, x_m, cyl)
         fp.runtime_last_slot_area_by_vol_m2[cyl] = float(area_sum_m2)
         if cyl == int(bundle.cylinder_indices[0]):
             fp.runtime_last_slot_area_sum_m2 = float(area_sum_m2)
-        if area_sum_m2 > float(fp.combustion_slot_open_threshold_m2):
+        if area_sum_m2 > _slot_open_threshold_m2(fp, cyl):
             fp.runtime_slots_were_open_by_vol[cyl] = 1
             fp.runtime_latch_valid_by_vol[cyl] = 0
             if cyl < int(getattr(fp.runtime_hcci_integral_by_vol, 'shape', (0,))[0]):
@@ -702,7 +774,7 @@ def bootstrap_free_piston_combustion_latch(bundle) -> None:
                 fp.runtime_slots_were_open = True
                 fp.runtime_latch_valid = False
             continue
-        if not (v_m_per_s < -float(fp.combustion_compression_velocity_threshold_m_per_s) and area_sum_m2 <= float(fp.combustion_slot_closed_threshold_m2)):
+        if not (v_m_per_s < -_compression_velocity_threshold_m_per_s(fp, cyl) and area_sum_m2 <= _slot_closed_threshold_m2(fp, cyl)):
             continue
         air_idx = int(bundle.state_layout.air_mass_index(cyl))
         cylinder_air_mass_kg = float(y0[air_idx])
@@ -720,7 +792,7 @@ def bootstrap_free_piston_combustion_latch(bundle) -> None:
             fp.runtime_latched_energy_J = energy_J
             fp.runtime_latch_valid = True
             fp.runtime_slots_were_open = False
-        if free_piston_uses_slot_closure_lambda(bundle):
+        if _cylinder_uses_slot_closure_lambda(bundle, cyl):
             duration_s = float(getattr(bundle.simulation, 'dt_s', 0.0))
             _arm_slotclose_charge(fp, 0.0, fuel_mass_kg, duration_s)
             fp.runtime_slotclose_charge_active_by_vol[cyl] = 1 if fuel_mass_kg > 0.0 and duration_s > 0.0 else 0
@@ -728,7 +800,7 @@ def bootstrap_free_piston_combustion_latch(bundle) -> None:
             fp.runtime_slotclose_charge_end_time_by_vol_s[cyl] = duration_s
             fp.runtime_slotclose_charge_target_fuel_by_vol_kg[cyl] = fuel_mass_kg
             fp.runtime_slotclose_charge_rate_by_vol_kg_per_s[cyl] = fuel_mass_kg / duration_s if duration_s > 0.0 else 0.0
-        if free_piston_uses_vapor_injector(bundle):
+        if _cylinder_uses_vapor_injector(bundle, cyl):
             _arm_vapor_injector(fp, 0.0, fuel_mass_kg, cyl)
 
 
@@ -751,7 +823,7 @@ def update_free_piston_combustion_latch_state(bundle, t_s: float, y_state: np.nd
     fp = bundle.free_piston
     for cyl_idx in getattr(bundle, 'cylinder_indices', []):
         cyl = int(cyl_idx)
-        if _comb_idx_for_cylinder(bundle, cyl) < 0:
+        if not free_piston_cylinder_uses_latched_fuel(bundle, cyl):
             continue
         x_m, v_m_per_s = _local_piston_kinematics_for_volume(bundle, y_state, cyl)
         area_sum_m2 = _cylinder_slot_area_sum_m2(bundle, x_m, cyl)
@@ -759,7 +831,7 @@ def update_free_piston_combustion_latch_state(bundle, t_s: float, y_state: np.nd
         if cyl == int(bundle.cylinder_indices[0]):
             fp.runtime_last_slot_area_sum_m2 = float(area_sum_m2)
 
-        if area_sum_m2 > float(fp.combustion_slot_open_threshold_m2):
+        if area_sum_m2 > _slot_open_threshold_m2(fp, cyl):
             fp.runtime_slots_were_open_by_vol[cyl] = 1
             fp.runtime_latch_valid_by_vol[cyl] = 0
             if cyl == int(bundle.cylinder_indices[0]):
@@ -769,8 +841,8 @@ def update_free_piston_combustion_latch_state(bundle, t_s: float, y_state: np.nd
 
         if not (
             bool(fp.runtime_slots_were_open_by_vol[cyl])
-            and area_sum_m2 <= float(fp.combustion_slot_closed_threshold_m2)
-            and v_m_per_s < -float(fp.combustion_compression_velocity_threshold_m_per_s)
+            and area_sum_m2 <= _slot_closed_threshold_m2(fp, cyl)
+            and v_m_per_s < -_compression_velocity_threshold_m_per_s(fp, cyl)
         ):
             continue
 
@@ -788,7 +860,7 @@ def update_free_piston_combustion_latch_state(bundle, t_s: float, y_state: np.nd
             fp.runtime_latched_energy_J = energy_J
             fp.runtime_latch_valid = True
             fp.runtime_slots_were_open = False
-        if free_piston_uses_slot_closure_lambda(bundle):
+        if _cylinder_uses_slot_closure_lambda(bundle, cyl):
             duration_s = float(getattr(bundle.simulation, 'dt_s', 0.0))
             _arm_slotclose_charge(fp, t_s, fuel_mass_kg, duration_s)
             fp.runtime_slotclose_charge_active_by_vol[cyl] = 1 if fuel_mass_kg > 0.0 and duration_s > 0.0 else 0
@@ -796,7 +868,7 @@ def update_free_piston_combustion_latch_state(bundle, t_s: float, y_state: np.nd
             fp.runtime_slotclose_charge_end_time_by_vol_s[cyl] = float(t_s + duration_s)
             fp.runtime_slotclose_charge_target_fuel_by_vol_kg[cyl] = fuel_mass_kg
             fp.runtime_slotclose_charge_rate_by_vol_kg_per_s[cyl] = fuel_mass_kg / duration_s if duration_s > 0.0 else 0.0
-        if free_piston_uses_vapor_injector(bundle):
+        if _cylinder_uses_vapor_injector(bundle, cyl):
             _arm_vapor_injector(fp, t_s, fuel_mass_kg, cyl)
     _update_hcci_diesel_autoignition_state(bundle, t_s, y_state)
 
@@ -807,7 +879,7 @@ def replay_free_piston_combustion_latch_series(bundle, y: np.ndarray, cylinder_i
     fuel_hist = np.zeros(n, dtype=np.float64)
     energy_hist = np.zeros(n, dtype=np.float64)
     area_hist = np.zeros(n, dtype=np.float64)
-    if not free_piston_uses_slot_closure_lambda(bundle):
+    if not (free_piston_uses_slot_closure_lambda(bundle) or free_piston_uses_vapor_injector(bundle)):
         return mass_hist, fuel_hist, energy_hist, area_hist
 
     fp = bundle.free_piston
@@ -817,26 +889,28 @@ def replay_free_piston_combustion_latch_series(bundle, y: np.ndarray, cylinder_i
     latched_fuel = 0.0
     latched_energy = 0.0
     cyl_idx = int(cylinder_idx) if cylinder_idx is not None else int(bundle.cylinder_indices[0])
+    if not free_piston_cylinder_uses_latched_fuel(bundle, cyl_idx):
+        return mass_hist, fuel_hist, energy_hist, area_hist
     air_idx = int(bundle.state_layout.air_mass_index(cyl_idx))
     for k in range(n):
         x_m, v_m_per_s = _local_piston_kinematics_for_volume(bundle, y[:, k], cyl_idx)
         area_sum_m2 = _cylinder_slot_area_sum_m2(bundle, x_m, cyl_idx)
         area_hist[k] = area_sum_m2
-        if area_sum_m2 > float(fp.combustion_slot_open_threshold_m2):
+        if area_sum_m2 > _slot_open_threshold_m2(fp, cyl_idx):
             slots_were_open = True
             latch_valid = False
         elif (
             slots_were_open
-            and area_sum_m2 <= float(fp.combustion_slot_closed_threshold_m2)
-            and v_m_per_s < -float(fp.combustion_compression_velocity_threshold_m_per_s)
+            and area_sum_m2 <= _slot_closed_threshold_m2(fp, cyl_idx)
+            and v_m_per_s < -_compression_velocity_threshold_m_per_s(fp, cyl_idx)
         ):
             latched_mass = float(y[air_idx, k])
             latched_fuel, latched_energy = compute_lambda_energy_from_cylinder_mass(latched_mass, bundle, cyl_idx)
             latch_valid = True
             slots_were_open = False
         elif (
-            k == 0 and area_sum_m2 <= float(fp.combustion_slot_closed_threshold_m2)
-            and v_m_per_s < -float(fp.combustion_compression_velocity_threshold_m_per_s)
+            k == 0 and area_sum_m2 <= _slot_closed_threshold_m2(fp, cyl_idx)
+            and v_m_per_s < -_compression_velocity_threshold_m_per_s(fp, cyl_idx)
         ):
             latched_mass = float(y[air_idx, k])
             latched_fuel, latched_energy = compute_lambda_energy_from_cylinder_mass(latched_mass, bundle, cyl_idx)

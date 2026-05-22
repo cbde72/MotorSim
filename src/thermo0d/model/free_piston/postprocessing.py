@@ -22,9 +22,11 @@ from thermo0d.physics.composition import burned_fraction_0to1, unburned_mass_kg
 from thermo0d.physics.quellen_props import lambda_from_air_and_fuel_mass, properties_from_mass_energy_components_quellen
 
 try:
-    from thermo0d.model.free_piston.combustion_latch import free_piston_combustion_enabled, free_piston_uses_slot_closure_lambda, replay_free_piston_combustion_latch_series, replay_free_piston_time_combustion_series
+    from thermo0d.model.free_piston.combustion_latch import free_piston_combustion_enabled, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector, replay_free_piston_combustion_latch_series, replay_free_piston_time_combustion_series
 except Exception:  # pragma: no cover - compatibility for project states without latch patch
+    free_piston_combustion_enabled = None
     free_piston_uses_slot_closure_lambda = None
+    free_piston_uses_vapor_injector = None
     replay_free_piston_combustion_latch_series = None
     replay_free_piston_time_combustion_series = None
 
@@ -50,7 +52,7 @@ def _stateful_bounce_index(bundle) -> int:
 def _replay_combustion_latch_history(bundle, y: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     n = int(y.shape[1])
     zeros = np.zeros(n, dtype=np.float64)
-    if not free_piston_combustion_enabled(bundle) or replay_free_piston_combustion_latch_series is None:
+    if free_piston_combustion_enabled is None or not free_piston_combustion_enabled(bundle) or replay_free_piston_combustion_latch_series is None:
         return zeros.copy(), zeros.copy(), zeros.copy(), zeros.copy()
     try:
         return replay_free_piston_combustion_latch_series(bundle, y)
@@ -147,8 +149,11 @@ def build_free_piston_rows(bundle, t: np.ndarray, y: np.ndarray) -> list[dict[st
     use_promo_thermo = bundle.gas_props.shape[0] > 4 and float(bundle.gas_props[4]) >= 0.5
     rows: list[dict[str, float | int]] = []
     latched_mass_hist, latched_fuel_hist, latched_energy_hist, slot_area_hist = _replay_combustion_latch_history(bundle, y)
-    use_slot_closure_lambda = free_piston_uses_slot_closure_lambda is not None and bool(free_piston_uses_slot_closure_lambda(bundle))
-    time_vibe_energy_hist = latched_energy_hist if use_slot_closure_lambda else None
+    use_latched_fuel = (
+        (free_piston_uses_slot_closure_lambda is not None and bool(free_piston_uses_slot_closure_lambda(bundle)))
+        or (free_piston_uses_vapor_injector is not None and bool(free_piston_uses_vapor_injector(bundle)))
+    )
+    time_vibe_energy_hist = latched_energy_hist if use_latched_fuel else None
     if replay_free_piston_time_combustion_series is not None:
         soc_time_hist, soc_energy_hist, _soc_active_hist = replay_free_piston_time_combustion_series(bundle, np.asarray(t, dtype=np.float64), np.asarray(y, dtype=np.float64), time_vibe_energy_hist)
     else:
