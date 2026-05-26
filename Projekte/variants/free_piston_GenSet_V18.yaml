@@ -179,7 +179,7 @@ preprocessing:
         ignition_model: beck_2003_two_stage                                                                                                                                   # Zweistufiges Beck-Zuendmodell mit Cool Flame und Hot Flame.
         burn_model: vibe-beck                                                                                                                                                 # Beck-Vibe-Brennverlaufsmodell nach Autoignition.
         duration_ms: 1.2                                                                                                                                                      # Brenndauer in Millisekunden.
-        lambda_target: 1.4                                                                                                                                                    # Ziel-Luftverhaeltnis Lambda.
+        lambda_target: 2.4                                                                                                                                                    # Ziel-Luftverhaeltnis Lambda.
         lhv_J_per_kg: 43000000.0                                                                                                                                              # Unterer Heizwert des Kraftstoffs.
         slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
         beck_cf_fuel_name: Diesel 2                                                                                                                                           # Kraftstoffname nach Beck Tabelle 6.2 fuer das Cool-Flame-Modell.

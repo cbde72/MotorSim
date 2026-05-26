@@ -7,201 +7,223 @@
   <style>
     :root {
       color-scheme: light;
-      --ink: #20242a;
-      --muted: #5a6472;
-      --line: #d9dee7;
-      --panel: #f6f8fb;
-      --green: #147d3f;
-      --green-bg: #e8f6ee;
-      --yellow: #8a6100;
-      --yellow-bg: #fff5d6;
-      --red: #a02b25;
-      --red-bg: #fde9e7;
-      --blue: #245b9e;
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #e2e8f0;
+      --panel: #f8fafc;
+      --green: #15803d;
+      --green-bg: #f0fdf4;
+      --yellow: #b45309;
+      --yellow-bg: #fffbeb;
+      --red: #b91c1c;
+      --red-bg: #fef2f2;
+      --blue: #1d4ed8;
+      --blue-bg: #eff6ff;
     }
 
     * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: "Segoe UI", Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       color: var(--ink);
-      background: #ffffff;
-      line-height: 1.55;
+      background: #f1f5f9;
+      line-height: 1.6;
     }
 
     header {
-      padding: 36px 48px 28px;
+      padding: 40px 48px 30px;
       border-bottom: 1px solid var(--line);
-      background: linear-gradient(180deg, #f7f9fc 0%, #ffffff 100%);
+      background: #ffffff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      text-align: center;
     }
 
     main {
       max-width: 1220px;
-      margin: 0 auto;
-      padding: 28px 32px 56px;
+      margin: 30px auto;
+      padding: 40px 48px 56px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
     }
 
-    h1, h2, h3 {
-      line-height: 1.2;
-      margin: 0;
-    }
+    h1, h2, h3 { line-height: 1.25; margin: 0; color: #0f172a; }
+    h1 { font-size: 34px; margin-bottom: 12px; }
+    h2 { font-size: 26px; margin-top: 48px; padding-bottom: 10px; border-bottom: 2px solid var(--line); }
+    h3 { font-size: 20px; margin-top: 32px; color: var(--blue); }
 
-    h1 {
-      font-size: 32px;
-      margin-bottom: 10px;
-    }
-
-    h2 {
-      font-size: 24px;
-      margin-top: 38px;
-      padding-top: 12px;
-      border-top: 1px solid var(--line);
-    }
-
-    h3 {
-      font-size: 18px;
-      margin-top: 24px;
-    }
-
-    p { margin: 10px 0; }
+    p { margin: 12px 0; }
 
     code {
-      font-family: Consolas, "Courier New", monospace;
-      background: #eef2f7;
-      padding: 1px 5px;
-      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: #f1f5f9;
+      color: #b91c1c;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 0.9em;
     }
 
     .subtitle {
       max-width: 950px;
+      margin: 0 auto;
       color: var(--muted);
-      font-size: 16px;
+      font-size: 17px;
     }
 
     .meta {
       display: flex;
       flex-wrap: wrap;
+      justify-content: center;
       gap: 8px;
-      margin-top: 18px;
+      margin-top: 24px;
     }
 
     .pill {
       border: 1px solid var(--line);
       border-radius: 999px;
-      padding: 4px 10px;
-      background: #ffffff;
+      padding: 6px 14px;
+      background: var(--panel);
       color: var(--muted);
       font-size: 13px;
+      font-weight: 500;
     }
 
     .toc {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 10px;
-      margin: 20px 0 10px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin: 24px 0 12px;
       padding: 0;
       list-style: none;
     }
 
     .toc a {
       display: block;
-      padding: 10px 12px;
+      padding: 12px 16px;
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: 8px;
       color: var(--blue);
       text-decoration: none;
-      background: var(--panel);
+      background: #ffffff;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    .toc a:hover {
+      border-color: var(--blue);
+      background: var(--blue-bg);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px rgba(37,99,235,0.1);
     }
 
     .note {
       border-left: 4px solid var(--blue);
-      background: #edf4fc;
-      padding: 12px 14px;
-      margin: 14px 0;
+      background: var(--blue-bg);
+      padding: 16px 20px;
+      margin: 20px 0;
+      border-radius: 0 8px 8px 0;
     }
 
     .warning {
       border-left: 4px solid var(--yellow);
       background: var(--yellow-bg);
-      padding: 12px 14px;
-      margin: 14px 0;
+      padding: 16px 20px;
+      margin: 20px 0;
+      border-radius: 0 8px 8px 0;
     }
 
     .formula {
       overflow-x: auto;
       border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #fbfcfe;
-      padding: 12px 14px;
-      margin: 12px 0;
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 24px;
+      margin: 20px 0;
+      text-align: center;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .formula math + math {
+      margin-top: 32px;
     }
 
     math {
       font-family: "Cambria Math", "STIX Two Math", serif;
-      font-size: 1.08em;
+      font-size: 1.45em;
     }
 
     table {
       width: 100%;
-      border-collapse: collapse;
-      margin: 12px 0 18px;
-      font-size: 14px;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 20px 0;
+      font-size: 14.5px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
 
     th, td {
-      border: 1px solid var(--line);
-      padding: 8px 9px;
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      padding: 12px 14px;
       vertical-align: top;
       text-align: left;
     }
+    th:last-child, td:last-child { border-right: none; }
+    tr:last-child td { border-bottom: none; }
 
     th {
-      background: #eef2f7;
-      font-weight: 650;
+      background: #f8fafc;
+      font-weight: 600;
+      color: #334155;
     }
 
-    tbody tr:nth-child(even) td { background: #fafbfe; }
+    tbody tr:hover td { background: #f1f5f9; transition: background 0.15s ease; }
 
     .nowrap { white-space: nowrap; }
     .small { font-size: 13px; color: var(--muted); }
 
     .traffic {
       display: grid;
-      gap: 12px;
-      margin-top: 14px;
+      gap: 16px;
+      margin-top: 20px;
     }
 
     .traffic-item {
       border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px 14px;
+      border-radius: 10px;
+      padding: 16px 20px;
     }
 
     .traffic-item h3 {
       margin-top: 0;
       display: flex;
-      gap: 8px;
+      gap: 10px;
       align-items: center;
+      font-size: 18px;
+      color: var(--ink);
     }
 
     .lamp {
-      width: 14px;
-      height: 14px;
+      width: 16px;
+      height: 16px;
       border-radius: 50%;
       display: inline-block;
-      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
     }
 
-    .green { background: var(--green-bg); }
-    .green .lamp { background: var(--green); }
-    .yellow { background: var(--yellow-bg); }
-    .yellow .lamp { background: #e6a700; }
-    .red { background: var(--red-bg); }
-    .red .lamp { background: var(--red); }
+    .green { background: var(--green-bg); border-color: #bbf7d0; }
+    .green .lamp { background: #22c55e; box-shadow: 0 0 8px #22c55e, inset 0 2px 4px rgba(0,0,0,0.2); }
+    .yellow { background: var(--yellow-bg); border-color: #fef08a; }
+    .yellow .lamp { background: #eab308; box-shadow: 0 0 8px #eab308, inset 0 2px 4px rgba(0,0,0,0.2); }
+    .red { background: var(--red-bg); border-color: #fecaca; }
+    .red .lamp { background: #ef4444; box-shadow: 0 0 8px #ef4444, inset 0 2px 4px rgba(0,0,0,0.2); }
 
-    ul { margin-top: 8px; padding-left: 22px; }
-    li { margin: 5px 0; }
+    ul { margin-top: 10px; padding-left: 24px; }
+    li { margin: 6px 0; }
   </style>
 </head>
 <body>
@@ -330,9 +352,11 @@
         </math>
       </div>
       <p>
-        Dabei ist <math><mi>s</mi></math> auf <math><mo>[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>]</mo></math>
-        begrenzt. Ausserhalb dieses Fensters ist die Rate null, nach Ende ist
-        <math><msub><mi>x</mi><mi>b</mi></msub><mo>=</mo><mn>1</mn></math>.
+        Dabei beschreibt <math><msub><mi>x</mi><mi>b</mi></msub></math> den normierten verbrannten Massenanteil (0 bis 1).
+        <math><mi>s</mi></math> ist die normierte Fortschrittsgr&ouml;&szlig;e, die auf das Intervall <math><mo>[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>]</mo></math> begrenzt ist.
+        Der Parameter <math><mi>a</mi></math> bestimmt die Vollst&auml;ndigkeit der Verbrennung (typischerweise 6.9 f&uuml;r 99.9% Umsatz),
+        w&auml;hrend der Formparameter <math><mi>m</mi></math> die Schiefe und Asymmetrie des Brennverlaufs vorgibt.
+        Ausserhalb dieses Fensters ist die Rate null, nach Ende ist <math><msub><mi>x</mi><mi>b</mi></msub><mo>=</mo><mn>1</mn></math>.
       </p>
 
       <h3>2.2 Waermefreisetzung</h3>
@@ -361,6 +385,12 @@
           </mrow>
         </math>
       </div>
+      <p>
+        Hierbei repr&auml;sentiert <math><msub><mi>Q</mi><mi>tot</mi></msub></math> die theoretisch verf&uuml;gbare Gesamtenergie in Joule.
+        Diese berechnet sich aus der zugef&uuml;hrten Kraftstoffmasse <math><msub><mi>m</mi><mi>fuel</mi></msub></math> in kg,
+        dem unteren Heizwert <math><msub><mi>H</mi><mi>u</mi></msub></math> in J/kg und dem Verbrennungswirkungsgrad <math><msub><mi>&eta;</mi><mi>comb</mi></msub></math>.
+        Die momentane W&auml;rmefreisetzungsrate <math><mover><mi>Q</mi><mo>.</mo></mover></math> in Watt (J/s) skaliert diese Gesamtenergie mit der zeitlichen Ableitung des Vibe-Fortschritts.
+      </p>
 
       <h3>2.3 Fortschrittsdefinitionen</h3>
       <table>
@@ -382,7 +412,7 @@
                 </mrow>
               </math>
             </td>
-            <td>Winkelbezogen, mit <code>angle_reference</code> und Wrap um den Zyklus.</td>
+            <td>Winkelbezogen, mit <code>angle_reference</code> und Wrap um den Zyklus. Dabei ist <math><mi>&theta;</mi></math> der aktuelle Kurbelwinkel, <math><msub><mi>&theta;</mi><mi>SOC</mi></msub></math> der Startwinkel und <math><mi>&Delta;</mi><mi>&theta;</mi></math> die Brenndauer in Grad.</td>
           </tr>
           <tr>
             <td><code>duration_mode: compression_hub</code></td>
@@ -399,7 +429,7 @@
                 </mrow>
               </math>
             </td>
-            <td>Zeitbasiert; wird fuer HCCI-Autoignition und <code>vibe-beck</code> verwendet.</td>
+            <td>Zeitbasiert; wird fuer HCCI-Autoignition und <code>vibe-beck</code> verwendet. <math><mi>t</mi></math> ist die aktuelle Zeit, <math><msub><mi>t</mi><mi>SOC</mi></msub></math> der Startzeitpunkt und <math><msub><mi>&Delta;t</mi><mi>comb</mi></msub></math> die Dauer in Sekunden.</td>
           </tr>
         </tbody>
       </table>
@@ -430,6 +460,13 @@
           </mrow>
         </math>
       </div>
+      <p>
+        Hierbei ist <math><mi>I</mi><mo>(</mo><mi>t</mi><mo>)</mo></math> das dimensionslose Livengood-Wu-Integral zum Zeitpunkt <math><mi>t</mi></math>.
+        <math><msub><mi>t</mi><mn>0</mn></msub></math> markiert den Integrationsstart (z.B. nach Schlie&szlig;en der Ventile).
+        <math><mi>&tau;</mi></math> beschreibt den momentanen Z&uuml;ndverzug in Sekunden, der dynamisch von Zylinderdruck <math><mi>p</mi></math>,
+        Temperatur <math><mi>T</mi></math>, Luftverh&auml;ltnis <math><mi>&lambda;</mi></math> und der Ladungszusammensetzung (bzw. dem Restgasanteil <math><mi>x</mi></math>) abh&auml;ngt.
+        Sobald das Integral den Wert 1 erreicht, tritt die Z&uuml;ndung (Start of Combustion, SOC) ein.
+      </p>
 
       <h3>3.2 Generisches HCCI-Modell <code>livengood_wu</code></h3>
       <div class="formula">
@@ -469,6 +506,12 @@
         </math>
       </div>
       <p>
+        Dabei ist <math><msub><mi>A</mi><mi>&tau;</mi></msub></math> ein pr&auml;-exponentieller Vorfaktor. Der Einfluss des Zylinderdrucks <math><mi>p</mi></math>
+        wird &uuml;ber den Referenzdruck <math><msub><mi>p</mi><mi>ref</mi></msub></math> und den Druckexponenten <math><msub><mi>n</mi><mi>p</mi></msub></math> abgebildet.
+        Die Reaktivit&auml;t steigt exponentiell mit der Temperatur <math><mi>T</mi></math>, gesteuert durch die Aktivierungstemperatur <math><msub><mi>T</mi><mi>A</mi></msub></math>.
+        Der Einfluss des Luftverh&auml;ltnisses <math><mi>&lambda;</mi></math> wird durch den Exponenten <math><msub><mi>n</mi><mi>&lambda;</mi></msub></math> und <math><msub><mi>&lambda;</mi><mi>ref</mi></msub></math> parametriert.
+        <math><msub><mi>f</mi><mi>RG</mi></msub></math> ist eine lineares Verlangsamungsmodell f&uuml;r den Restgasanteil, basierend auf dem aktuellen Restgas-Massenanteil <math><msub><mi>x</mi><mi>RG</mi></msub></math> und einem Engineering-Vorfaktor <math><msub><mi>F</mi><mi>RG</mi></msub></math>.
+        <br><br>
         Der berechnete Z&uuml;ndverzug wird im Code unten auf <code>1.0e-9 s</code> begrenzt und oben
         mit <code>max_ignition_delay_s</code> gedeckelt.
       </p>
@@ -507,9 +550,13 @@
         </math>
       </div>
       <p>
-        Im Code ist <math><mi>p</mi></math> in bar fuer den Druckterm, <math><msub><mi>p</mi><mn>0</mn></msub></math>
-        der Referenzdruck in bar und <math><mi>p</mi><mi>V</mi><mo>/</mo><mi>m</mi></math> die spezifische
-        ideale Gasgroesse in J/kg.
+        Hierbei ist <math><mi>&tau;</mi></math> der Z&uuml;ndverzug nach Beck in Sekunden.
+        <math><msub><mi>c</mi><mn>1</mn></msub></math> ist ein kraftstoffabh&auml;ngiger Zeit-Vorfaktor und <math><msub><mi>c</mi><mn>2</mn></msub></math> der dazugeh&ouml;rige Druckexponent.
+        Im Code ist <math><mi>p</mi></math> der Zylinderdruck in bar und <math><msub><mi>p</mi><mn>0</mn></msub></math>
+        der Referenzdruck (meist 1 bar). Das Verh&auml;ltnis <math><msub><mi>O</mi><mrow><mn>2</mn><mo>,</mo><mi>Luft</mi></mrow></msub><mo>/</mo><msub><mi>O</mi><mrow><mn>2</mn><mo>,</mo><mi>Ladung</mi></mrow></msub></math> korrigiert den
+        Sauerstoffmangel durch Abgasverd&uuml;nnung.
+        <math><msub><mi>E</mi><mi>A</mi></msub></math> beschreibt die kraftstoffspezifische Aktivierungsenergie.
+        Der Term <math><mi>p</mi><mi>V</mi><mo>/</mo><mi>m</mi></math> entspricht der universellen Gaskonstante mal Temperatur (Spezifische Energie in J/kg).
       </p>
 
       <h3>4.2 Sauerstoffterm im aktuellen Code</h3>
@@ -583,6 +630,14 @@
           </mrow>
         </math>
       </div>
+      <p>
+        Die Variablen <math><msub><mi>I</mi><mi>CF</mi></msub></math> und <math><msub><mi>I</mi><mi>HF</mi></msub></math> repr&auml;sentieren die Livengood-Wu-Integrale
+        f&uuml;r die Cool Flame (Vorreaktion) bzw. die Hot Flame (Hauptverbrennung).
+        <math><msub><mi>&tau;</mi><mi>CF</mi></msub></math> und <math><msub><mi>&tau;</mi><mi>HF</mi></msub></math> sind die jeweiligen Z&uuml;ndverz&uuml;ge, berechnet mit den unterschiedlichen
+        Aktivierungsenergien <math><msub><mi>E</mi><mrow><mi>A</mi><mo>,</mo><mi>CF</mi></mrow></msub></math> und <math><msub><mi>E</mi><mrow><mi>A</mi><mo>,</mo><mi>HF</mi></mrow></msub></math>.
+        Nach der Z&uuml;ndung werden die freiwerdenden Energiemengen aufgeteilt: <math><msub><mi>Q</mi><mi>CF</mi></msub></math> und <math><msub><mi>Q</mi><mi>HF</mi></msub></math>
+        werden aus der Gesamtw&auml;rme <math><msub><mi>Q</mi><mi>tot</mi></msub></math> abgeleitet, wobei <math><msub><mi>f</mi><mi>CF</mi></msub></math> den fest konfigurierten Energieanteil der Cool Flame angibt.
+      </p>
 
       <h3>4.4 <code>vibe-beck</code></h3>
       <p>
@@ -599,6 +654,11 @@
           </mrow>
         </math>
       </div>
+      <p>
+        Dabei ist <math><msub><mi>s</mi><mi>Beck</mi></msub></math> der normierte zeitliche Fortschritt f&uuml;r die Vibe-Freisetzung.
+        <math><mi>t</mi></math> steht f&uuml;r die aktuelle Simulationszeit. <math><msub><mi>t</mi><mi>SOC</mi></msub></math> markiert den
+        berechneten Z&uuml;ndzeitpunkt (Start of Combustion) der jeweiligen Stufe, und <math><msub><mi>&Delta;t</mi><mi>Beck</mi></msub></math> ist die absolute zeitliche Dauer dieser Verbrennungsphase (CF oder HF) in Sekunden.
+      </p>
     </section>
 
     <section id="parameter">
@@ -610,17 +670,17 @@
           <tr><th>Parameter</th><th>Bedeutung</th><th>Randbedingung</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>start_mode</code></td><td><code>angle</code>, <code>compression_hub</code> oder <code>hign_position</code>.</td><td>Bei <code>hign_position</code> ist Zeitdauer erforderlich.</td></tr>
-          <tr><td><code>start_deg</code></td><td>Startwinkel.</td><td>Nur fuer <code>start_mode: angle</code>.</td></tr>
-          <tr><td><code>start_hub_m</code></td><td>Startposition entlang des Kompressionshubs.</td><td>Nur fuer <code>start_mode: compression_hub</code>, <math><mo>&ge;</mo><mn>0</mn></math>.</td></tr>
-          <tr><td><code>hign_m</code>, <code>hign_mm</code></td><td>Zuendposition als Abstand zu OT.</td><td>Genau einer der beiden Werte, <math><mo>&gt;</mo><mn>0</mn></math>.</td></tr>
-          <tr><td><code>duration_mode</code></td><td><code>angle</code>, <code>compression_hub</code> oder <code>time</code>.</td><td>Wird bei fehlender Angabe aus den Dauerfeldern abgeleitet.</td></tr>
-          <tr><td><code>duration_deg</code>, <code>duration_hub_m</code>, <code>duration_s</code>, <code>duration_ms</code></td><td>Brenndauer.</td><td>Passend zum Dauer-Modus, positiv.</td></tr>
-          <tr><td><code>a</code>, <code>m</code></td><td>Vibe-Formparameter.</td><td><code>a &gt; 0</code>; <code>m</code> muss numerisch gueltig sein.</td></tr>
-          <tr><td><code>fuel_mass_per_cycle_kg</code>, <code>lhv_J_per_kg</code></td><td>Kraftstoffmasse und Heizwert.</td><td>Gemeinsam oder alternativ <code>added_energy_per_cycle_J</code>.</td></tr>
-          <tr><td><code>added_energy_per_cycle_J</code></td><td>Direkt vorgegebene Zyklusenergie.</td><td><math><mo>&ge;</mo><mn>0</mn></math>.</td></tr>
-          <tr><td><code>energy_coupling</code>, <code>stroke_reference_m</code>, <code>stroke_exponent</code></td><td>Optionale Energieskalierung mit Hub.</td><td>Referenzhub positiv, wenn Kopplung aktiv ist.</td></tr>
-          <tr><td><code>fueling_mode</code></td><td><code>fixed_energy</code>, Slot-Close-Lambda oder Vapor-Injector.</td><td>Lambda-Modi benoetigen gueltige Luftmasse und Ziel-Lambda.</td></tr>
+          <tr><td><code>start_mode</code></td><td><code>angle</code>, <code>compression_hub</code> oder <code>hign_position</code>.</td><td>Legt den Ausl&ouml;ser f&uuml;r den Verbrennungsstart fest: Kurbelwinkel-gesteuert (<code>angle</code>), entlang des Kompressionshubs (<code>compression_hub</code>) oder bei Erreichen eines definierten Abstands zum OT (<code>hign_position</code>).</td></tr>
+          <tr><td><code>start_deg</code></td><td>Startwinkel.</td><td>Bestimmt den Z&uuml;nd-Kurbelwinkel. Wird nur ausgewertet, wenn <code>start_mode: angle</code> konfiguriert ist.</td></tr>
+          <tr><td><code>start_hub_m</code></td><td>Startposition entlang des Kompressionshubs.</td><td>Distanz ab UT w&auml;hrend der Kompression. Greift nur bei <code>start_mode: compression_hub</code>, <math><mo>&ge;</mo><mn>0</mn></math>.</td></tr>
+          <tr><td><code>hign_m</code>, <code>hign_mm</code></td><td>Z&uuml;ndposition als Abstand zu OT.</td><td>L&ouml;st die Verbrennung aus, sobald der Kolben sich dem OT auf diesen Wert gen&auml;hert hat. Genau einer der beiden Werte darf konfiguriert sein, <math><mo>&gt;</mo><mn>0</mn></math>.</td></tr>
+          <tr><td><code>duration_mode</code></td><td><code>angle</code>, <code>compression_hub</code> oder <code>time</code>.</td><td>Gibt an, ob die Brenndauer in Winkelgraden, Hub-Metern oder in Sekunden (Zeit) bemessen wird. Fehlt die Angabe, wird der Modus aus den Dauer-Feldern interpoliert.</td></tr>
+          <tr><td><code>duration_deg</code>, <code>duration_hub_m</code>, <code>duration_s</code>, <code>duration_ms</code></td><td>Brenndauer der Vibe-Funktion.</td><td>Bestimmt, wie lange die W&auml;rmefreisetzung andauert. Muss passend zum gew&auml;hlten <code>duration_mode</code> gesetzt und positiv sein.</td></tr>
+          <tr><td><code>a</code>, <code>m</code></td><td>Vibe-Formparameter (Vollst&auml;ndigkeit & Form).</td><td><code>a &gt; 0</code> (meist 6.9 f&uuml;r 99.9% Umsatz); <code>m</code> (meist 2.0 bis 3.0) bestimmt die Schiefe der Freisetzungsrate. M&uuml;ssen numerisch g&uuml;ltig sein.</td></tr>
+          <tr><td><code>fuel_mass_per_cycle_kg</code>, <code>lhv_J_per_kg</code></td><td>Kraftstoffmasse und unterer Heizwert.</td><td>Definieren die gesamte verf&uuml;gbare Zyklusenergie. Alternativ kann <code>added_energy_per_cycle_J</code> direkt angegeben werden.</td></tr>
+          <tr><td><code>added_energy_per_cycle_J</code></td><td>Direkt vorgegebene Zyklusenergie.</td><td>Gesamte in die Verbrennung eingebrachte Energie (ohne Heizwert-Berechnung). Darf nicht negativ sein (<math><mo>&ge;</mo><mn>0</mn></math>).</td></tr>
+          <tr><td><code>energy_coupling</code>, <code>stroke_reference_m</code>, <code>stroke_exponent</code></td><td>Optionale Energieskalierung &uuml;ber den tats&auml;chlichen Hub.</td><td>Erlaubt eine automatische Anpassung der Verbrennungsenergie bei variierenden Freikolben-H&uuml;ben. Referenzhub muss positiv sein.</td></tr>
+          <tr><td><code>fueling_mode</code></td><td><code>fixed_energy</code> oder Einspritz-Latch-Modelle.</td><td><code>fixed_energy</code> ignoriert die reale Frischluft. Lambda-Modi (z.B. Vapor-Injector beim Schlie&szlig;en der Schlitze) berechnen die Kraftstoffmenge dynamisch aus der gefangenen Luft und dem <code>lambda_target</code>.</td></tr>
         </tbody>
       </table>
 
@@ -630,25 +690,25 @@
           <tr><th>Parameter</th><th>Default / V18</th><th>Bedeutung</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>ignition_model</code></td><td><code>livengood_wu</code>, V18: <code>beck_2003_two_stage</code></td><td>Auswahl des Z&uuml;ndverzugsmodells.</td></tr>
-          <tr><td><code>burn_model</code></td><td><code>wiebe_autoignition</code>, V18: <code>vibe-beck</code></td><td>Zeitbasierter Brennverlauf nach Autoignition.</td></tr>
-          <tr><td><code>duration_ms</code> / <code>duration_s</code></td><td>V18: <code>1.2 ms</code></td><td>Dauer der Hot-Flame-Hauptverbrennung.</td></tr>
-          <tr><td><code>a</code>, <code>m</code></td><td><code>6.9</code>, <code>2.0</code></td><td>Vibe-Formparameter fuer Hot Flame.</td></tr>
-          <tr><td><code>lambda_target</code></td><td>V18: <code>1.4</code></td><td>Ziel-Luftverhaeltnis fuer Kraftstoffenergie bei Slot-Close-Bedatung.</td></tr>
-          <tr><td><code>afr_stoich_kg_air_per_kg_fuel</code></td><td><code>14.5</code></td><td>Stoechiometrischer Luftbedarf.</td></tr>
-          <tr><td><code>lhv_J_per_kg</code></td><td>V18: <code>43e6</code></td><td>Unterer Heizwert.</td></tr>
-          <tr><td><code>tau_A_s</code></td><td><code>1.0e-5</code></td><td>Vorfaktor fuer Z&uuml;ndverzug.</td></tr>
-          <tr><td><code>pressure_exponent</code> / <code>beck_c2</code></td><td><code>-1.2</code></td><td>Druckexponent im Z&uuml;ndverzug.</td></tr>
-          <tr><td><code>tau_activation_temperature_K</code></td><td><code>5000.0</code></td><td>Generischer Arrhenius-Ersatz ueber Aktivierungstemperatur, wenn keine Aktivierungsenergie verwendet wird.</td></tr>
-          <tr><td><code>tau_activation_energy_J_per_kg</code></td><td>optional</td><td>Hot-Flame-Aktivierungsenergie; bei Beck sonst aus Kraftstofftabelle.</td></tr>
-          <tr><td><code>beck_cf_fuel_name</code></td><td>V18: <code>Diesel 2</code></td><td>Auswahl des Beck-Kraftstoffdatensatzes.</td></tr>
-          <tr><td><code>start_temperature_min_K</code></td><td>V18: <code>580.0</code></td><td>Numerische Freigabeschwelle fuer HCCI-Integral.</td></tr>
-          <tr><td><code>start_pressure_min_Pa</code></td><td>V18: <code>500000.0</code></td><td>Numerische Freigabeschwelle fuer HCCI-Integral.</td></tr>
-          <tr><td><code>max_ignition_delay_s</code></td><td>V18: <code>0.002</code></td><td>Obergrenze fuer den berechneten Z&uuml;ndverzug.</td></tr>
-          <tr><td><code>residual_slowdown_factor</code></td><td><code>1.0</code></td><td>Engineering-Korrektur fuer Restgasanteil.</td></tr>
-          <tr><td><code>cool_flame_energy_fraction</code></td><td><code>0.08</code></td><td>Derzeit direkt genutzter Energieanteil der Cool Flame.</td></tr>
-          <tr><td><code>cool_flame_duration_ms</code></td><td><code>0.3409</code></td><td>Derzeit direkt genutzte Cool-Flame-Dauer.</td></tr>
-          <tr><td><code>cool_flame_a</code>, <code>cool_flame_m</code></td><td><code>6.9</code>, <code>2.0</code></td><td>Vibe-Formparameter der Cool Flame.</td></tr>
+          <tr><td><code>ignition_model</code></td><td><code>livengood_wu</code>, V18: <code>beck_2003_two_stage</code></td><td>Auswahl des Z&uuml;ndverzugsmodells. <code>beck_2003_two_stage</code> berechnet Cool Flame und Hot Flame getrennt.</td></tr>
+          <tr><td><code>burn_model</code></td><td><code>wiebe_autoignition</code>, V18: <code>vibe-beck</code></td><td>Brennverlauf, der nach Erreichen der Z&uuml;ndbedingung (SOC) startet. <code>vibe-beck</code> ist rein zeitbasiert.</td></tr>
+          <tr><td><code>duration_ms</code> / <code>duration_s</code></td><td>V18: <code>1.2 ms</code></td><td>Zeitliche Dauer der Hot-Flame-Hauptverbrennung.</td></tr>
+          <tr><td><code>a</code>, <code>m</code></td><td><code>6.9</code>, <code>2.0</code></td><td>Vibe-Formparameter f&uuml;r die Hauptverbrennung (Hot Flame).</td></tr>
+          <tr><td><code>lambda_target</code></td><td>V18: <code>1.4</code></td><td>Ziel-Luftverh&auml;ltnis. Bestimmt, wie viel Kraftstoff beim "Slot-Close" in Relation zur real gefangenen Frischluftmasse eingespritzt/freigegeben wird.</td></tr>
+          <tr><td><code>afr_stoich_kg_air_per_kg_fuel</code></td><td><code>14.5</code></td><td>St&ouml;chiometrischer Luftbedarf des Kraftstoffs (AFR).</td></tr>
+          <tr><td><code>lhv_J_per_kg</code></td><td>V18: <code>43e6</code></td><td>Unterer Heizwert des verwendeten Kraftstoffs in J/kg.</td></tr>
+          <tr><td><code>tau_A_s</code></td><td><code>1.0e-5</code></td><td>Vorfaktor (<math><msub><mi>A</mi><mi>&tau;</mi></msub></math>) f&uuml;r die Z&uuml;ndverzugsberechnung im generischen Modell.</td></tr>
+          <tr><td><code>pressure_exponent</code> / <code>beck_c2</code></td><td><code>-1.2</code></td><td>Druckexponent (<math><msub><mi>n</mi><mi>p</mi></msub></math>) im Z&uuml;ndverzug. Skaliert den Einfluss des Zylinderdrucks auf die Z&uuml;ndgeschwindigkeit.</td></tr>
+          <tr><td><code>tau_activation_temperature_K</code></td><td><code>5000.0</code></td><td>Aktivierungstemperatur (<math><msub><mi>T</mi><mi>A</mi></msub><mo>=</mo><msub><mi>E</mi><mi>A</mi></msub><mo>/</mo><mi>R</mi></math>). Steuert exponentiell die Abh&auml;ngigkeit von der Zylindertemperatur.</td></tr>
+          <tr><td><code>tau_activation_energy_J_per_kg</code></td><td>optional</td><td>Spezifische Hot-Flame-Aktivierungsenergie. Ist hier nichts angegeben, bedient sich das Modell an der hinterlegten Beck-Kraftstofftabelle.</td></tr>
+          <tr><td><code>beck_cf_fuel_name</code></td><td>V18: <code>Diesel 2</code></td><td>Name des Kraftstoffs (gem&auml;&szlig; Beck 2003). Weist dem Modell die passenden Cool/Hot-Flame Parameter zu.</td></tr>
+          <tr><td><code>start_temperature_min_K</code></td><td>V18: <code>580.0</code></td><td>Numerische Integrationsfreigabe: Unterhalb dieser Temperatur wird der Z&uuml;ndverzug nicht aufsummiert (spart Rechenzeit im kalten Bereich).</td></tr>
+          <tr><td><code>start_pressure_min_Pa</code></td><td>V18: <code>500000.0</code></td><td>Druckschwelle f&uuml;r das Livengood-Wu Integral. Analog zur Temperaturschwelle.</td></tr>
+          <tr><td><code>max_ignition_delay_s</code></td><td>V18: <code>0.002</code></td><td>Deckelung des Z&uuml;ndverzugs (hier 2 ms). Verhindert, dass extrem lange berechnete Z&uuml;ndverz&uuml;ge die Simulation blockieren oder SOC verschleppen.</td></tr>
+          <tr><td><code>residual_slowdown_factor</code></td><td><code>1.0</code></td><td>Korrekturfaktor: Verz&ouml;gert die Z&uuml;ndung k&uuml;nstlich bei hohen Restgasanteilen (Engineering-Ansatz, nicht rein aus Beck abgeleitet).</td></tr>
+          <tr><td><code>cool_flame_energy_fraction</code></td><td><code>0.08</code></td><td>Anteil der gesamten Kraftstoffenergie, der bereits in der Vorreaktion (Cool Flame) freigesetzt wird (hier 8%).</td></tr>
+          <tr><td><code>cool_flame_duration_ms</code></td><td><code>0.3409</code></td><td>Zeitliche Dauer der Cool-Flame-W&auml;rmefreisetzung in Millisekunden.</td></tr>
+          <tr><td><code>cool_flame_a</code>, <code>cool_flame_m</code></td><td><code>6.9</code>, <code>2.0</code></td><td>Vibe-Formparameter speziell f&uuml;r die Vorreaktion (Cool Flame).</td></tr>
         </tbody>
       </table>
 
@@ -712,23 +772,23 @@
         <tbody>
           <tr>
             <td><code>tau_activation_temperature_K: 5000.0</code></td>
-            <td>Aktivierungstemperatur fuer das generische HCCI-Modell oder als Fallback, wenn keine Aktivierungsenergie gesetzt ist.</td>
-            <td>Im Beck-Zweistufenmodell sollen bevorzugt <code>E_A_CF</code> und <code>E_A_HF</code> aus der Kraftstofftabelle wirken.</td>
+            <td>Gibt die Aktivierungstemperatur f&uuml;r das generische HCCI-Modell vor (T_A = E_A / R). Dient als Fallback, falls keine spezifische Aktivierungsenergie definiert wurde.</td>
+            <td>Im Beck-Zweistufenmodell sollten stattdessen bevorzugt <code>E_A_CF</code> und <code>E_A_HF</code> direkt aus der Kraftstofftabelle &uuml;bernommen werden.</td>
           </tr>
           <tr>
             <td><code>start_temperature_min_K: 580.0</code></td>
-            <td>Unterhalb dieser Temperatur wird das HCCI-Integral nicht fortgeschrieben.</td>
-            <td>Numerische Freigabe, keine eigentliche Beck-Gleichung.</td>
+            <td>Harte Temperaturschwelle. Unterhalb dieser Temperatur wird das Livengood-Wu-Integral ignoriert und ruht auf 0.</td>
+            <td>Dient als numerische Freigabe zur Laufzeitoptimierung im kalten Kompressionshub, ist keine physikalische Beck-Gleichung.</td>
           </tr>
           <tr>
             <td><code>start_pressure_min_Pa: 500000.0</code></td>
-            <td>Unterhalb dieses Drucks wird das HCCI-Integral nicht fortgeschrieben.</td>
-            <td>Numerische Freigabe, keine eigentliche Beck-Gleichung.</td>
+            <td>Harte Druckschwelle (hier 5 bar). Unterhalb dieses Zylinderdrucks wird der Z&uuml;ndverzug nicht aufsummiert.</td>
+            <td>Ebenfalls eine numerische Freigabe analog zur Temperaturschwelle. Verhindert unphysikalische Aufsummierung beim Ansaugen.</td>
           </tr>
           <tr>
             <td><code>max_ignition_delay_s: 0.002</code></td>
-            <td>Obergrenze fuer <math><mi>&tau;</mi></math>; laengere berechnete Z&uuml;ndverzuege werden auf 2 ms gekappt.</td>
-            <td>Kann Literaturwerte bewusst verkuerzen und SOC frueher ausloesen.</td>
+            <td>Obergrenze f&uuml;r den berechneten Z&uuml;ndverzug (<math><mi>&tau;</mi></math>). &Uuml;berschreitet der Wert diese Grenze, wird er k&uuml;nstlich auf 2 ms gekappt.</td>
+            <td>Kann genutzt werden, um Z&uuml;ndungen fr&uuml;her zu erzwingen oder Literaturwerte, die f&uuml;r extrem kalte Zust&auml;nde abweichen, zu beschr&auml;nken.</td>
           </tr>
         </tbody>
       </table>
