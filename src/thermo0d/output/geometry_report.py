@@ -1026,7 +1026,6 @@ def _build_free_piston_results_signal_markdown(bundle) -> str:
         "| `cylinder_1_m_fuel_vapor_kg`, `cylinder_2_m_fuel_vapor_kg` | Kraftstoffdampfmasse. |",
         "| `cylinder_1_m_fuel_total_kg`, `cylinder_2_m_fuel_total_kg` | Summe aus fluessigem Kraftstoff und Kraftstoffdampf. |",
         "| `cylinder_1_m_burned_kg`, `cylinder_2_m_burned_kg` | Verbrannte Masse. |",
-        "| `cylinder_1_m_residual_kg`, `cylinder_2_m_residual_kg` | Restgasmasse. |",
         "| `cylinder_1_m_unburned_kg`, `cylinder_2_m_unburned_kg` | Unverbrannte Masse. |",
         "| `cylinder_1_burned_fraction_0to1`, `cylinder_2_burned_fraction_0to1` | Verbrannter Anteil. |",
         "| `cylinder_1_p_Pa`, `cylinder_2_p_Pa` | Druck. |",

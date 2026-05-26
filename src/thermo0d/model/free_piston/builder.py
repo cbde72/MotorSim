@@ -566,7 +566,6 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             y_init[u_idx] = initial_cylinder_internal_energy_J
             initial_burned_mass_kg = initial_cylinder_mass_kg * _initial_cylinder_burned_fraction_0to1(fp, synthetic_cylinder)
             y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
-            y_init[state_layout.residual_mass_index(i)] = initial_burned_mass_kg
             cylinder_cfg_for_submodels = placeholder_cylinders[0] if placeholder_cylinders else None
         elif isinstance(vol, CylinderVolumeConfig):
             if cyl_idx is None:
@@ -601,7 +600,6 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             y_init[u_idx] = initial_cylinder_internal_energy_J
             initial_burned_mass_kg = initial_cylinder_mass_kg * _initial_cylinder_burned_fraction_0to1(fp, vol)
             y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
-            y_init[state_layout.residual_mass_index(i)] = initial_burned_mass_kg
             if cylinder_cfg_for_submodels is None:
                 cylinder_cfg_for_submodels = vol
             cylinder_cfg_by_index[i] = vol
@@ -620,7 +618,6 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             )
             initial_burned_mass_kg = initial_mass_kg * builder._initial_burned_fraction_0to1(vol)
             y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
-            y_init[state_layout.residual_mass_index(i)] = initial_burned_mass_kg
         elif isinstance(vol, BounceChamberVolumeConfig):
             bounce_count += 1
             motion_sign = 1.0 if bounce_count == 1 else -1.0
@@ -654,7 +651,6 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             y_init[u_idx] = initial_bounce_internal_energy_J
             initial_burned_mass_kg = initial_bounce_mass_kg * builder._initial_burned_fraction_0to1(vol)
             y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
-            y_init[state_layout.residual_mass_index(i)] = initial_burned_mass_kg
         elif isinstance(vol, EnvironmentVolumeConfig):
             vol_matrix[i, VolumeCol.TYPE] = float(VolumeType.ENVIRONMENT)
             vol_matrix[i, VolumeCol.KIN_ROW] = -1.0
@@ -665,7 +661,6 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             y_init[m_idx] = 0.0
             y_init[u_idx] = 0.0
             y_init[state_layout.burned_mass_index(i)] = 0.0
-            y_init[state_layout.residual_mass_index(i)] = 0.0
         else:
             raise TypeError(f'Unsupported volume config: {type(vol)!r}')
 

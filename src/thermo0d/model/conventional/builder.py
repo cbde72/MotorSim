@@ -101,7 +101,6 @@ def build_conventional_bundle(builder) -> ModelBundle:
             y_init[state_layout.mass_index(i)] = 0.0
             y_init[state_layout.energy_index(i)] = 0.0
             y_init[state_layout.burned_mass_index(i)] = 0.0
-            y_init[state_layout.residual_mass_index(i)] = 0.0
         else:
             assign_state_from_mass_and_temperature(
                 y_init,
@@ -113,7 +112,6 @@ def build_conventional_bundle(builder) -> ModelBundle:
             )
             initial_burned_mass_kg = initial_mass_kg * builder._initial_burned_fraction_0to1(vol)
             y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
-            y_init[state_layout.residual_mass_index(i)] = initial_burned_mass_kg
 
         if isinstance(vol, CylinderVolumeConfig):
             cylinder_indices.append(i)

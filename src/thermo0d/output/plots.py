@@ -482,7 +482,7 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
     real_cr = float(np.max(V_m3[seg]) / np.min(V_m3[seg])) if np.min(V_m3[seg]) > 1.0e-18 else None
     mass_at_intake_close_mg = None
     air_mass_at_intake_close_mg = None
-    residual_mass_at_intake_close_mg = None
+    burned_mass_at_intake_close_mg = None
     theta_at_intake_close_deg = None
     fp = getattr(bundle, "free_piston", None)
     slot_closed_threshold_m2 = max(float(getattr(fp, "combustion_slot_closed_threshold_m2", 1.0e-9) or 1.0e-9), 0.0)
@@ -512,9 +512,9 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
         air_mass_kg = _last_finite_value([row], [f"{cyl_name}_m_air_kg", "cylinder_m_air_kg"])
         if air_mass_kg is not None:
             air_mass_at_intake_close_mg = air_mass_kg * 1.0e6
-        residual_mass_kg = _last_finite_value([row], [f"{cyl_name}_m_residual_kg", "cylinder_m_residual_kg"])
-        if residual_mass_kg is not None:
-            residual_mass_at_intake_close_mg = residual_mass_kg * 1.0e6
+        burned_mass_kg = _last_finite_value([row], [f"{cyl_name}_m_burned_kg", "cylinder_m_burned_kg"])
+        if burned_mass_kg is not None:
+            burned_mass_at_intake_close_mg = burned_mass_kg * 1.0e6
         break
 
     restgas_row = None
@@ -546,18 +546,13 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
         burned_share = _last_finite_value([restgas_row], [f"{cyl_name}_share_burned_0to1", "cylinder_share_burned_0to1"])
         if burned_share is not None:
             burned_percent = 100.0 * max(0.0, min(1.0, burned_share))
-        share_residual = _last_finite_value([restgas_row], [f"{cyl_name}_share_residual_0to1", "cylinder_share_residual_0to1"])
-        if share_residual is not None:
-            restgas_percent = 100.0 * max(0.0, min(1.0, share_residual))
+            restgas_percent = burned_percent
         else:
-            residual_mass = _last_finite_value([restgas_row], [f"{cyl_name}_m_residual_kg", "cylinder_m_residual_kg"])
+            burned_mass = _last_finite_value([restgas_row], [f"{cyl_name}_m_burned_kg", "cylinder_m_burned_kg"])
             total_mass = _last_finite_value([restgas_row], [f"{cyl_name}_m_kg", "cylinder_m_kg"])
-            if residual_mass is None:
-                residual_mass = _last_finite_value([restgas_row], [f"{cyl_name}_m_burned_kg", "cylinder_m_burned_kg"])
-            if residual_mass is not None and total_mass is not None and total_mass > 1.0e-18:
-                restgas_percent = 100.0 * max(0.0, min(1.0, residual_mass / total_mass))
-                if burned_percent is None:
-                    burned_percent = restgas_percent
+            if burned_mass is not None and total_mass is not None and total_mass > 1.0e-18:
+                burned_percent = 100.0 * max(0.0, min(1.0, burned_mass / total_mass))
+                restgas_percent = burned_percent
 
     info_text = "\n".join([
         f"Kolbenarbeit: {_format_value(piston_work_J, 'J')}",
@@ -574,7 +569,7 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
         f"Winkel Einlassschluss: {_format_value(theta_at_intake_close_deg, 'deg', 1)}",
         f"Frischluft Einlassschluss: {_format_value(air_mass_at_intake_close_mg, 'mg')}",
         f"Gesamtmasse Einlassschluss: {_format_value(mass_at_intake_close_mg, 'mg')}",
-        f"Restgas Einlassschluss: {_format_value(residual_mass_at_intake_close_mg, 'mg')}",
+        f"Verbrannt Einlassschluss: {_format_value(burned_mass_at_intake_close_mg, 'mg')}",
         f"Verdichtung geom.: {_format_value(geom_cr, '-', 1)}",
         f"Verdichtung eff.: {_format_value(eff_cr, '-', 1)}",
         f"Verdichtung real: {_format_value(real_cr, '-', 1)}",
@@ -669,19 +664,16 @@ def write_free_piston_last_ut_ot_ut_species_plot(bundle, rows: list[dict[str, fl
     t_s = _arr('t_s')
     x_m = _arr(x_key)
     v_mps = _arr(v_key)
+    q_rad = _arr_first(['free_piston_q', 'cylinder_free_piston_q'])
     fresh_gas_kg = _arr_first([f'{cyl_name}_m_fresh_gas_kg', 'cylinder_m_fresh_gas_kg'])
     if not np.any(np.isfinite(fresh_gas_kg)):
         air_kg = _arr_first([f'{cyl_name}_m_air_kg', 'cylinder_m_air_kg'])
         fuel_vapor_kg = _arr_first([f'{cyl_name}_m_fuel_vapor_kg', 'cylinder_m_fuel_vapor_kg'])
         fresh_gas_kg = air_kg + np.where(np.isfinite(fuel_vapor_kg), fuel_vapor_kg, 0.0)
     burned_kg = _arr_first([f'{cyl_name}_m_burned_kg', 'cylinder_m_burned_kg'])
-    residual_kg = _arr_first([f'{cyl_name}_m_residual_kg', 'cylinder_m_residual_kg'])
-    fresh_burned_kg = _arr_first([f'{cyl_name}_m_fresh_burned_kg', 'cylinder_m_fresh_burned_kg'])
-    if not np.any(np.isfinite(fresh_burned_kg)):
-        fresh_burned_kg = burned_kg - np.where(np.isfinite(residual_kg), residual_kg, 0.0)
 
     valid = np.isfinite(x_m) & np.isfinite(v_mps) & (
-        np.isfinite(fresh_gas_kg) | np.isfinite(burned_kg) | np.isfinite(residual_kg) | np.isfinite(fresh_burned_kg)
+        np.isfinite(fresh_gas_kg) | np.isfinite(burned_kg)
     )
     if int(np.count_nonzero(valid)) < 5:
         return None
@@ -690,8 +682,7 @@ def write_free_piston_last_ut_ot_ut_species_plot(bundle, rows: list[dict[str, fl
     v_mps = v_mps[valid]
     fresh_gas_kg = fresh_gas_kg[valid]
     burned_kg = burned_kg[valid]
-    residual_kg = residual_kg[valid]
-    fresh_burned_kg = fresh_burned_kg[valid]
+    q_rad = q_rad[valid]
 
     ut_idx = np.where((v_mps[:-1] > 0.0) & (v_mps[1:] <= 0.0))[0] + 1
     ot_idx = np.where((v_mps[:-1] < 0.0) & (v_mps[1:] >= 0.0))[0] + 1
@@ -718,8 +709,6 @@ def write_free_piston_last_ut_ot_ut_species_plot(bundle, rows: list[dict[str, fl
     fig, ax = plt.subplots(figsize=(8.0, 5.0), dpi=150)
     ax.plot(x_progress_deg, fresh_gas_kg[seg] * 1.0e6, linewidth=1.7, color='#175cd3', label='fresh gas')
     ax.plot(x_progress_deg, burned_kg[seg] * 1.0e6, linewidth=1.7, color='#b42318', label='burned total')
-    ax.plot(x_progress_deg, residual_kg[seg] * 1.0e6, linewidth=1.7, color='#7a5af8', linestyle='--', label='residual')
-    ax.plot(x_progress_deg, fresh_burned_kg[seg] * 1.0e6, linewidth=1.7, color='#f79009', linestyle='--', label='fresh burned')
     ax.axvline(0.0, color='0.35', linewidth=0.9, linestyle=':')
     ax.axvline(ot_progress_deg, color='0.35', linewidth=0.9, linestyle=':')
     ax.axvline(360.0, color='0.35', linewidth=0.9, linestyle=':')
@@ -729,7 +718,7 @@ def write_free_piston_last_ut_ot_ut_species_plot(bundle, rows: list[dict[str, fl
     ax.set_xlim(0.0, 360.0)
     ax.set_xlabel('UT-OT-UT Fortschritt [deg]')
     ax.set_ylabel('Masse im Zylinder [mg]')
-    ax.set_title('Frischgas, verbranntes Gas und Restgas im Zylinder - letzter UT-OT-UT-Zyklus')
+    ax.set_title('Frischgas und verbranntes Gas im Zylinder - letzter UT-OT-UT-Zyklus')
     ax.grid(True, alpha=0.35)
     ax.legend(loc='best', fontsize=7)
     run_config_text = f"Config: {Path(run_config_path).name}" if run_config_path is not None else ""
@@ -771,12 +760,14 @@ def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str
     t_s = _arr('t_s')
     x_m = _arr(x_key)
     v_mps = _arr(v_key)
+    q_rad = _arr_first(['free_piston_q', 'cylinder_free_piston_q'])
     valid = np.isfinite(x_m) & np.isfinite(v_mps)
     if int(np.count_nonzero(valid)) < 5:
         return []
     t_s = t_s[valid]
     x_m = x_m[valid]
     v_mps = v_mps[valid]
+    q_rad = q_rad[valid]
 
     ut_idx = np.where((v_mps[:-1] > 0.0) & (v_mps[1:] <= 0.0))[0] + 1
     ot_idx = np.where((v_mps[:-1] < 0.0) & (v_mps[1:] >= 0.0))[0] + 1
@@ -793,12 +784,30 @@ def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str
     ot = int(ot_between[-1])
     seg = slice(ut1, ut2 + 1)
 
-    if np.isfinite(t_s[ut1]) and np.isfinite(t_s[ut2]) and t_s[ut2] > t_s[ut1]:
-        x_progress_deg = 360.0 * (t_s[seg] - t_s[ut1]) / (t_s[ut2] - t_s[ut1])
-        ot_progress_deg = 360.0 * (t_s[ot] - t_s[ut1]) / (t_s[ut2] - t_s[ut1])
+    fp = getattr(bundle, 'free_piston', None)
+    is_rotary = fp is not None and getattr(fp, 'kinematics_type', 'linear') == 'oscillating_rotary'
+
+    if is_rotary and np.any(np.isfinite(q_rad)):
+        q_deg = q_rad * (180.0 / math.pi)
+        x_progress_deg = q_deg[seg]
+        ot_progress_deg = q_deg[ot]
+        ut_start_deg = q_deg[ut1]
+        ut_end_deg = q_deg[ut2]
+        xlabel = 'Schwingwinkel [deg]'
+        xlim_min = min(float(np.min(x_progress_deg)), ot_progress_deg)
+        xlim_max = max(float(np.max(x_progress_deg)), ot_progress_deg)
     else:
-        x_progress_deg = np.linspace(0.0, 360.0, int(ut2 - ut1 + 1), dtype=np.float64)
-        ot_progress_deg = float(x_progress_deg[int(ot - ut1)])
+        if np.isfinite(t_s[ut1]) and np.isfinite(t_s[ut2]) and t_s[ut2] > t_s[ut1]:
+            x_progress_deg = 360.0 * (t_s[seg] - t_s[ut1]) / (t_s[ut2] - t_s[ut1])
+            ot_progress_deg = 360.0 * (t_s[ot] - t_s[ut1]) / (t_s[ut2] - t_s[ut1])
+        else:
+            x_progress_deg = np.linspace(0.0, 360.0, int(ut2 - ut1 + 1), dtype=np.float64)
+            ot_progress_deg = float(x_progress_deg[int(ot - ut1)])
+        ut_start_deg = 0.0
+        ut_end_deg = 360.0
+        xlabel = 'UT-OT-UT Fortschritt [deg]'
+        xlim_min = 0.0
+        xlim_max = 360.0
 
     def _series(keys: list[str], scale: float = 1.0, offset: float = 0.0, fallback: np.ndarray | None = None) -> np.ndarray:
         values = _arr_first(keys)[valid]
@@ -851,14 +860,16 @@ def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str
         if not handles:
             plt.close(fig)
             return None
-        base_ax.axvline(0.0, color='0.35', linewidth=0.9, linestyle=':')
+        base_ax.axvline(ut_start_deg, color='0.35', linewidth=0.9, linestyle=':')
         base_ax.axvline(ot_progress_deg, color='0.35', linewidth=0.9, linestyle=':')
-        base_ax.axvline(360.0, color='0.35', linewidth=0.9, linestyle=':')
-        base_ax.text(0.0, 0.98, 'UT', transform=base_ax.get_xaxis_transform(), ha='left', va='top', fontsize=7)
+        if not is_rotary:
+            base_ax.axvline(ut_end_deg, color='0.35', linewidth=0.9, linestyle=':')
+        base_ax.text(ut_start_deg, 0.98, 'UT', transform=base_ax.get_xaxis_transform(), ha='left' if not is_rotary else 'center', va='top', fontsize=7)
         base_ax.text(ot_progress_deg, 0.98, 'OT', transform=base_ax.get_xaxis_transform(), ha='center', va='top', fontsize=7)
-        base_ax.text(360.0, 0.98, 'UT', transform=base_ax.get_xaxis_transform(), ha='right', va='top', fontsize=7)
-        base_ax.set_xlim(0.0, 360.0)
-        base_ax.set_xlabel('UT-OT-UT Fortschritt [deg]')
+        if not is_rotary:
+            base_ax.text(ut_end_deg, 0.98, 'UT', transform=base_ax.get_xaxis_transform(), ha='right', va='top', fontsize=7)
+        base_ax.set_xlim(xlim_min, xlim_max)
+        base_ax.set_xlabel(xlabel)
         base_ax.set_title(title)
         base_ax.grid(True, alpha=0.35)
         base_ax.legend(handles, labels, loc='best', fontsize=7)
@@ -998,7 +1009,7 @@ def export_free_piston_last_ut_ot_ut_frames(
     v_key = 'free_piston_v_m_per_s'
     theta_key = f"{cyl_name}_theta_deg"  # Kurbelwinkel
 
-    if any(key not in rows[0] for key in (p_key, V_key, x_key, v_key, theta_key)):
+    if any(key not in rows[0] for key in (p_key, V_key, x_key, v_key)):
         return []
 
     def _arr(key: str) -> np.ndarray:
@@ -1014,9 +1025,10 @@ def export_free_piston_last_ut_ot_ut_frames(
     V_m3 = _arr(V_key)
     x_m = _arr(x_key)
     v_mps = _arr(v_key)
-    theta_deg = _arr(theta_key)
+    theta_deg = _arr(theta_key) if theta_key in rows[0] else np.zeros_like(x_m)
+    q_rad = _arr('free_piston_q')
 
-    valid = np.isfinite(p_pa) & np.isfinite(V_m3) & np.isfinite(x_m) & np.isfinite(v_mps) & np.isfinite(theta_deg)
+    valid = np.isfinite(p_pa) & np.isfinite(V_m3) & np.isfinite(x_m) & np.isfinite(v_mps)
     if int(np.count_nonzero(valid)) < 5:
         return []
 
@@ -1025,6 +1037,7 @@ def export_free_piston_last_ut_ot_ut_frames(
     x_m = x_m[valid]
     v_mps = v_mps[valid]
     theta_deg = theta_deg[valid]
+    q_rad = q_rad[valid]
 
     # Detect UT/OT transitions
     ut_idx = np.where((v_mps[:-1] > 0.0) & (v_mps[1:] <= 0.0))[0] + 1
@@ -1050,6 +1063,20 @@ def export_free_piston_last_ut_ot_ut_frames(
     V_cycle = V_m3[seg]
     x_cycle = x_m[seg]
     ot_idx_local = ot - ut1  # Local index within cycle
+    
+    fp = getattr(bundle, 'free_piston', None)
+    is_rotary = fp is not None and getattr(fp, 'kinematics_type', 'linear') == 'oscillating_rotary'
+    
+    if is_rotary and np.any(np.isfinite(q_rad[seg])):
+        x_axis_cycle = q_rad[seg] * (180.0 / math.pi)
+        xlabel = 'Schwingwinkel [°]'
+        xlim_min = float(np.min(x_axis_cycle)) - 0.5
+        xlim_max = float(np.max(x_axis_cycle)) + 0.5
+    else:
+        x_axis_cycle = None
+        xlabel = 'Kurbelwinkel [°]'
+        xlim_min = axis_min_deg - 5
+        xlim_max = axis_max_deg + 5
 
     # Normalize angles to 0-360
     theta_cycle = (theta_cycle - theta_cycle[0]) % 360.0
@@ -1067,9 +1094,13 @@ def export_free_piston_last_ut_ot_ut_frames(
         if idx == 0:
             p_val = p_cycle[0]
             V_val = V_cycle[0]
+            if x_axis_cycle is not None:
+                current_x = x_axis_cycle[0]
         elif idx >= len(theta_cycle):
             p_val = p_cycle[-1]
             V_val = V_cycle[-1]
+            if x_axis_cycle is not None:
+                current_x = x_axis_cycle[-1]
         else:
             # Linear interpolation with bounds checking
             theta_prev = theta_cycle[idx - 1]
@@ -1081,40 +1112,53 @@ def export_free_piston_last_ut_ot_ut_frames(
                 frac = np.clip(frac, 0.0, 1.0)
             p_val = p_cycle[idx - 1] + frac * (p_cycle[idx] - p_cycle[idx - 1])
             V_val = V_cycle[idx - 1] + frac * (V_cycle[idx] - V_cycle[idx - 1])
+            if x_axis_cycle is not None:
+                current_x = x_axis_cycle[idx - 1] + frac * (x_axis_cycle[idx] - x_axis_cycle[idx - 1])
 
         # Create frame plot with enhanced annotations
         fig, ax = plt.subplots(figsize=(8.0, 5.0), dpi=150)
-        ax.plot(theta_cycle, p_cycle / 1.0e5, linewidth=2.0, label='Druck [bar]', color='#1f77b4')
-        ax.axvline(angle, color='#d62728', linestyle='--', linewidth=2.0, alpha=0.7, label=f'Aktueller Winkel: {angle:.1f}°')
+        x_axis_cycle_plot = x_axis_cycle if x_axis_cycle is not None else theta_cycle
+        ax.plot(x_axis_cycle_plot, p_cycle / 1.0e5, linewidth=2.0, label='Druck [bar]', color='#1f77b4')
+        
+        if x_axis_cycle is not None:
+            angle_label = f'{current_x:.1f}°'
+        else:
+            current_x = angle
+            angle_label = f'{angle:.1f}°'
+            
+        ax.axvline(current_x, color='#d62728', linestyle='--', linewidth=2.0, alpha=0.7, label=f'Aktuelle Position: {angle_label}')
         
         # Mark UT/OT points
-        ax.scatter([theta_cycle[0], theta_cycle[ot_idx_local], theta_cycle[-1]],
+        ax.scatter([x_axis_cycle_plot[0], x_axis_cycle_plot[ot_idx_local], x_axis_cycle_plot[-1]],
                    [p_cycle[0] / 1.0e5, p_cycle[ot_idx_local] / 1.0e5, p_cycle[-1] / 1.0e5],
                    s=80, marker='o', color=['#2ca02c', '#ff7f0e', '#2ca02c'], zorder=5, edgecolors='black', linewidth=1.5)
         
-        ax.annotate('UT (Start)', xy=(theta_cycle[0], p_cycle[0] / 1.0e5), xytext=(10, 10), 
+        ax.annotate('UT (Start)', xy=(x_axis_cycle_plot[0], p_cycle[0] / 1.0e5), xytext=(10, 10), 
                    textcoords='offset points', fontsize=8, fontweight='bold',
                    bbox=dict(boxstyle='round,pad=0.4', facecolor='#2ca02c', alpha=0.7),
                    arrowprops=dict(arrowstyle='->', lw=1.5))
-        ax.annotate('OT', xy=(theta_cycle[ot_idx_local], p_cycle[ot_idx_local] / 1.0e5), xytext=(10, -15), 
+        ax.annotate('OT', xy=(x_axis_cycle_plot[ot_idx_local], p_cycle[ot_idx_local] / 1.0e5), xytext=(10, -15), 
                    textcoords='offset points', fontsize=8, fontweight='bold',
                    bbox=dict(boxstyle='round,pad=0.4', facecolor='#ff7f0e', alpha=0.7),
                    arrowprops=dict(arrowstyle='->', lw=1.5))
-        ax.annotate('UT (End)', xy=(theta_cycle[-1], p_cycle[-1] / 1.0e5), xytext=(-60, 10), 
+        ax.annotate('UT (End)', xy=(x_axis_cycle_plot[-1], p_cycle[-1] / 1.0e5), xytext=(-60, 10), 
                    textcoords='offset points', fontsize=8, fontweight='bold',
                    bbox=dict(boxstyle='round,pad=0.4', facecolor='#2ca02c', alpha=0.7),
                    arrowprops=dict(arrowstyle='->', lw=1.5))
 
-        ax.set_xlabel('Kurbelwinkel [°]', fontsize=10, fontweight='bold')
+        ax.set_xlabel(xlabel, fontsize=10, fontweight='bold')
         ax.set_ylabel('Zylinderdruck [bar]', fontsize=10, fontweight='bold')
-        ax.set_xlim(axis_min_deg - 5, axis_max_deg + 5)
+        ax.set_xlim(xlim_min, xlim_max)
         ax.grid(True, alpha=0.35, linestyle='--')
         ax.legend(loc='upper left', fontsize=8)
         ax.set_title(f'UT-OT-UT Hub (Frame {frame_idx + 1}/{len(angles)})', fontsize=10, fontweight='bold')
 
         # Footer with actual values
         run_config_text = f"Config: {Path(run_config_path).name}" if run_config_path is not None else ""
-        plot_config_text = f"Frame: {angle:.1f}° | p={p_val/1.0e5:.2f} bar | V={V_val*1.0e6:.2f} cm³"
+        if x_axis_cycle is not None:
+            plot_config_text = f"Schwingwinkel: {current_x:.1f}° | p={p_val/1.0e5:.2f} bar | V={V_val*1.0e6:.2f} cm³"
+        else:
+            plot_config_text = f"Frame: {angle:.1f}° | p={p_val/1.0e5:.2f} bar | V={V_val*1.0e6:.2f} cm³"
         footer_text = "\n".join(part for part in (run_config_text, plot_config_text) if part)
         if footer_text:
             fig.text(0.995, 0.006, footer_text, ha="right", va="bottom", fontsize=6, color="#666666", alpha=0.9)

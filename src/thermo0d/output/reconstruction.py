@@ -223,7 +223,7 @@ def _smoothstep01(value: float) -> float:
     return x * x * (3.0 - 2.0 * x)
 
 
-def _scavenging_overlap_diagnostics(fp, cylinder_mass_kg: float, cylinder_air_kg: float, cylinder_burned_kg: float, cylinder_residual_kg: float, transfer_in_rate_kg_per_s: float, transfer_air_in_rate_kg_per_s: float, exhaust_out_rate_kg_per_s: float) -> tuple[float, float, float]:
+def _scavenging_overlap_diagnostics(fp, cylinder_mass_kg: float, cylinder_air_kg: float, cylinder_burned_kg: float, transfer_in_rate_kg_per_s: float, transfer_air_in_rate_kg_per_s: float, exhaust_out_rate_kg_per_s: float) -> tuple[float, float, float]:
     if fp is None or not bool(getattr(fp, 'scavenging_enabled', False)):
         return 0.0, 0.0, 0.0
     if str(getattr(fp, 'scavenging_model', 'overlap_short_circuit_0d')) != 'overlap_short_circuit_0d':
@@ -231,7 +231,6 @@ def _scavenging_overlap_diagnostics(fp, cylinder_mass_kg: float, cylinder_air_kg
     if cylinder_mass_kg <= 1.0e-18 or transfer_in_rate_kg_per_s <= 1.0e-18 or exhaust_out_rate_kg_per_s <= 1.0e-18:
         return 0.0, 0.0, 0.0
     base_burned_fraction = max(0.0, min(1.0, cylinder_burned_kg / cylinder_mass_kg))
-    base_residual_fraction = max(0.0, min(base_burned_fraction, cylinder_residual_kg / cylinder_mass_kg))
     base_air_fraction = max(0.0, min(1.0 - base_burned_fraction, cylinder_air_kg / cylinder_mass_kg))
     ratio = transfer_in_rate_kg_per_s / max(exhaust_out_rate_kg_per_s, 1.0e-18)
     eta_scav = 1.0 - math.exp(-max(float(getattr(fp, 'scavenging_factor', 1.25)), 0.0) * ratio)
@@ -243,13 +242,12 @@ def _scavenging_overlap_diagnostics(fp, cylinder_mass_kg: float, cylinder_air_kg
     short_fraction = max(0.0, min(1.0, short_fraction))
     normal_exhaust_air_rate = exhaust_out_rate_kg_per_s * base_air_fraction
     normal_exhaust_burned_rate = exhaust_out_rate_kg_per_s * base_burned_fraction
-    normal_exhaust_residual_rate = exhaust_out_rate_kg_per_s * base_residual_fraction
     min_residual_fraction = max(0.0, min(1.0, float(getattr(fp, 'scavenging_min_residual_fraction', 0.03))))
-    residual_drive = max(base_residual_fraction - min_residual_fraction, 0.0) / max(1.0 - min_residual_fraction, 1.0e-12)
+    residual_drive = max(base_burned_fraction - min_residual_fraction, 0.0) / max(1.0 - min_residual_fraction, 1.0e-12)
     scavenged_extra_burned_rate = min(
         eta_scav * (1.0 - short_fraction) * transfer_in_rate_kg_per_s * residual_drive,
         normal_exhaust_air_rate,
-        normal_exhaust_residual_rate,
+        normal_exhaust_burned_rate,
     )
     short_circuit_air_rate = min(
         short_fraction * min(max(transfer_air_in_rate_kg_per_s, 0.0), exhaust_out_rate_kg_per_s),
@@ -265,19 +263,17 @@ def _safe_mass_fraction(component_mass_kg: float, total_mass_kg: float) -> float
     return float(max(float(component_mass_kg), 0.0) / total)
 
 
-def _upstream_species_fractions(state_layout: StateLayout, state: np.ndarray, volume_index: int, environment_is_fixed: np.ndarray) -> tuple[float, float, float]:
+def _upstream_species_fractions(state_layout: StateLayout, state: np.ndarray, volume_index: int, environment_is_fixed: np.ndarray) -> tuple[float, float]:
     if int(environment_is_fixed[volume_index]) == 1:
-        return 0.0, 1.0, 0.0
+        return 0.0, 1.0
     upstream_mass = float(state_layout.gas_mass_from_state(state, volume_index))
     if upstream_mass <= 1.0e-18:
-        return 0.0, 0.0, 0.0
+        return 0.0, 0.0
     upstream_burned_mass = float(state_layout.burned_mass_from_state(state, volume_index))
     upstream_air_mass = float(state_layout.air_mass_from_state(state, volume_index))
-    upstream_residual_mass = float(state_layout.residual_mass_from_state(state, volume_index))
     burned_fraction = max(0.0, min(1.0, upstream_burned_mass / upstream_mass))
     air_fraction = max(0.0, min(1.0 - burned_fraction, upstream_air_mass / upstream_mass))
-    residual_fraction = max(0.0, min(burned_fraction, upstream_residual_mass / upstream_mass))
-    return burned_fraction, air_fraction, residual_fraction
+    return burned_fraction, air_fraction
 
 
 @dataclass(slots=True)
@@ -566,8 +562,6 @@ class SignalReconstructionService:
                 energy = float(y_arr[int(state_layout.energy_index(i)), k])
                 burned_mass = float(state_layout.burned_mass_from_state(state_k, i))
                 air_mass = float(state_layout.air_mass_from_state(state_k, i))
-                residual_mass = float(state_layout.residual_mass_from_state(state_k, i))
-                fresh_burned_mass = float(state_layout.fresh_burned_mass_from_state(state_k, i))
                 liquid_fuel_mass = float(state_layout.liquid_fuel_mass_from_state(state_k, i))
                 fuel_vapor_mass = float(state_layout.fuel_vapor_mass_from_state(state_k, i))
                 vol_type = int(vol_matrix[i, VolumeCol.TYPE])
@@ -792,8 +786,6 @@ class SignalReconstructionService:
                 cls._ensure_float_column(columns, f'{name}_m_burned_kg', n_samples)[k] = burned_mass
                 cls._ensure_float_column(columns, f'{name}_m_air_kg', n_samples)[k] = air_mass
                 cls._ensure_float_column(columns, f'{name}_m_fresh_gas_kg', n_samples)[k] = air_mass + fuel_vapor_mass
-                cls._ensure_float_column(columns, f'{name}_m_residual_kg', n_samples)[k] = residual_mass
-                cls._ensure_float_column(columns, f'{name}_m_fresh_burned_kg', n_samples)[k] = fresh_burned_mass
                 cls._ensure_float_column(columns, f'{name}_m_fuel_liquid_kg', n_samples)[k] = liquid_fuel_mass
                 cls._ensure_float_column(columns, f'{name}_m_fuel_vapor_kg', n_samples)[k] = fuel_vapor_mass
                 cls._ensure_float_column(columns, f'{name}_m_fuel_total_kg', n_samples)[k] = fuel_vapor_mass + liquid_fuel_mass
@@ -805,7 +797,6 @@ class SignalReconstructionService:
                 cls._ensure_float_column(columns, f'{name}_share_fuel_liquid_0to1', n_samples)[k] = _safe_mass_fraction(liquid_fuel_mass, total_inventory_mass)
                 cls._ensure_float_column(columns, f'{name}_share_fuel_total_0to1', n_samples)[k] = _safe_mass_fraction(fuel_vapor_mass + liquid_fuel_mass, total_inventory_mass)
                 cls._ensure_float_column(columns, f'{name}_share_burned_0to1', n_samples)[k] = _safe_mass_fraction(burned_mass, total_inventory_mass)
-                cls._ensure_float_column(columns, f'{name}_share_residual_0to1', n_samples)[k] = _safe_mass_fraction(residual_mass, total_inventory_mass)
                 cls._ensure_float_column(columns, f'{name}_share_fresh_gas_0to1', n_samples)[k] = _safe_mass_fraction(air_mass + fuel_vapor_mass, total_inventory_mass)
                 cls._ensure_float_column(columns, f'{name}_share_unburned_0to1', n_samples)[k] = _safe_mass_fraction(unburned_mass, total_inventory_mass)
                 cls._ensure_float_column(columns, f'{name}_T_K', n_samples)[k] = temp
@@ -991,21 +982,19 @@ class SignalReconstructionService:
                 ))
                 if mdot_kg_per_s >= 0.0:
                     upstream_state = y_arr[:, k]
-                    upstream_burned_fraction, upstream_air_fraction, upstream_residual_fraction = _upstream_species_fractions(state_layout, upstream_state, left, environment_is_fixed)
+                    upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(state_layout, upstream_state, left, environment_is_fixed)
                     h_up = cp_up * temp_up
                 else:
                     upstream_state = y_arr[:, k]
-                    upstream_burned_fraction, upstream_air_fraction, upstream_residual_fraction = _upstream_species_fractions(state_layout, upstream_state, right, environment_is_fixed)
+                    upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(state_layout, upstream_state, right, environment_is_fixed)
                     h_up = cp_up * temp_up
                 mdot_burned_kg_per_s = float(mdot_kg_per_s * upstream_burned_fraction)
                 mdot_air_kg_per_s = float(mdot_kg_per_s * upstream_air_fraction)
-                mdot_residual_kg_per_s = float(mdot_kg_per_s * upstream_residual_fraction)
                 mdot_unburned_kg_per_s = float(mdot_kg_per_s - mdot_burned_kg_per_s)
                 mdot_fuel_vapor_kg_per_s = float(mdot_kg_per_s - mdot_burned_kg_per_s - mdot_air_kg_per_s)
                 cls._ensure_float_column(columns, f'{conn_name}_mdot_kg_per_s', n_samples)[k] = mdot_kg_per_s
                 cls._ensure_float_column(columns, f'{conn_name}_mdot_burned_kg_per_s', n_samples)[k] = mdot_burned_kg_per_s
                 cls._ensure_float_column(columns, f'{conn_name}_mdot_air_kg_per_s', n_samples)[k] = mdot_air_kg_per_s
-                cls._ensure_float_column(columns, f'{conn_name}_mdot_residual_kg_per_s', n_samples)[k] = mdot_residual_kg_per_s
                 cls._ensure_float_column(columns, f'{conn_name}_mdot_fuel_vapor_kg_per_s', n_samples)[k] = mdot_fuel_vapor_kg_per_s
                 cls._ensure_float_column(columns, f'{conn_name}_mdot_unburned_kg_per_s', n_samples)[k] = mdot_unburned_kg_per_s
 
@@ -1121,7 +1110,6 @@ class SignalReconstructionService:
                         cyl_mass_kg,
                         cyl_air_kg,
                         cyl_burned_kg,
-                        float(y_arr[int(state_layout.residual_mass_index(i)), k]),
                         float(scav_transfer_in[i]),
                         float(scav_transfer_air_in[i]),
                         float(scav_exhaust_out[i]),

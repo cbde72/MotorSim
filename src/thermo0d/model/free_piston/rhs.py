@@ -61,23 +61,17 @@ def _fuel_vapor_mass_from_state(layout, y: np.ndarray, volume_index: int) -> flo
     return float(layout.fuel_vapor_mass_from_state(y, volume_index))
 
 
-def _residual_mass_from_state(layout, y: np.ndarray, volume_index: int) -> float:
-    return float(layout.residual_mass_from_state(y, volume_index))
-
-
-def _upstream_species_fractions(layout, y: np.ndarray, volume_index: int, environment_is_fixed: np.ndarray) -> tuple[float, float, float]:
+def _upstream_species_fractions(layout, y: np.ndarray, volume_index: int, environment_is_fixed: np.ndarray) -> tuple[float, float]:
     if int(environment_is_fixed[volume_index]) == 1:
-        return 0.0, 1.0, 0.0
+        return 0.0, 1.0
     upstream_mass = float(layout.gas_mass_from_state(y, volume_index))
     if upstream_mass <= 1.0e-18:
-        return 0.0, 0.0, 0.0
+        return 0.0, 0.0
     upstream_burned = float(layout.burned_mass_from_state(y, volume_index))
     upstream_air = float(layout.air_mass_from_state(y, volume_index))
-    upstream_residual = float(layout.residual_mass_from_state(y, volume_index))
     burned_fraction = max(0.0, min(1.0, upstream_burned / upstream_mass))
     air_fraction = max(0.0, min(1.0 - burned_fraction, upstream_air / upstream_mass))
-    residual_fraction = max(0.0, min(burned_fraction, upstream_residual / upstream_mass))
-    return burned_fraction, air_fraction, residual_fraction
+    return burned_fraction, air_fraction
 
 
 def _smoothstep01(value: float) -> float:
@@ -93,7 +87,6 @@ def _apply_overlap_scavenging_correction(
     mass_indices: np.ndarray,
     burned_indices: np.ndarray,
     air_indices: np.ndarray,
-    residual_indices: np.ndarray,
     environment_is_fixed: np.ndarray,
     transfer_in_rate_kg_per_s: float,
     transfer_air_in_rate_kg_per_s: float,
@@ -120,7 +113,6 @@ def _apply_overlap_scavenging_correction(
     if cylinder_mass_kg <= 1.0e-18:
         return
     base_burned_fraction = max(0.0, min(1.0, float(y[burned_indices[cylinder_idx]]) / cylinder_mass_kg))
-    base_residual_fraction = max(0.0, min(base_burned_fraction, float(y[residual_indices[cylinder_idx]]) / cylinder_mass_kg))
     base_air_fraction = max(0.0, min(1.0 - base_burned_fraction, float(y[air_indices[cylinder_idx]]) / cylinder_mass_kg))
     if base_air_fraction <= 1.0e-15 and base_burned_fraction <= 1.0e-15:
         return
@@ -136,11 +128,10 @@ def _apply_overlap_scavenging_correction(
 
     normal_exhaust_air_rate = exhaust_out_rate_kg_per_s * base_air_fraction
     normal_exhaust_burned_rate = exhaust_out_rate_kg_per_s * base_burned_fraction
-    normal_exhaust_residual_rate = exhaust_out_rate_kg_per_s * base_residual_fraction
     min_residual_fraction = max(0.0, min(1.0, float(getattr(fp, 'scavenging_min_residual_fraction', 0.03))))
-    residual_drive = max(base_residual_fraction - min_residual_fraction, 0.0) / max(1.0 - min_residual_fraction, 1.0e-12)
+    residual_drive = max(base_burned_fraction - min_residual_fraction, 0.0) / max(1.0 - min_residual_fraction, 1.0e-12)
     scavenged_extra_burned_rate = eta_scav * (1.0 - short_fraction) * transfer_in_rate_kg_per_s * residual_drive
-    scavenged_extra_burned_rate = min(scavenged_extra_burned_rate, normal_exhaust_air_rate, normal_exhaust_residual_rate)
+    scavenged_extra_burned_rate = min(scavenged_extra_burned_rate, normal_exhaust_air_rate, normal_exhaust_burned_rate)
     short_circuit_air_rate = short_fraction * min(max(transfer_air_in_rate_kg_per_s, 0.0), exhaust_out_rate_kg_per_s)
     short_circuit_air_rate = min(short_circuit_air_rate, normal_exhaust_burned_rate + scavenged_extra_burned_rate)
 
@@ -153,8 +144,6 @@ def _apply_overlap_scavenging_correction(
 
     dy_dt[burned_indices[cylinder_idx]] -= burned_correction_rate
     dy_dt[air_indices[cylinder_idx]] += burned_correction_rate
-    residual_correction_rate = min(scavenged_extra_burned_rate, normal_exhaust_residual_rate) - min(short_circuit_air_rate, normal_exhaust_residual_rate + scavenged_extra_burned_rate)
-    dy_dt[residual_indices[cylinder_idx]] -= residual_correction_rate
     for vol_idx in range(int(exhaust_out_by_vol_kg_per_s.shape[0])):
         out_rate = float(exhaust_out_by_vol_kg_per_s[vol_idx])
         if out_rate <= 1.0e-18:
@@ -164,7 +153,6 @@ def _apply_overlap_scavenging_correction(
         if int(environment_is_fixed[vol_idx]) != 1:
             dy_dt[burned_indices[vol_idx]] += target_correction
             dy_dt[air_indices[vol_idx]] -= target_correction
-            dy_dt[residual_indices[vol_idx]] += residual_correction_rate * share
 
     fp.runtime_scavenging_burned_correction_kg_per_s = float(burned_correction_rate)
     fp.runtime_scavenging_short_circuit_fraction = float(short_fraction)
@@ -249,7 +237,6 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     energy_indices = np.array([int(bundle.state_layout.energy_index(i)) for i in range(n_vol)], dtype=np.int32)
     burned_indices = np.array([int(bundle.state_layout.burned_mass_index(i)) for i in range(n_vol)], dtype=np.int32)
     air_indices = np.array([int(bundle.state_layout.air_mass_index(i)) for i in range(n_vol)], dtype=np.int32)
-    residual_indices = np.array([int(bundle.state_layout.residual_mass_index(i)) for i in range(n_vol)], dtype=np.int32)
     liquid_indices = np.array([int(bundle.state_layout.liquid_fuel_mass_index(i)) for i in range(n_vol)], dtype=np.int32)
 
     bounce_idx = _stateful_bounce_index(bundle)
@@ -475,18 +462,15 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                 dy_dt[energy_indices[right]] += mdot * h_up
 
             if mdot >= 0.0:
-                upstream_burned_fraction, upstream_air_fraction, upstream_residual_fraction = _upstream_species_fractions(bundle.state_layout, y, left, environment_is_fixed)
+                upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(bundle.state_layout, y, left, environment_is_fixed)
                 burned_transfer = mdot * upstream_burned_fraction
                 air_transfer = mdot * upstream_air_fraction
-                residual_transfer = mdot * upstream_residual_fraction
                 if int(environment_is_fixed[left]) != 1:
                     dy_dt[burned_indices[left]] -= burned_transfer
                     dy_dt[air_indices[left]] -= air_transfer
-                    dy_dt[residual_indices[left]] -= residual_transfer
                 if int(environment_is_fixed[right]) != 1:
                     dy_dt[burned_indices[right]] += burned_transfer
                     dy_dt[air_indices[right]] += air_transfer
-                    dy_dt[residual_indices[right]] += residual_transfer
                 if conn_type == int(ConnectionType.SLOT):
                     if right in cylinder_index_set and left != right:
                         scav_transfer_in_by_cyl_kg_per_s[right] += float(mdot)
@@ -494,18 +478,15 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                     elif left in cylinder_index_set and right != left:
                         scav_exhaust_out_by_cyl_to_vol_kg_per_s[left, right] += float(mdot)
             else:
-                upstream_burned_fraction, upstream_air_fraction, upstream_residual_fraction = _upstream_species_fractions(bundle.state_layout, y, right, environment_is_fixed)
+                upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(bundle.state_layout, y, right, environment_is_fixed)
                 burned_transfer = (-mdot) * upstream_burned_fraction
                 air_transfer = (-mdot) * upstream_air_fraction
-                residual_transfer = (-mdot) * upstream_residual_fraction
                 if int(environment_is_fixed[left]) != 1:
                     dy_dt[burned_indices[left]] += burned_transfer
                     dy_dt[air_indices[left]] += air_transfer
-                    dy_dt[residual_indices[left]] += residual_transfer
                 if int(environment_is_fixed[right]) != 1:
                     dy_dt[burned_indices[right]] -= burned_transfer
                     dy_dt[air_indices[right]] -= air_transfer
-                    dy_dt[residual_indices[right]] -= residual_transfer
                 if conn_type == int(ConnectionType.SLOT):
                     if left in cylinder_index_set and right != left:
                         scav_transfer_in_by_cyl_kg_per_s[left] += float(-mdot)
@@ -528,7 +509,6 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                 mass_indices,
                 burned_indices,
                 air_indices,
-                residual_indices,
                 environment_is_fixed,
                 float(scav_transfer_in_by_cyl_kg_per_s[cyl]),
                 float(scav_transfer_air_in_by_cyl_kg_per_s[cyl]),
@@ -615,7 +595,6 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             dy_dt[energy_indices[i]] = 0.0
             dy_dt[burned_indices[i]] = 0.0
             dy_dt[air_indices[i]] = 0.0
-            dy_dt[residual_indices[i]] = 0.0
             dy_dt[liquid_indices[i]] = 0.0
             continue
 

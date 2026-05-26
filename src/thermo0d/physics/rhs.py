@@ -288,7 +288,7 @@ def _evaporation_sink_rate(theta_deg: float, dtheta_dt_deg_s: float, evap_row: n
 
 @nb.njit(cache=True)
 def _gas_state_base_index(volume_index: int) -> int:
-    return 6 * int(volume_index)
+    return 5 * int(volume_index)
 
 
 @nb.njit(cache=True)
@@ -324,17 +324,6 @@ def _air_mass_from_state_vec(y: np.ndarray, volume_index: int) -> float:
 
 
 @nb.njit(cache=True)
-def _residual_mass_from_state_vec(y: np.ndarray, volume_index: int) -> float:
-    burned = _burned_mass_from_state_vec(y, volume_index)
-    residual = y[_base_index(volume_index) + 4]
-    if residual <= 0.0:
-        return 0.0
-    if residual >= burned:
-        return burned
-    return residual
-
-
-@nb.njit(cache=True)
 def _fuel_vapor_mass_from_state_vec(y: np.ndarray, volume_index: int) -> float:
     gas = _gas_mass_from_state_vec(y, volume_index)
     burned = _burned_mass_from_state_vec(y, volume_index)
@@ -344,15 +333,14 @@ def _fuel_vapor_mass_from_state_vec(y: np.ndarray, volume_index: int) -> float:
 
 
 @nb.njit(cache=True)
-def _upstream_species_fractions(y: np.ndarray, volume_index: int, environment_is_fixed: np.ndarray) -> tuple[float, float, float]:
+def _upstream_species_fractions(y: np.ndarray, volume_index: int, environment_is_fixed: np.ndarray) -> tuple[float, float]:
     if int(environment_is_fixed[volume_index]) == 1:
-        return 0.0, 1.0, 0.0
+        return 0.0, 1.0
     upstream_mass = _gas_mass_from_state_vec(y, volume_index)
     upstream_burned = _burned_mass_from_state_vec(y, volume_index)
     upstream_air = _air_mass_from_state_vec(y, volume_index)
-    upstream_residual = _residual_mass_from_state_vec(y, volume_index)
     if upstream_mass <= 1.0e-18:
-        return 0.0, 0.0, 0.0
+        return 0.0, 0.0
     burned_fraction = upstream_burned / upstream_mass
     air_fraction = upstream_air / upstream_mass
     if burned_fraction < 0.0:
@@ -364,12 +352,7 @@ def _upstream_species_fractions(y: np.ndarray, volume_index: int, environment_is
         air_fraction = 0.0
     elif air_fraction > remaining:
         air_fraction = remaining
-    residual_fraction = upstream_residual / upstream_mass
-    if residual_fraction < 0.0:
-        residual_fraction = 0.0
-    elif residual_fraction > burned_fraction:
-        residual_fraction = burned_fraction
-    return burned_fraction, air_fraction, residual_fraction
+    return burned_fraction, air_fraction
 
 
 @nb.njit(cache=True)
@@ -399,7 +382,7 @@ def rhs_thermo_numba(
     """Evaluate the full Thermo0D right-hand side.
 
     Per volume the thermodynamic state is ordered as
-    ``[m_gas, U, m_burned, m_air, m_residual, m_fuel_liquid]``.
+    ``[m_gas, U, m_burned, m_air, m_fuel_liquid]``.
     The gas-phase fuel vapor mass is reconstructed as
     ``m_gas - m_burned - m_air``.
     """
@@ -573,14 +556,12 @@ def rhs_thermo_numba(
             left_u = left_m + 1
             left_b = left_m + 2
             left_a = left_m + 3
-            left_r = left_m + 4
-            left_l = left_m + 5
+            left_l = left_m + 4
             right_m = _gas_state_base_index(right)
             right_u = right_m + 1
             right_b = right_m + 2
             right_a = right_m + 3
-            right_r = right_m + 4
-            right_l = right_m + 5
+            right_l = right_m + 4
             _ = (left_l, right_l)
 
             if int(environment_is_fixed[left]) != 1:
@@ -591,31 +572,25 @@ def rhs_thermo_numba(
                 dy[right_u] += mdot * h_up
 
             if mdot >= 0.0:
-                upstream_burned_fraction, upstream_air_fraction, upstream_residual_fraction = _upstream_species_fractions(y, left, environment_is_fixed)
+                upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(y, left, environment_is_fixed)
                 burned_transfer = mdot * upstream_burned_fraction
                 air_transfer = mdot * upstream_air_fraction
-                residual_transfer = mdot * upstream_residual_fraction
                 if int(environment_is_fixed[left]) != 1:
                     dy[left_b] -= burned_transfer
                     dy[left_a] -= air_transfer
-                    dy[left_r] -= residual_transfer
                 if int(environment_is_fixed[right]) != 1:
                     dy[right_b] += burned_transfer
                     dy[right_a] += air_transfer
-                    dy[right_r] += residual_transfer
             else:
-                upstream_burned_fraction, upstream_air_fraction, upstream_residual_fraction = _upstream_species_fractions(y, right, environment_is_fixed)
+                upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(y, right, environment_is_fixed)
                 burned_transfer = (-mdot) * upstream_burned_fraction
                 air_transfer = (-mdot) * upstream_air_fraction
-                residual_transfer = (-mdot) * upstream_residual_fraction
                 if int(environment_is_fixed[left]) != 1:
                     dy[left_b] += burned_transfer
                     dy[left_a] += air_transfer
-                    dy[left_r] += residual_transfer
                 if int(environment_is_fixed[right]) != 1:
                     dy[right_b] -= burned_transfer
                     dy[right_a] -= air_transfer
-                    dy[right_r] -= residual_transfer
 
             if int(vol_matrix[left, V_TYPE]) == VolumeType.CYLINDER and mdot < 0.0:
                 mdot_in_by_vol[left] += -mdot
@@ -630,14 +605,12 @@ def rhs_thermo_numba(
         energy_idx = base + 1
         burned_idx = base + 2
         air_idx = base + 3
-        residual_idx = base + 4
-        liquid_idx = base + 5
+        liquid_idx = base + 4
         if int(environment_is_fixed[i]) == 1 or vol_type == VolumeType.ENVIRONMENT:
             dy[mass_idx] = 0.0
             dy[energy_idx] = 0.0
             dy[burned_idx] = 0.0
             dy[air_idx] = 0.0
-            dy[residual_idx] = 0.0
             dy[liquid_idx] = 0.0
             continue
 

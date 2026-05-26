@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotorSim V03 - Dokumentation V15, V16, V17</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --border: #e2e8f0;
+            --code-bg: #f1f5f9;
+            --code-text: #b91c1c;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        header {
+            background-color: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 2.5rem 1rem;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        h1 { margin: 0 0 0.5rem 0; color: var(--primary); font-size: 2.2rem; }
+        header p { margin: 0; color: var(--text-muted); font-size: 1.1rem; }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        
+        /* Tabs Styling */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 2rem;
+            overflow-x: auto;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .tab-btn:hover {
+            color: var(--primary);
+            background-color: #f1f5f9;
+            border-radius: 6px 6px 0 0;
+        }
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        
+        /* Content Styling */
+        .tab-content {
+            display: none;
+            background: var(--surface);
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        h2 { 
+            border-bottom: 2px solid var(--border); 
+            padding-bottom: 0.5rem; 
+            margin-top: 2rem; 
+            color: #1e293b;
+        }
+        h2:first-child { margin-top: 0; }
+        
+        /* Table Styling */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 0.95rem;
+        }
+        th, td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: var(--code-bg);
+            font-weight: 600;
+            color: #334155;
+        }
+        tr:hover { background-color: #f8fafc; }
+        
+        code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            color: var(--code-text);
+            font-size: 0.9em;
+        }
+        
+        /* MathML Container */
+        .math-container {
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            text-align: center;
+            font-size: 1.25rem;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+        }
+        .math-desc {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: -1rem;
+            margin-bottom: 2rem;
+            font-style: italic;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>MotorSim V03 - Dokumentation</h1>
+    <p>Konfigurationsgenerationen V15, V16 & V17 (Oscillating Rotary & Erweiterte Freikolben)</p>
+</header>
+
+<div class="container">
+    <div class="tabs">
+        <button class="tab-btn active" onclick="openTab(event, 'uebersicht')">Übersicht & Architektur</button>
+        <button class="tab-btn" onclick="openTab(event, 'parameter')">Parameter-Referenz (V15-V17)</button>
+        <button class="tab-btn" onclick="openTab(event, 'formeln')">Physikalische Formeln (MathML)</button>
+        <button class="tab-btn" onclick="openTab(event, 'verbrennung')">Verbrennung & Submodelle</button>
+    </div>
+
+    <!-- TAB: ÜBERSICHT -->
+    <div id="uebersicht" class="tab-content active">
+        <h2>Übersicht der Generationen V15 bis V17</h2>
+        <p>Die Konfigurationen der Reihen <code>V15</code>, <code>V16</code> und <code>V17</code> markieren in MotorSim V03 den Übergang zu komplexen Freikolben-Topologien. Der Fokus liegt hierbei nicht mehr nur auf rein linearen Freikolben (Free-Piston), sondern auf der <strong>oszillierenden Drehpendel-Kinematik (Oscillating Rotary)</strong>.</p>
+        
+        <h3>Die wichtigsten Neuerungen dieser Generationen:</h3>
+        <ul>
+            <li><strong>Kinematik:</strong> Umschaltung zwischen <code>linear</code> und <code>oscillating_rotary</code>. Das thermodynamische Modell rechnet weiterhin linear (als Äquivalentmodell), während der mechanische Solver Winkel <code>q</code> (rad) und Winkelgeschwindigkeit integriert.</li>
+            <li><strong>Spülmodell (Scavenging):</strong> Einführung des <code>overlap_short_circuit_0d</code> Modells. Statt eines perfekten Mischmodells kann hier der Kurzschluss (Short-Circuit) von Frischluft in den Auslass sowie das Ausspülen von Restgas parametriert werden.</li>
+            <li><strong>Einspritzung & Latch:</strong> Der <code>fueling_mode</code> <code>lambda_from_cylinder_air_at_slot_close_vapor_injector</code> ermöglicht eine Vorlagerung von Kraftstoff. Aus der beim "Schlitz-Zu"-Winkel tatsächlich gefangenen Frischluftmasse (Latched Air Mass) berechnet das Modell über das Ziel-Lambda die korrekte Einspritzmenge.</li>
+            <li><strong>Plots & Export:</strong> Angepasste Plot-Exporte für zyklische Darstellung zwischen <code>UT-OT-UT</code>, wobei im Rotary-Modus der physikalische Schwingwinkel als X-Achse verwendet wird.</li>
+        </ul>
+    </div>
+
+    <!-- TAB: PARAMETER -->
+    <div id="parameter" class="tab-content">
+        <h2>Spezifische Parameter der Konfigurationen V15, V16, V17</h2>
+        <p>Die folgenden Tabellen listen die relevanten Parameter der <code>free_piston</code>-, <code>scavenging</code>- und <code>combustion</code>-Blöcke auf.</p>
+
+        <h3>1. Kinematik & Mechanik (<code>free_piston.mechanics</code>)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Typ</th>
+                    <th>Beschreibung</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>kinematics_type</code></td>
+                    <td>string</td>
+                    <td><code>linear</code> oder <code>oscillating_rotary</code>. Definiert den Integrationsmodus.</td>
+                </tr>
+                <tr>
+                    <td><code>x_min_m</code> / <code>x_max_m</code></td>
+                    <td>float</td>
+                    <td>Thermischer, linearer Äquivalenthub (z.B. 0.0 bis 0.108 m). Wird für Volumen- und Slotberechnungen genutzt.</td>
+                </tr>
+                <tr>
+                    <td><code>angle_min_deg</code> / <code>angle_max_deg</code></td>
+                    <td>float</td>
+                    <td>Mechanische Schwingwinkel (z.B. -9.0 bis +9.0). Nur bei <code>oscillating_rotary</code>.</td>
+                </tr>
+                <tr>
+                    <td><code>effective_radius_m</code></td>
+                    <td>float</td>
+                    <td>Wirkradius, der den Schwingwinkel in den linearen Hub übersetzt.</td>
+                </tr>
+                <tr>
+                    <td><code>rotary_inertia_kg_m2</code></td>
+                    <td>float</td>
+                    <td>Massenträgheitsmoment des Rotors (ersetzt <code>moving_mass_kg</code> im Rotary-Modus).</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2. 0D Spülmodell (<code>free_piston.scavenging</code>)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Typ</th>
+                    <th>Beschreibung</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>enabled</code></td>
+                    <td>bool</td>
+                    <td>Aktiviert das erweiterte Kurzschluss- und Spülmodell (überschreibt die Standardmischung).</td>
+                </tr>
+                <tr>
+                    <td><code>model</code></td>
+                    <td>string</td>
+                    <td>Aktuell: <code>overlap_short_circuit_0d</code>.</td>
+                </tr>
+                <tr>
+                    <td><code>scavenging_factor</code></td>
+                    <td>float</td>
+                    <td>Verdrängungsstärke. Höhere Werte bedeuten, dass einströmendes Frischgas das Abgas wie ein Pfropfen ausschiebt.</td>
+                </tr>
+                <tr>
+                    <td><code>max_trapping_efficiency</code></td>
+                    <td>float</td>
+                    <td>Obergrenze (z.B. 0.92) für den Anteil der Frischluft, der im Zylinder verbleibt.</td>
+                </tr>
+                <tr>
+                    <td><code>min_residual_fraction</code></td>
+                    <td>float</td>
+                    <td>Harte Untergrenze für das Restgas (z.B. 0.03 für 3%), das trotz perfekter Spülung bauartbedingt gefangen bleibt.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>3. Verbrennung & Injektor (<code>combustion</code>)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Typ</th>
+                    <th>Beschreibung</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>fueling_mode</code></td>
+                    <td>string</td>
+                    <td><code>lambda_from_cylinder_air_at_slot_close_vapor_injector</code> errechnet die Kraftstoffmasse dynamisch beim Spülende.</td>
+                </tr>
+                <tr>
+                    <td><code>lambda_target</code></td>
+                    <td>float</td>
+                    <td>Gibt das Ziel-Verbrennungsluftverhältnis vor (z.B. 1.0).</td>
+                </tr>
+                <tr>
+                    <td><code>injection_duration_ms</code></td>
+                    <td>float</td>
+                    <td>Einspritzdauer in Millisekunden. In dieser Zeit wird die berechnete Dampfmasse kontinuierlich in den Zylinder geführt.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- TAB: FORMELN -->
+    <div id="formeln" class="tab-content">
+        <h2>Physikalische Modelle (Formelübersicht)</h2>
+        <p>MotorSim V03 berechnet das thermodynamische System auf Basis eines 5-Zustands-Modells (\(m_{gas}, U, m_{burned}, m_{air}, m_{fuel,liquid}\)).</p>
+        
+        <h3>1. Thermische Zustandsgleichung (Ideales Gas)</h3>
+        <div class="math-container">
+            <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                <mi>p</mi>
+                <mo>&#xB;</mo>
+                <mi>V</mi>
+                <mo>=</mo>
+                <mi>m</mi>
+                <mo>&#xB;</mo>
+                <mi>R</mi>
+                <mo>&#xB;</mo>
+                <mi>T</mi>
+            </math>
+        </div>
+        <div class="math-desc">Zusammenhang zwischen Zylinderdruck p, Volumen V, Gesamtmasse m, der aus der Zusammensetzung ermittelten Gaskonstante R und Temperatur T.</div>
+
+        <h3>2. Woschni Wandwärmeübergang</h3>
+        <div class="math-container">
+            <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                <msub><mi>h</mi><mi>c</mi></msub>
+                <mo>=</mo>
+                <mn>3.26</mn>
+                <mo>&#xB;</mo>
+                <msup><mi>B</mi><mrow><mo>-</mo><mn>0.2</mn></mrow></msup>
+                <mo>&#xB;</mo>
+                <msup><mi>p</mi><mn>0.8</mn></msup>
+                <mo>&#xB;</mo>
+                <msup><mi>T</mi><mrow><mo>-</mo><mn>0.55</mn></mrow></msup>
+                <mo>&#xB;</mo>
+                <msup><mi>w</mi><mn>0.8</mn></msup>
+            </math>
+        </div>
+        <div class="math-desc">Wärmeübergangskoeffizient h_c in Abhängigkeit von Bohrung B, Druck p, Temperatur T und charakteristischer Gasgeschwindigkeit w.</div>
+
+        <h3>3. Vibe Verbrennungsverlauf</h3>
+        <div class="math-container">
+            <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                <mfrac>
+                    <mrow><mi>d</mi><msub><mi>x</mi><mi>b</mi></msub></mrow>
+                    <mrow><mi>d</mi><mi>&#x03B8;</mi></mrow>
+                </mfrac>
+                <mo>=</mo>
+                <mi>a</mi>
+                <mo>(</mo><mi>m</mi><mo>+</mo><mn>1</mn><mo>)</mo>
+                <msup>
+                    <mrow><mo>(</mo><mfrac><mrow><mi>&#x03B8;</mi><mo>-</mo><msub><mi>&#x03B8;</mi><mn>0</mn></msub></mrow><mrow><mi>&#x0394;</mi><mi>&#x03B8;</mi></mrow></mfrac><mo>)</mo></mrow>
+                    <mi>m</mi>
+                </msup>
+                <mo>exp</mo>
+                <mrow>
+                    <mo>(</mo>
+                    <mo>-</mo><mi>a</mi>
+                    <msup>
+                        <mrow><mo>(</mo><mfrac><mrow><mi>&#x03B8;</mi><mo>-</mo><msub><mi>&#x03B8;</mi><mn>0</mn></msub></mrow><mrow><mi>&#x0394;</mi><mi>&#x03B8;</mi></mrow></mfrac><mo>)</mo></mrow>
+                        <mrow><mi>m</mi><mo>+</mo><mn>1</mn></mrow>
+                    </msup>
+                    <mo>)</mo>
+                </mrow>
+            </math>
+        </div>
+        <div class="math-desc">Umsetzungsrate dx_b/dθ der Brennstoffmasse über den Kurbelwinkel bzw. Schwingwinkel.</div>
+
+        <h3>4. Rotary Kinematik (Oscillating Rotary)</h3>
+        <div class="math-container">
+            <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                <msub><mi>x</mi><mrow><mi>e</mi><mi>f</mi><mi>f</mi></mrow></msub>
+                <mo>=</mo>
+                <mi>q</mi>
+                <mo>&#xB;</mo>
+                <msub><mi>r</mi><mrow><mi>e</mi><mi>f</mi><mi>f</mi></mrow></msub>
+            </math>
+        </div>
+        <div class="math-desc">Übersetzung des integrierten Schwingwinkels q [rad] in die fiktive lineare Kolbenposition x_eff [m] mittels Wirkradius r_eff.</div>
+
+        <h3>5. Kurzschluss- und Spülmodell (Scavenging Factor)</h3>
+        <div class="math-container">
+            <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                <msub><mi>&#x03B7;</mi><mrow><mi>s</mi><mi>c</mi><mi>a</mi><mi>v</mi></mrow></msub>
+                <mo>=</mo>
+                <mn>1</mn>
+                <mo>-</mo>
+                <msup>
+                    <mi>e</mi>
+                    <mrow><mo>-</mo><mi>f</mi><mo>&#xB;</mo><mi>R</mi></mrow>
+                </msup>
+            </math>
+            <br>
+            <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                <mi>R</mi>
+                <mo>=</mo>
+                <mfrac>
+                    <msub><mover><mi>m</mi><mo>&#x02D9;</mo></mover><mrow><mi>i</mi><mi>n</mi></mrow></msub>
+                    <msub><mover><mi>m</mi><mo>&#x02D9;</mo></mover><mrow><mi>o</mi><mi>u</mi><mi>t</mi></mrow></msub>
+                </mfrac>
+            </math>
+        </div>
+        <div class="math-desc">Spüleffizienz in Abhängigkeit vom Scavenging Factor f und dem Spülverhältnis R (einströmende Massenrate zu ausströmender Massenrate).</div>
+    </div>
+
+    <!-- TAB: VERBRENNUNG -->
+    <div id="verbrennung" class="tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 1.5rem;">
+            <h2 style="border: none; padding: 0; margin: 0;">Verbrennung, Einspritzung und Zündmodelle</h2>
+            <a href="verbrennung.html" style="color: var(--primary); text-decoration: underline; font-weight: 600; font-size: 0.95rem;" target="_blank">➔ Detaildokumentation Verbrennung (verbrennung.html)</a>
+        </div>
+        
+        <p>In MotorSim V03 wird die Verbrennung als lokaler Energieterm und Massenwandler innerhalb des Zylindervolumens berechnet. Abhängig vom Konfigurationsmodus (<code>fueling_mode</code>) wird entweder eine feste Energiemenge freigesetzt, oder eine reale Gemischberechnung auf Basis der tatsächlich gefangenen Frischluftmasse durchgeführt.</p>
+
+        <h3>1. Brennverläufe (Heat Release Models)</h3>
+        <p>Die Wärmefreisetzung beschreibt die Umsatzrate des Kraftstoffs. MotorSim unterstützt den bewährten <strong>Vibe (Wiebe)</strong>-Verlauf sowie Erweiterungen für <strong>HCCI / Diesel</strong> (mit Zündverzug).</p>
+        
+        <h4>Vibe-Funktion (Wiebe)</h4>
+        <div class="math-container">
+            <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                <msub><mi>x</mi><mi>b</mi></msub><mo>(</mo><mi>z</mi><mo>)</mo>
+                <mo>=</mo>
+                <mn>1</mn>
+                <mo>-</mo>
+                <mo>exp</mo>
+                <mrow>
+                    <mo>(</mo>
+                    <mo>-</mo><mi>a</mi><mo>&#xB;</mo><msup><mi>z</mi><mrow><mi>m</mi><mo>+</mo><mn>1</mn></mrow></msup>
+                    <mo>)</mo>
+                </mrow>
+            </math>
+        </div>
+        <div class="math-desc">Der verbrannte Massenanteil x<sub>b</sub> in Abhängigkeit vom normierten Fortschritt z (Kurbelwinkel oder Zeit), dem Formparameter m und dem Vollständigkeitsparameter a.</div>
+
+        <h4>HCCI / Diesel - Zündverzug (Arrhenius)</h4>
+        <p>Für HCCI/Diesel-Konfigurationen (<code>HcciDieselCombustionConfig</code>) wird der Start der Verbrennung dynamisch berechnet. Der Zündverzug \(\tau\) ergibt sich aus einer Arrhenius-Gleichung, basierend auf dem lokalen Druck und der Temperatur im Zylinder:</p>
+        <div class="math-container">
+            <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                <msub><mi>&#x03C4;</mi><mrow><mi>i</mi><mi>g</mi><mi>n</mi></mrow></msub>
+                <mo>=</mo>
+                <msub><mi>A</mi><mi>&#x03C4;</mi></msub>
+                <mo>&#xB;</mo>
+                <msup>
+                    <mrow><mo>(</mo><mfrac><mi>p</mi><msub><mi>p</mi><mrow><mi>r</mi><mi>e</mi><mi>f</mi></mrow></msub></mfrac><mo>)</mo></mrow>
+                    <mrow><mo>-</mo><mi>n</mi></mrow>
+                </msup>
+                <mo>&#xB;</mo>
+                <mo>exp</mo>
+                <mrow>
+                    <mo>(</mo>
+                    <mfrac><msub><mi>T</mi><mrow><mi>a</mi><mi>c</mi><mi>t</mi></mrow></msub><mi>T</mi></mfrac>
+                    <mo>)</mo>
+                </mrow>
+            </math>
+        </div>
+        <div class="math-desc">Die Zündverzugszeit τ<sub>ign</sub> berechnet aus Vorfaktor A<sub>τ</sub>, dem normierten Druck p/p<sub>ref</sub> mit Druckexponent n und der Aktivierungstemperatur T<sub>act</sub>.</div>
+
+        <h3>2. Fueling Modes und Lambda-Latch</h3>
+        <p>Das Framework unterscheidet, woher die Kraftstoffmasse für die Verbrennung stammt:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th><code>fueling_mode</code></th>
+                    <th>Verhalten & Berechnung</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>fixed_energy</code></td>
+                    <td>Konstante, in der Konfiguration fest vorgegebene Energie (<code>added_energy_per_cycle_J</code> oder <code>fuel_mass_per_cycle_kg * lhv</code>). Luftmasse und Lambda dienen hierbei nur der Information.</td>
+                </tr>
+                <tr>
+                    <td><code>lambda_from_cylinder_air_at_slot_close_vapor_injector</code></td>
+                    <td>Das Modell "merkt" sich exakt beim Schließen aller Ein- und Auslassschlitze die gefangene Frischluftmasse (Latched Air Mass). Daraus und aus dem geforderten <code>lambda_target</code> errechnet der Vapor-Injector die Kraftstoffmasse.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="math-container">
+            <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                <msub><mi>m</mi><mrow><mi>f</mi><mi>u</mi><mi>e</mi><mi>l</mi><mo>,</mo><mi>i</mi><mi>n</mi><mi>j</mi></mrow></msub>
+                <mo>=</mo>
+                <mfrac>
+                    <msub><mi>m</mi><mrow><mi>a</mi><mi>i</mi><mi>r</mi><mo>,</mo><mi>l</mi><mi>a</mi><mi>t</mi><mi>c</mi><mi>h</mi><mi>e</mi><mi>d</mi></mrow></msub>
+                    <mrow>
+                        <msub><mi>&#x03BB;</mi><mrow><mi>t</mi><mi>a</mi><mi>r</mi><mi>g</mi><mi>e</mi><mi>t</mi></mrow></msub>
+                        <mo>&#xB;</mo>
+                        <mi>A</mi><mi>F</mi><msub><mi>R</mi><mrow><mi>s</mi><mi>t</mi><mi>o</mi><mi>i</mi><mi>c</mi><mi>h</mi></mrow></msub>
+                    </mrow>
+                </mfrac>
+            </math>
+        </div>
+        <div class="math-desc">Berechnung der einzuspritzenden Kraftstoffmasse beim Latch-Zeitpunkt.</div>
+
+        <h3>3. Species-Bilanz während der Verbrennung</h3>
+        <p>Die Umsetzung limitiert die Freisetzungsrate physikalisch anhand des lokal verfügbaren Gemischs. Aus dem Heizwert \(H_u\) und dem Wirkungsgrad \(\eta\) ergibt sich die theoretische Kraftstoff-Umsatzrate:</p>
+        <div class="math-container">
+            <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                <msub><mover><mi>m</mi><mo>&#x02D9;</mo></mover><mrow><mi>f</mi><mi>u</mi><mi>e</mi><mi>l</mi><mo>,</mo><mi>r</mi><mi>e</mi><mi>q</mi></mrow></msub>
+                <mo>=</mo>
+                <mfrac>
+                    <msub><mover><mi>Q</mi><mo>&#x02D9;</mo></mover><mrow><mi>V</mi><mi>i</mi><mi>b</mi><mi>e</mi></mrow></msub>
+                    <mrow><msub><mi>H</mi><mi>u</mi></msub><mo>&#xB;</mo><msub><mi>&#x03B7;</mi><mrow><mi>c</mi><mi>o</mi><mi>m</mi><mi>b</mi></mrow></msub></mrow>
+                </mfrac>
+            </math>
+        </div>
+        <p>Im Zustandsvektor des Zylinders werden daraufhin die Gaskomponenten präzise verschoben:</p>
+        <ul>
+            <li>Luftmasse (<code>m_air</code>) sinkt: \(\Delta \dot{m}_{air} = - \dot{m}_{fuel} \cdot AFR_{stoich}\)</li>
+            <li>Verbrannte Masse (<code>m_burned</code>) steigt: \(\Delta \dot{m}_{burned} = \dot{m}_{fuel} \cdot (1 + AFR_{stoich})\)</li>
+            <li>Die freigesetzte Wärmeenergie \(\dot{Q}_{comb}\) erhöht die innere Energie \(U\) des Zylindervolumens.</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        
+        // Alle Inhalte verstecken
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].classList.remove("active");
+        }
+        
+        // Alle Tab-Buttons auf inaktiv setzen
+        tablinks = document.getElementsByClassName("tab-btn");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].classList.remove("active");
+        }
+        
+        // Aktiven Tab und Button setzen
+        document.getElementById(tabName).classList.add("active");
+        evt.currentTarget.classList.add("active");
+    }
+</script>
+
+</body>
+</html>

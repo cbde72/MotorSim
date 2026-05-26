@@ -12,7 +12,7 @@ class StateLayout:
     v_index: int | None = None
     mechanical_dofs: int = 0
 
-    STATES_PER_VOLUME: ClassVar[int] = 6
+    STATES_PER_VOLUME: ClassVar[int] = 5
 
     @classmethod
     def classic(cls, n_volumes: int) -> "StateLayout":
@@ -55,11 +55,8 @@ class StateLayout:
     def air_mass_index(self, volume_index: int) -> int:
         return self._base_index(volume_index) + 3
 
-    def residual_mass_index(self, volume_index: int) -> int:
-        return self._base_index(volume_index) + 4
-
     def liquid_fuel_mass_index(self, volume_index: int) -> int:
-        return self._base_index(volume_index) + 5
+        return self._base_index(volume_index) + 4
 
     def gas_mass_from_state(self, y, volume_index: int) -> float:
         return max(float(y[self.gas_mass_index(volume_index)]), 0.0)
@@ -83,19 +80,6 @@ class StateLayout:
         if air >= max_air:
             return max_air
         return air
-
-    def residual_mass_from_state(self, y, volume_index: int) -> float:
-        burned = self.burned_mass_from_state(y, volume_index)
-        residual = float(y[self.residual_mass_index(volume_index)])
-        if residual <= 0.0:
-            return 0.0
-        if residual >= burned:
-            return burned
-        return residual
-
-    def fresh_burned_mass_from_state(self, y, volume_index: int) -> float:
-        fresh = self.burned_mass_from_state(y, volume_index) - self.residual_mass_from_state(y, volume_index)
-        return fresh if fresh > 0.0 else 0.0
 
     def liquid_fuel_mass_from_state(self, y, volume_index: int) -> float:
         liquid = float(y[self.liquid_fuel_mass_index(volume_index)])
@@ -149,7 +133,6 @@ class StateLayout:
             labels.append(f"{base}_U_J")
             labels.append(f"{base}_m_burned_kg")
             labels.append(f"{base}_m_air_kg")
-            labels.append(f"{base}_m_residual_kg")
             labels.append(f"{base}_m_fuel_liquid_kg")
         if self.has_free_piston_states:
             dofs = max(int(self.mechanical_dofs), 1)
