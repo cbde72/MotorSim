@@ -678,13 +678,19 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                     q_total_active_J,
                 )
             if int(getattr(runtime_cool_flame_active_by_vol, 'shape', (0,))[0]) > i and bool(runtime_cool_flame_active_by_vol[i]):
+                # Use Cool-Flame specific Vibe parameters if available; otherwise
+                # fall back to the standard main combustion A / M values.
+                cf_a_arr = getattr(fp, 'hcci_cool_flame_a_by_vol', None)
+                cf_a = float(cf_a_arr[i]) if cf_a_arr is not None and i < cf_a_arr.shape[0] else float(comb_row[CombCol.A])
+                cf_m_arr = getattr(fp, 'hcci_cool_flame_m_by_vol', None)
+                cf_m = float(cf_m_arr[i]) if cf_m_arr is not None and i < cf_m_arr.shape[0] else float(comb_row[CombCol.M])
                 if use_vibe_beck:
                     qdot_comb += vibe_beck_time_heat_release_rate_with_total_energy(
                         t_s,
                         float(runtime_cool_flame_time_by_vol_s[i]),
                         float(fp.hcci_cool_flame_duration_by_vol_s[i]),
-                        float(fp.hcci_cool_flame_a_by_vol[i]),
-                        float(fp.hcci_cool_flame_m_by_vol[i]),
+                        cf_a,
+                        cf_m,
                         float(runtime_cool_flame_energy_by_vol_J[i]),
                     )
                 else:
@@ -692,8 +698,8 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                         t_s,
                         float(runtime_cool_flame_time_by_vol_s[i]),
                         float(fp.hcci_cool_flame_duration_by_vol_s[i]),
-                        float(fp.hcci_cool_flame_a_by_vol[i]),
-                        float(fp.hcci_cool_flame_m_by_vol[i]),
+                        cf_a,
+                        cf_m,
                         float(runtime_cool_flame_energy_by_vol_J[i]),
                     )
         elif use_latched_fuel_combustion:

@@ -115,6 +115,49 @@ def _hcci_cool_flame_energy_J(fp, cyl: int, q_total_J: float) -> float:
     return max(float(q_total_J) * min(max(fraction, 0.0), 0.95), 0.0)
 
 
+def _compute_dynamic_cool_flame(bundle, cyl: int, p_Pa: float, temp_K: float, air_mass_kg: float, fuel_mass_kg: float, residual_mass_kg: float, mass_kg: float, afr_stoich: float, q_total_J: float) -> tuple[float, float]:
+    """Dynamische Auswertung der Cool Flame Parameter nach Beck (2003, Kap. 6)."""
+    fp = bundle.free_piston
+    if not getattr(fp, 'hcci_cool_flame_dynamic_enabled', True):
+        return _hcci_cool_flame_energy_J(fp, cyl, q_total_J), float(fp.hcci_cool_flame_duration_by_vol_s[cyl])
+
+    lam = lambda_from_air_and_fuel_mass(float(air_mass_kg), float(fuel_mass_kg), float(afr_stoich))
+    # Beck verwendet in der Regel EGR in Prozent für die Polynome
+    residual_percent = max(min(float(residual_mass_kg) / max(float(mass_kg), 1.0e-18), 1.0), 0.0) * 100.0
+    
+    n_rpm = 60.0 / float(bundle.cycle_period_s) if float(bundle.cycle_period_s) > 1.0e-12 else 3000.0
+    n_1000 = n_rpm / 1000.0
+    p_bar = float(p_Pa) * 1.0e-5
+
+    # Koeffizienten Diesel 2 (Beck 2003, Tabelle 6.2)
+    # c1(p), c2(T), c3(lam), c4(n), c5(EGR), c0
+    c_dq = [0.363, 0.0, -0.333, 1.424, 0.155, 0.0075]
+    # Beck (2003): Die Dauer der Cool Flame ist in Mikrosekunden (us) skaliert!
+    c_dt = [-0.071, -0.0085, 0.016, -0.241, -0.645, 340.9]
+
+    # Auswertung, falls die Kraftstoff-Koeffizienten-Arrays dynamisch geliefert werden
+    dyn_dq = getattr(fp, 'hcci_cf_c_dq_by_vol', None)
+    dyn_dt = getattr(fp, 'hcci_cf_c_dt_by_vol', None)
+    if dyn_dq is not None and dyn_dt is not None and cyl < dyn_dq.shape[0] and np.any(dyn_dq[cyl]):
+        c_dq = dyn_dq[cyl]
+        c_dt = dyn_dt[cyl]
+
+    dq_b_max = c_dq[0]*p_bar + c_dq[1]*temp_K + c_dq[2]*lam + c_dq[3]*n_1000 + c_dq[4]*residual_percent + c_dq[5]
+    duration_us = c_dt[0]*p_bar + c_dt[1]*temp_K + c_dt[2]*lam + c_dt[3]*n_1000 + c_dt[4]*residual_percent + c_dt[5]
+    
+    dq_b_max = max(dq_b_max, 0.0)
+    cool_duration_s = max(duration_us, 1.0) * 1.0e-6
+    
+    # Fläche des Dreiecks = 0.5 * dQ_max [J/°CA] * dt [°CA]
+    # Umrechnung von Sekunden in Kurbelwinkel: °CA = t_s * 6 * n_rpm
+    duration_deg = cool_duration_s * 6.0 * n_rpm
+    cool_energy_J = 0.5 * dq_b_max * duration_deg
+
+    # Konservative Obergrenze: max 15% der verfügbaren Kraftstoffenergie
+    cool_energy_J = max(0.0, min(cool_energy_J, float(q_total_J) * 0.15))
+
+    return cool_energy_J, cool_duration_s
+
 def _fueling_mode_for_cylinder(bundle, cylinder_idx: int) -> int:
     fp = getattr(bundle, 'free_piston', None)
     if fp is None:
@@ -218,6 +261,8 @@ def _ensure_runtime_arrays(bundle) -> None:
         'runtime_cool_flame_done_by_vol',
         'runtime_injector_active_by_vol',
         'runtime_slotclose_charge_active_by_vol',
+        'runtime_cf_active_by_vol',
+        'runtime_hf_active_by_vol',
     )
     float_names = (
         'runtime_latched_cylinder_mass_by_vol_kg',
@@ -244,15 +289,40 @@ def _ensure_runtime_arrays(bundle) -> None:
         'runtime_cool_flame_time_by_vol_s',
         'runtime_cool_flame_end_time_by_vol_s',
         'runtime_cool_flame_energy_by_vol_J',
+        'runtime_cf_integral_by_vol',
+        'runtime_cf_tau_by_vol_s',
+        'runtime_hf_integral_by_vol',
+        'runtime_hf_tau_by_vol_s',
     )
+
+    if not hasattr(type(fp), '_dynamic_arrays'):
+        setattr(type(fp), '_dynamic_arrays', {})
+    fp_id = id(fp)
+    if fp_id not in type(fp)._dynamic_arrays:
+        type(fp)._dynamic_arrays[fp_id] = {}
+
+    # Work around objects that implement __slots__ and therefore cannot always
+    # receive new instance attributes. We instead attach runtime arrays via a
+    # per-instance registry on the type, exposed through dynamically created
+    # properties.
     for name in int_names:
-        arr = getattr(fp, name)
-        if int(getattr(arr, 'shape', (0,))[0]) != n_vol:
-            setattr(fp, name, np.zeros(n_vol, dtype=np.int64))
+        arr = getattr(fp, name, None)
+        if arr is None or int(getattr(arr, 'shape', (0,))[0]) != n_vol:
+            try:
+                setattr(fp, name, np.zeros(n_vol, dtype=np.int64))
+            except AttributeError:
+                type(fp)._dynamic_arrays[fp_id][name] = np.zeros(n_vol, dtype=np.int64)
+                if not hasattr(type(fp), name):
+                    setattr(type(fp), name, property(lambda self, n=name: type(self)._dynamic_arrays.get(id(self), {}).get(n)))
     for name in float_names:
-        arr = getattr(fp, name)
-        if int(getattr(arr, 'shape', (0,))[0]) != n_vol:
-            setattr(fp, name, np.zeros(n_vol, dtype=np.float64))
+        arr = getattr(fp, name, None)
+        if arr is None or int(getattr(arr, 'shape', (0,))[0]) != n_vol:
+            try:
+                setattr(fp, name, np.zeros(n_vol, dtype=np.float64))
+            except AttributeError:
+                type(fp)._dynamic_arrays[fp_id][name] = np.zeros(n_vol, dtype=np.float64)
+                if not hasattr(type(fp), name):
+                    setattr(type(fp), name, property(lambda self, n=name: type(self)._dynamic_arrays.get(id(self), {}).get(n)))
 
 
 def _comb_idx_for_cylinder(bundle, cylinder_idx: int) -> int:
@@ -641,6 +711,14 @@ def _update_hcci_diesel_autoignition_state(bundle, t_s: float, y_state: np.ndarr
             fuel_mass_kg=fuel_mass,
             afr_stoich=afr,
         )
+        lam = lambda_from_air_and_fuel_mass(air_mass, fuel_mass, afr)
+        pressure_factor = (max(float(fp.hcci_reference_pressure_by_vol_Pa[cyl]), 1.0) / max(pressure_Pa, 1.0)) ** float(fp.hcci_pressure_exponent_by_vol[cyl])
+        temp_factor = float(np.exp(float(fp.hcci_activation_temperature_by_vol_K[cyl]) / max(temp_K, 1.0)))
+        lambda_factor = (max(lam, 1.0e-12) / max(float(fp.hcci_reference_lambda_by_vol[cyl]), 1.0e-12)) ** float(fp.hcci_lambda_slowdown_exponent_by_vol[cyl])
+        residual_fraction = max(min(residual_mass / max(mass, 1.0e-18), 1.0), 0.0)
+        residual_factor = 1.0 + (float(fp.hcci_residual_slowdown_factor_by_vol[cyl]) - 1.0) * residual_fraction
+        tau_s = max(float(fp.hcci_tau_A_by_vol_s[cyl]) * pressure_factor * temp_factor * lambda_factor * residual_factor, 1.0e-9)
+        tau_s = min(tau_s, float(fp.hcci_max_ignition_delay_by_vol_s[cyl]))
         fp.runtime_hcci_tau_by_vol_s[cyl] = tau_s
         if _hcci_two_stage_enabled(fp, cyl) and not bool(fp.runtime_cool_flame_done_by_vol[cyl]):
             tau_s = _hcci_ignition_delay_s(
@@ -659,8 +737,9 @@ def _update_hcci_diesel_autoignition_state(bundle, t_s: float, y_state: np.ndarr
             fp.runtime_hcci_cool_tau_by_vol_s[cyl] = tau_s
             fp.runtime_hcci_cool_integral_by_vol[cyl] += dt_s / max(tau_s, 1.0e-12)
             if fp.runtime_hcci_cool_integral_by_vol[cyl] >= 1.0:
-                cool_energy_J = _hcci_cool_flame_energy_J(fp, cyl, q_total_J)
-                cool_duration_s = float(fp.hcci_cool_flame_duration_by_vol_s[cyl])
+                cool_energy_J, cool_duration_s = _compute_dynamic_cool_flame(
+                    bundle, cyl, pressure_Pa, temp_K, air_mass, fuel_mass, residual_mass, mass, afr, q_total_J
+                )
                 if cool_energy_J > 0.0 and cool_duration_s > 0.0:
                     fp.runtime_cool_flame_active_by_vol[cyl] = 1
                     fp.runtime_cool_flame_done_by_vol[cyl] = 1
@@ -680,7 +759,11 @@ def _update_hcci_diesel_autoignition_state(bundle, t_s: float, y_state: np.ndarr
                 fp.runtime_soc_active_by_vol[cyl] = 1
                 fp.runtime_soc_time_by_vol_s[cyl] = float(t_s)
                 fp.runtime_soc_end_time_by_vol_s[cyl] = float(t_s + duration_s)
-                fp.runtime_soc_energy_by_vol_J[cyl] = float(q_total_J - _hcci_cool_flame_energy_J(fp, cyl, q_total_J) if _hcci_two_stage_enabled(fp, cyl) else q_total_J)
+                if _hcci_two_stage_enabled(fp, cyl):
+                    cf_energy = float(fp.runtime_cool_flame_energy_by_vol_J[cyl])
+                    fp.runtime_soc_energy_by_vol_J[cyl] = max(0.0, float(q_total_J - cf_energy))
+                else:
+                    fp.runtime_soc_energy_by_vol_J[cyl] = float(q_total_J)
                 fp.runtime_hcci_integral_by_vol[cyl] = 0.0
                 if cyl == int(bundle.cylinder_indices[0]):
                     fp.runtime_soc_active = True
@@ -710,6 +793,7 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
         hcci_integral = 0.0
         hcci_cool_integral = 0.0
         cool_done = False
+        cool_energy_latched_J = 0.0
         active = False
         soc_time_s = 0.0
         soc_end_time_s = 0.0
@@ -796,7 +880,18 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
                 if hcci_cool_integral >= 1.0:
                     cool_done = True
                     hcci_cool_integral = 0.0
+                    cool_energy_latched_J, _ = _compute_dynamic_cool_flame(
+                        bundle, cyl_idx, pressure_Pa, temp_K, air_mass, fuel_mass, residual_mass, mass, afr, q_total_J
+                    )
                 continue
+            lam = lambda_from_air_and_fuel_mass(air_mass, fuel_mass, afr)
+            pressure_factor = (max(float(fp.hcci_reference_pressure_by_vol_Pa[cyl_idx]), 1.0) / max(pressure_Pa, 1.0)) ** float(fp.hcci_pressure_exponent_by_vol[cyl_idx])
+            temp_factor = float(np.exp(float(fp.hcci_activation_temperature_by_vol_K[cyl_idx]) / max(temp_K, 1.0)))
+            lambda_factor = (max(lam, 1.0e-12) / max(float(fp.hcci_reference_lambda_by_vol[cyl_idx]), 1.0e-12)) ** float(fp.hcci_lambda_slowdown_exponent_by_vol[cyl_idx])
+            residual_fraction = max(min(residual_mass / max(mass, 1.0e-18), 1.0), 0.0)
+            residual_factor = 1.0 + (float(fp.hcci_residual_slowdown_factor_by_vol[cyl_idx]) - 1.0) * residual_fraction
+            tau_s = max(float(fp.hcci_tau_A_by_vol_s[cyl_idx]) * pressure_factor * temp_factor * lambda_factor * residual_factor, 1.0e-9)
+            tau_s = min(tau_s, float(fp.hcci_max_ignition_delay_by_vol_s[cyl_idx]))
             hcci_integral += dt_s / max(tau_s, 1.0e-12)
             if hcci_integral >= 1.0:
                 duration_s = _time_mode_duration_s(bundle, cyl_idx)
@@ -804,7 +899,10 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
                     active = True
                     soc_time_s = t_k
                     soc_end_time_s = t_k + duration_s
-                    soc_energy_J = q_total_J - _hcci_cool_flame_energy_J(fp, cyl_idx, q_total_J) if _hcci_two_stage_enabled(fp, cyl_idx) else q_total_J
+                    if _hcci_two_stage_enabled(fp, cyl_idx):
+                        soc_energy_J = max(0.0, q_total_J - cool_energy_latched_J)
+                    else:
+                        soc_energy_J = q_total_J
                     hcci_integral = 0.0
                     soc_time_hist[k] = soc_time_s
                     soc_energy_hist[k] = soc_energy_J
