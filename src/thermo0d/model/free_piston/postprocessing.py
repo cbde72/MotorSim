@@ -165,8 +165,8 @@ def build_free_piston_rows(bundle, t: np.ndarray, y: np.ndarray) -> list[dict[st
         mass_kg = float(bundle.state_layout.gas_mass_from_state(state_k, int(bundle.cylinder_indices[0])))
         internal_energy_J = float(y[u_idx, k])
         burned_mass_kg = float(bundle.state_layout.burned_mass_from_state(state_k, int(bundle.cylinder_indices[0])))
-        residual_mass_kg = float(bundle.state_layout.residual_mass_from_state(state_k, int(bundle.cylinder_indices[0])))
-        fresh_burned_mass_kg = float(bundle.state_layout.fresh_burned_mass_from_state(state_k, int(bundle.cylinder_indices[0])))
+        residual_mass_kg = burned_mass_kg
+        fresh_burned_mass_kg = 0.0
         air_mass_kg = float(bundle.state_layout.air_mass_from_state(state_k, int(bundle.cylinder_indices[0])))
         liquid_fuel_mass_kg = float(bundle.state_layout.liquid_fuel_mass_from_state(state_k, int(bundle.cylinder_indices[0])))
         fuel_vapor_mass_kg = float(bundle.state_layout.fuel_vapor_mass_from_state(state_k, int(bundle.cylinder_indices[0])))

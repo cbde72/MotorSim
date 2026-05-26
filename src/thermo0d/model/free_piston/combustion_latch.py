@@ -501,7 +501,7 @@ def _update_hcci_diesel_autoignition_state(bundle, t_s: float, y_state: np.ndarr
         energy = float(y_state[int(bundle.state_layout.energy_index(cyl))])
         air_mass = float(bundle.state_layout.air_mass_from_state(y_state, cyl))
         burned_mass = float(bundle.state_layout.burned_mass_from_state(y_state, cyl))
-        residual_mass = float(bundle.state_layout.residual_mass_from_state(y_state, cyl))
+        residual_mass = burned_mass
         fuel_mass = float(fp.runtime_latched_fuel_mass_by_vol_kg[cyl]) if bool(fp.runtime_latch_valid_by_vol[cyl]) else float(bundle.state_layout.fuel_vapor_mass_from_state(y_state, cyl))
         if mass <= 1.0e-18 or air_mass <= 1.0e-18 or fuel_mass <= 1.0e-18:
             continue
@@ -599,7 +599,7 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
             energy = float(y[int(bundle.state_layout.energy_index(cyl_idx)), k])
             air_mass = float(bundle.state_layout.air_mass_from_state(y[:, k], cyl_idx))
             burned_mass = float(bundle.state_layout.burned_mass_from_state(y[:, k], cyl_idx))
-            residual_mass = float(bundle.state_layout.residual_mass_from_state(y[:, k], cyl_idx))
+            residual_mass = burned_mass
             lhv = float(bundle.combustion_lhv_by_vol[cyl_idx]) if getattr(bundle, 'combustion_lhv_by_vol', None) is not None and cyl_idx < int(bundle.combustion_lhv_by_vol.shape[0]) else float(getattr(fp, 'combustion_lhv_J_per_kg', 0.0) or 0.0)
             comb_eff = float(bundle.combustion_efficiency_by_vol[cyl_idx]) if getattr(bundle, 'combustion_efficiency_by_vol', None) is not None and cyl_idx < int(bundle.combustion_efficiency_by_vol.shape[0]) else float(getattr(fp, 'combustion_efficiency_0to1', 1.0) or 1.0)
             fuel_mass = q_total_J / max(lhv * comb_eff, 1.0e-18)
