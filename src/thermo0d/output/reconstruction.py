@@ -24,7 +24,7 @@ try:
     from thermo0d.physics.kinematics import global_theta_and_rate_from_time
 except ImportError:
     global_theta_and_rate_from_time = None
-from thermo0d.physics.combustion import combustion_duration_mode_from_row, vibe_heat_release_rate_with_total_energy, vibe_time_heat_release_rate_with_total_energy
+from thermo0d.physics.combustion import combustion_duration_mode_from_row, vibe_beck_time_heat_release_rate_with_total_energy, vibe_heat_release_rate_with_total_energy, vibe_time_heat_release_rate_with_total_energy
 from thermo0d.physics.rhs import _evaluate_check_valve_area, _evaluate_orifice_area, _evaluate_slot_state, _evaluate_valve_state
 from thermo0d.physics.source_terms import cylinder_energy_source_terms_from_context
 from thermo0d.physics.composition import burned_fraction_0to1, unburned_mass_kg
@@ -1063,14 +1063,26 @@ class SignalReconstructionService:
                     comb_row = comb_matrix[comb_idx]
                     duration_mode = int(combustion_duration_mode_from_row(comb_row))
                     if duration_mode == int(CombDurationMode.TIME):
-                        added_energy_w = vibe_time_heat_release_rate_with_total_energy(
-                            t_arr[k],
-                            float(cyl_soc_time_hist[k]),
-                            float(comb_row[CombCol.DURATION_DEG]),
-                            float(comb_row[CombCol.A]),
-                            float(comb_row[CombCol.M]),
-                            float(cyl_soc_energy_hist[k]),
-                        )
+                        hcci_burn_model_by_vol = getattr(fp, 'hcci_burn_model_by_vol', np.zeros(0, dtype=np.int64))
+                        use_vibe_beck = i < int(getattr(hcci_burn_model_by_vol, 'shape', (0,))[0]) and int(hcci_burn_model_by_vol[i]) == 1
+                        if use_vibe_beck:
+                            added_energy_w = vibe_beck_time_heat_release_rate_with_total_energy(
+                                t_arr[k],
+                                float(cyl_soc_time_hist[k]),
+                                float(comb_row[CombCol.DURATION_DEG]),
+                                float(comb_row[CombCol.A]),
+                                float(comb_row[CombCol.M]),
+                                float(cyl_soc_energy_hist[k]),
+                            )
+                        else:
+                            added_energy_w = vibe_time_heat_release_rate_with_total_energy(
+                                t_arr[k],
+                                float(cyl_soc_time_hist[k]),
+                                float(comb_row[CombCol.DURATION_DEG]),
+                                float(comb_row[CombCol.A]),
+                                float(comb_row[CombCol.M]),
+                                float(cyl_soc_energy_hist[k]),
+                            )
                     elif use_fp_latched_fuel:
                         if free_piston_reference_is_active(int(comb_row[CombCol.REF_TYPE]), float(piston_x_by_vol[i]), float(piston_v_by_vol[i]), fp.x_min_m, fp.x_max_m):
                             added_energy_w = vibe_heat_release_rate_with_total_energy(

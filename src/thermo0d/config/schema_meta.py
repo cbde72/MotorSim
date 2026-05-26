@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from thermo0d.physics.beck import BECK_COOL_FLAME_FUEL_NAMES
+
 SOLVER_KINDS = ["euler", "rk4", "scipy_rk45", "scipy_bdf", "scipy_radau"]
 SAMPLING_MODES = ["time", "crank_angle"]
 PLOT_SOURCES = ["last_cycle_uniform", "export_rows"]
@@ -141,6 +143,18 @@ FIELD_META: dict[str, FieldMeta] = {
     "combustion.stroke_reference_m": FieldMeta("Stroke ref [m]", "float", default=None, help_text="Referenzhub für energy_coupling = stroke_ratio.", section="submodel", visible_if=("combustion.model", "vibe")),
     "combustion.stroke_exponent": FieldMeta("Stroke exponent", "float", default=1.0, help_text="Exponent der Hub-Skalierung für die Energiezufuhr.", section="submodel", visible_if=("combustion.model", "vibe")),
     "combustion.angle_reference": FieldMeta("Angle ref", "choice", default="absolute", choices=tuple(ANGLE_REFERENCES), help_text="Bezugssystem der Verbrennungswinkel.", section="submodel", visible_if=("combustion.model", "vibe")),
+
+    "combustion.ignition_model": FieldMeta("Ignition model", "choice", default="livengood_wu", choices=("livengood_wu", "beck_2003_1_arrhenius", "beck_2003_two_stage"), help_text="HCCI-Zuendverzugsmodell: generisches Livengood-Wu oder Beck 2003 mit optionaler Cool-/Hot-Flame-Stufung.", section="submodel", visible_if=("combustion.model", "hcci_diesel")),
+    "combustion.burn_model": FieldMeta("Burn model", "choice", default="wiebe_autoignition", choices=("wiebe_autoignition", "vibe-beck"), help_text="Brennverlaufsmodell nach Autoignition.", section="submodel", visible_if=("combustion.model", "hcci_diesel")),
+    "combustion.beck_c1_s": FieldMeta("Beck c1 [s]", "float", default=1.0e-5, help_text="Beck 1-Arrhenius Vorfaktor c1 der Zuendverzugszeit.", section="submodel", visible_if=("combustion.ignition_model", "beck_2003_1_arrhenius")),
+    "combustion.beck_c2": FieldMeta("Beck c2", "float", default=-1.2, help_text="Beck Druckexponent c2 in (p/p0)^c2.", section="submodel", visible_if=("combustion.ignition_model", "beck_2003_1_arrhenius")),
+    "combustion.beck_reference_pressure_bar": FieldMeta("Beck p0 [bar]", "float", default=1.0, help_text="Beck Referenzdruck p0 fuer den Druckterm.", section="submodel", visible_if=("combustion.ignition_model", "beck_2003_1_arrhenius")),
+    "combustion.beck_reference_o2_percent": FieldMeta("Beck O2 air [%]", "float", default=20.94, help_text="Sauerstoffkonzentration trockener Luft fuer den linearen O2-Term nach Beck.", section="submodel", visible_if=("combustion.ignition_model", "beck_2003_1_arrhenius")),
+    "combustion.beck_cf_fuel_name": FieldMeta("Beck CF fuel", "choice", default="Diesel 2", choices=BECK_COOL_FLAME_FUEL_NAMES, help_text="Kraftstoffname nach Beck Tabelle 6.2 fuer die Cool-Flame-Parametersaetze.", section="submodel", visible_if=("combustion.ignition_model", "beck_2003_two_stage")),
+    "combustion.tau_activation_energy_J_per_kg": FieldMeta("Activation energy [J/kg]", "float", default=None, help_text="Optionale Beck-Aktivierungsenergie je Masse. Wenn nicht gesetzt, wird tau_activation_temperature_K genutzt.", section="submodel", visible_if=("combustion.model", "hcci_diesel")),
+    "combustion.cool_flame_enabled": FieldMeta("Cool flame", "bool", default=False, help_text="Aktiviert separate Cool-Flame-Stufe vor der Hot-Flame-Hauptverbrennung.", section="submodel", visible_if=("combustion.model", "hcci_diesel")),
+    "combustion.cool_flame_energy_fraction": FieldMeta("CF energy fraction", "float", default=0.08, help_text="Anteil der Zyklusenergie, der in der Cool-Flame-Stufe freigesetzt wird.", section="submodel", visible_if=("combustion.cool_flame_enabled", True)),
+    "combustion.cool_flame_duration_ms": FieldMeta("CF duration [ms]", "float", default=0.3409, help_text="Zeitdauer des Cool-Flame-Vibe-Ersatzbrennverlaufs.", section="submodel", visible_if=("combustion.cool_flame_enabled", True)),
 
     "evaporation.model": FieldMeta("Evaporation model", "choice", default="none", choices=("none", "simple"), help_text="Verdampfungsmodell dieses Volumens.", section="submodel"),
     "evaporation.start_deg": FieldMeta("Start [deg]", "float", default=300.0, help_text="Startwinkel der Verdampfung.", section="submodel", visible_if=("evaporation.model", "simple")),

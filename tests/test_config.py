@@ -273,3 +273,37 @@ def test_hcci_diesel_combustion_config_loads_from_central_submodel(tmp_path: Pat
     assert hcci.burn_model == 'wiebe_autoignition'
     assert hcci.duration_ms == 1.2
     assert hcci.lambda_target == 1.4
+
+
+def test_hcci_diesel_beck_ignition_model_loads(tmp_path: Path) -> None:
+    text = Path('Projekte/variants/free_piston_GenSet_V14.yaml').read_text(encoding='utf-8')
+    text = text.replace('ref: vibe_lambda_slot', 'ref: hcci_diesel_default', 1)
+    text = text.replace('ignition_model: livengood_wu', 'ignition_model: beck_2003_1_arrhenius')
+    cfg_path = tmp_path / 'hcci_beck.yaml'
+    cfg_path.write_text(text, encoding='utf-8')
+
+    cfg = load_config(cfg_path)
+    hcci = cfg.preprocessing.volumes[0].combustion
+
+    assert hcci.ignition_model == 'beck_2003_1_arrhenius'
+    assert hcci.beck_c1_s == 1.0e-5
+    assert hcci.beck_c2 == -1.2
+    assert hcci.beck_reference_pressure_bar == 1.0
+    assert hcci.beck_reference_o2_percent == 20.94
+
+
+def test_hcci_diesel_beck_two_stage_ignition_model_loads(tmp_path: Path) -> None:
+    text = Path('Projekte/variants/free_piston_GenSet_V18.yaml').read_text(encoding='utf-8')
+    cfg_path = tmp_path / 'hcci_beck_two_stage.yaml'
+    cfg_path.write_text(text, encoding='utf-8')
+
+    cfg = load_config(cfg_path)
+    hcci = cfg.preprocessing.volumes[0].combustion
+
+    assert hcci.ignition_model == 'beck_2003_two_stage'
+    assert hcci.burn_model == 'vibe-beck'
+    assert hcci.beck_cf_fuel_name == 'Diesel 2'
+    assert hcci.cool_flame_enabled is False
+    assert hcci.cool_flame_energy_fraction == 0.08
+    assert hcci.cool_flame_dqmax_c1 == 0.363
+    assert hcci.cool_flame_duration_c0 == 340.9

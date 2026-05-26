@@ -272,6 +272,72 @@ def vibe_time_heat_release_rate_with_total_energy(
     )
 
 
+@nb.njit(cache=True)
+def vibe_beck_time_fraction_and_rate_numba(
+    t_s: float,
+    soc_time_s: float,
+    duration_s: float,
+    a: float,
+    m: float,
+) -> tuple[float, float]:
+    return vibe_time_fraction_and_rate_numba(t_s, soc_time_s, duration_s, a, m)
+
+
+@nb.njit(cache=True)
+def vibe_beck_time_heat_release_rate_with_total_energy_numba(
+    t_s: float,
+    soc_time_s: float,
+    duration_s: float,
+    a: float,
+    m: float,
+    q_total_J: float,
+) -> float:
+    if q_total_J <= 0.0 or duration_s <= 1.0e-18:
+        return 0.0
+    _xb, dxb_dt = vibe_beck_time_fraction_and_rate_numba(
+        t_s,
+        soc_time_s,
+        duration_s,
+        a,
+        m,
+    )
+    return q_total_J * dxb_dt
+
+
+def vibe_beck_time_heat_release_rate_with_total_energy(
+    t_s: float,
+    soc_time_s: float,
+    duration_s: float,
+    a: float,
+    m: float,
+    q_total_J: float,
+) -> float:
+    return vibe_beck_time_heat_release_rate_with_total_energy_numba(
+        float(t_s),
+        float(soc_time_s),
+        float(duration_s),
+        float(a),
+        float(m),
+        float(q_total_J),
+    )
+
+
+def vibe_beck_time_fraction_and_rate(
+    t_s: float,
+    soc_time_s: float,
+    duration_s: float,
+    a: float,
+    m: float,
+) -> tuple[float, float]:
+    return vibe_beck_time_fraction_and_rate_numba(
+        float(t_s),
+        float(soc_time_s),
+        float(duration_s),
+        float(a),
+        float(m),
+    )
+
+
 def vibe_fraction_and_rate(
     theta_local_deg: float,
     theta_global_deg: float,

@@ -20,6 +20,7 @@ from thermo0d.input.builder_common import (
 )
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_volume_from_position, free_piston_generalized_initial_state
 from thermo0d.physics.quellen_props import reduced_mixture_properties_from_temperature_quellen
+from thermo0d.physics.beck import beck_cool_flame_fuel_parameters
 from thermo0d.model.free_piston.state_layout import build_free_piston_state_layout
 from thermo0d.model.free_piston.thermo import mass_from_pTV, specific_internal_energy_from_temperature
 
@@ -506,16 +507,30 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     combustion_compression_velocity_threshold_by_vol_m_per_s = np.full(n_vol, 0.02, dtype=np.float64)
     injector_duration_by_vol_s = np.zeros(n_vol, dtype=np.float64)
     hcci_enabled_by_vol = np.zeros(n_vol, dtype=np.int64)
+    hcci_ignition_model_by_vol = np.zeros(n_vol, dtype=np.int64)
+    hcci_burn_model_by_vol = np.zeros(n_vol, dtype=np.int64)
+    hcci_two_stage_enabled_by_vol = np.zeros(n_vol, dtype=np.int64)
     hcci_tau_A_by_vol_s = np.zeros(n_vol, dtype=np.float64)
     hcci_pressure_exponent_by_vol = np.zeros(n_vol, dtype=np.float64)
     hcci_activation_temperature_by_vol_K = np.zeros(n_vol, dtype=np.float64)
+    hcci_activation_energy_by_vol_J_per_kg = np.zeros(n_vol, dtype=np.float64)
+    hcci_hot_flame_activation_energy_by_vol_J_per_kg = np.zeros(n_vol, dtype=np.float64)
+    hcci_cool_flame_activation_energy_by_vol_J_per_kg = np.zeros(n_vol, dtype=np.float64)
     hcci_reference_pressure_by_vol_Pa = np.zeros(n_vol, dtype=np.float64)
+    hcci_reference_pressure_by_vol_bar = np.ones(n_vol, dtype=np.float64)
     hcci_reference_lambda_by_vol = np.ones(n_vol, dtype=np.float64)
+    hcci_reference_o2_by_vol_percent = np.full(n_vol, 20.94, dtype=np.float64)
     hcci_lambda_slowdown_exponent_by_vol = np.zeros(n_vol, dtype=np.float64)
     hcci_residual_slowdown_factor_by_vol = np.ones(n_vol, dtype=np.float64)
     hcci_start_temperature_min_by_vol_K = np.zeros(n_vol, dtype=np.float64)
     hcci_start_pressure_min_by_vol_Pa = np.zeros(n_vol, dtype=np.float64)
     hcci_max_ignition_delay_by_vol_s = np.zeros(n_vol, dtype=np.float64)
+    hcci_cool_flame_energy_fraction_by_vol = np.zeros(n_vol, dtype=np.float64)
+    hcci_cool_flame_duration_by_vol_s = np.zeros(n_vol, dtype=np.float64)
+    hcci_cool_flame_a_by_vol = np.full(n_vol, 6.9, dtype=np.float64)
+    hcci_cool_flame_m_by_vol = np.full(n_vol, 2.0, dtype=np.float64)
+    hcci_cool_flame_dqmax_params_by_vol = np.zeros((n_vol, 6), dtype=np.float64)
+    hcci_cool_flame_duration_params_by_vol = np.zeros((n_vol, 6), dtype=np.float64)
 
     cylinder_cfg_for_submodels: CylinderVolumeConfig | None = None
     cylinder_cfg_by_index: dict[int, CylinderVolumeConfig] = {}
@@ -760,16 +775,34 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             start_mode_enum = CombStartMode.AUTOIGNITION
             duration_mode_enum = CombDurationMode.TIME
             hcci_enabled_by_vol[int(cyl_i)] = 1
-            hcci_tau_A_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.tau_A_s)
-            hcci_pressure_exponent_by_vol[int(cyl_i)] = float(combustion_cfg_local.tau_pressure_exponent)
+            ignition_model_name = str(combustion_cfg_local.ignition_model)
+            burn_model_name = str(combustion_cfg_local.burn_model)
+            uses_beck = ignition_model_name in ('beck_2003_1_arrhenius', 'beck_2003_two_stage')
+            hcci_ignition_model_by_vol[int(cyl_i)] = 2 if ignition_model_name == 'beck_2003_two_stage' else (1 if uses_beck else 0)
+            hcci_burn_model_by_vol[int(cyl_i)] = 1 if burn_model_name == 'vibe-beck' else 0
+            hcci_two_stage_enabled_by_vol[int(cyl_i)] = 1 if ignition_model_name == 'beck_2003_two_stage' or bool(getattr(combustion_cfg_local, 'cool_flame_enabled', False)) else 0
+            hcci_tau_A_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.beck_c1_s if uses_beck else combustion_cfg_local.tau_A_s)
+            hcci_pressure_exponent_by_vol[int(cyl_i)] = float(combustion_cfg_local.beck_c2 if uses_beck else combustion_cfg_local.tau_pressure_exponent)
             hcci_activation_temperature_by_vol_K[int(cyl_i)] = float(combustion_cfg_local.tau_activation_temperature_K)
+            hcci_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(combustion_cfg_local.tau_activation_energy_J_per_kg or 0.0)
             hcci_reference_pressure_by_vol_Pa[int(cyl_i)] = float(combustion_cfg_local.tau_reference_pressure_Pa)
+            hcci_reference_pressure_by_vol_bar[int(cyl_i)] = float(combustion_cfg_local.beck_reference_pressure_bar)
             hcci_reference_lambda_by_vol[int(cyl_i)] = float(combustion_cfg_local.tau_reference_lambda)
+            hcci_reference_o2_by_vol_percent[int(cyl_i)] = float(combustion_cfg_local.beck_reference_o2_percent)
             hcci_lambda_slowdown_exponent_by_vol[int(cyl_i)] = float(combustion_cfg_local.lambda_slowdown_exponent)
             hcci_residual_slowdown_factor_by_vol[int(cyl_i)] = float(combustion_cfg_local.residual_slowdown_factor)
             hcci_start_temperature_min_by_vol_K[int(cyl_i)] = float(combustion_cfg_local.start_temperature_min_K)
             hcci_start_pressure_min_by_vol_Pa[int(cyl_i)] = float(combustion_cfg_local.start_pressure_min_Pa)
             hcci_max_ignition_delay_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.max_ignition_delay_s)
+            beck_cf_params = beck_cool_flame_fuel_parameters(combustion_cfg_local.beck_cf_fuel_name)
+            hcci_hot_flame_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(combustion_cfg_local.tau_activation_energy_J_per_kg or beck_cf_params.hot_flame_activation_energy_J_per_kg)
+            hcci_cool_flame_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(beck_cf_params.cool_flame_activation_energy_J_per_kg)
+            hcci_cool_flame_energy_fraction_by_vol[int(cyl_i)] = float(combustion_cfg_local.cool_flame_energy_fraction)
+            hcci_cool_flame_duration_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.cool_flame_duration_ms) * 1.0e-3
+            hcci_cool_flame_a_by_vol[int(cyl_i)] = float(combustion_cfg_local.cool_flame_a)
+            hcci_cool_flame_m_by_vol[int(cyl_i)] = float(combustion_cfg_local.cool_flame_m)
+            hcci_cool_flame_dqmax_params_by_vol[int(cyl_i), :] = np.asarray(beck_cf_params.dqmax, dtype=np.float64)
+            hcci_cool_flame_duration_params_by_vol[int(cyl_i), :] = np.asarray(beck_cf_params.duration, dtype=np.float64)
         else:
             start_deg, duration_value, ref_type, start_mode_enum, duration_mode_enum = _resolve_combustion_timing_for_free_piston(
                 combustion_cfg_local,
@@ -954,16 +987,30 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         combustion_comb_idx=int(vol_matrix[cyl_idx, VolumeCol.COMB_ROW]),
         combustion_cylinder_slot_conn_indices=cylinder_slot_conn_indices,
         hcci_enabled_by_vol=hcci_enabled_by_vol,
+        hcci_ignition_model_by_vol=hcci_ignition_model_by_vol,
+        hcci_burn_model_by_vol=hcci_burn_model_by_vol,
+        hcci_two_stage_enabled_by_vol=hcci_two_stage_enabled_by_vol,
         hcci_tau_A_by_vol_s=hcci_tau_A_by_vol_s,
         hcci_pressure_exponent_by_vol=hcci_pressure_exponent_by_vol,
         hcci_activation_temperature_by_vol_K=hcci_activation_temperature_by_vol_K,
+        hcci_activation_energy_by_vol_J_per_kg=hcci_activation_energy_by_vol_J_per_kg,
+        hcci_hot_flame_activation_energy_by_vol_J_per_kg=hcci_hot_flame_activation_energy_by_vol_J_per_kg,
+        hcci_cool_flame_activation_energy_by_vol_J_per_kg=hcci_cool_flame_activation_energy_by_vol_J_per_kg,
         hcci_reference_pressure_by_vol_Pa=hcci_reference_pressure_by_vol_Pa,
+        hcci_reference_pressure_by_vol_bar=hcci_reference_pressure_by_vol_bar,
         hcci_reference_lambda_by_vol=hcci_reference_lambda_by_vol,
+        hcci_reference_o2_by_vol_percent=hcci_reference_o2_by_vol_percent,
         hcci_lambda_slowdown_exponent_by_vol=hcci_lambda_slowdown_exponent_by_vol,
         hcci_residual_slowdown_factor_by_vol=hcci_residual_slowdown_factor_by_vol,
         hcci_start_temperature_min_by_vol_K=hcci_start_temperature_min_by_vol_K,
         hcci_start_pressure_min_by_vol_Pa=hcci_start_pressure_min_by_vol_Pa,
         hcci_max_ignition_delay_by_vol_s=hcci_max_ignition_delay_by_vol_s,
+        hcci_cool_flame_energy_fraction_by_vol=hcci_cool_flame_energy_fraction_by_vol,
+        hcci_cool_flame_duration_by_vol_s=hcci_cool_flame_duration_by_vol_s,
+        hcci_cool_flame_a_by_vol=hcci_cool_flame_a_by_vol,
+        hcci_cool_flame_m_by_vol=hcci_cool_flame_m_by_vol,
+        hcci_cool_flame_dqmax_params_by_vol=hcci_cool_flame_dqmax_params_by_vol,
+        hcci_cool_flame_duration_params_by_vol=hcci_cool_flame_duration_params_by_vol,
         runtime_scavenging_transfer_in_by_vol_kg_per_s=np.zeros(n_vol, dtype=np.float64),
         runtime_scavenging_exhaust_out_by_vol_kg_per_s=np.zeros(n_vol, dtype=np.float64),
         runtime_scavenging_burned_correction_by_vol_kg_per_s=np.zeros(n_vol, dtype=np.float64),

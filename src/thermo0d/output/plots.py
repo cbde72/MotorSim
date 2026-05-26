@@ -734,9 +734,13 @@ def write_free_piston_last_ut_ot_ut_species_plot(bundle, rows: list[dict[str, fl
 
 
 def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str, float | int]], output_dir: str | Path, prefix: str, run_config_path: str | Path | None = None) -> list[str]:
+    """Write diagnostic plots for the final complete UT-OT-UT free-piston cycle."""
     output_dir = Path(output_dir).resolve()
     if not rows:
         return []
+
+    # The diagnostic plots are tied to the free-piston displacement and velocity
+    # channels. Without both channels, a reliable UT/OT cycle cannot be detected.
     x_key = 'free_piston_distance_from_tdc_m'
     v_key = 'free_piston_v_m_per_s'
     if any(key not in rows[0] for key in (x_key, v_key)):
@@ -757,6 +761,8 @@ def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str
                 return _arr(key)
         return np.full(len(rows), np.nan, dtype=np.float64)
 
+    # Convert the row-oriented export data into aligned NumPy arrays and keep
+    # only samples with finite piston position and velocity.
     t_s = _arr('t_s')
     x_m = _arr(x_key)
     v_mps = _arr(v_key)
@@ -769,6 +775,8 @@ def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str
     v_mps = v_mps[valid]
     q_rad = q_rad[valid]
 
+    # UT and OT are identified from velocity sign changes. The last full cycle
+    # is the final UT, the previous UT, and the last OT between them.
     ut_idx = np.where((v_mps[:-1] > 0.0) & (v_mps[1:] <= 0.0))[0] + 1
     ot_idx = np.where((v_mps[:-1] < 0.0) & (v_mps[1:] >= 0.0))[0] + 1
     if ut_idx.size < 2 or ot_idx.size < 1:
@@ -787,6 +795,8 @@ def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str
     fp = getattr(bundle, 'free_piston', None)
     is_rotary = fp is not None and getattr(fp, 'kinematics_type', 'linear') == 'oscillating_rotary'
 
+    # Rotary kinematics can use the simulated oscillation angle directly. Linear
+    # kinematics are normalized to a 0..360 degree progress axis for comparability.
     if is_rotary and np.any(np.isfinite(q_rad)):
         q_deg = q_rad * (180.0 / math.pi)
         x_progress_deg = q_deg[seg]
@@ -809,6 +819,8 @@ def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str
         xlim_min = 0.0
         xlim_max = 360.0
 
+    # Helper for optional channels: use the first available key, slice it to the
+    # selected cycle, and apply unit conversion in one place.
     def _series(keys: list[str], scale: float = 1.0, offset: float = 0.0, fallback: np.ndarray | None = None) -> np.ndarray:
         values = _arr_first(keys)[valid]
         if not np.any(np.isfinite(values)) and fallback is not None:
@@ -816,6 +828,8 @@ def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str
         return values[seg] * scale + offset
 
     def _accel() -> np.ndarray:
+        # Prefer the exported acceleration channel; fall back to a numerical
+        # derivative only when timestamps are usable.
         a = _arr_first(['free_piston_a_m_per_s2'])[valid]
         if np.any(np.isfinite(a)):
             return a
@@ -824,6 +838,8 @@ def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str
         return np.gradient(v_mps, t_s)
 
     def _plot_multi_axis(filename: str, title: str, axes: list[dict[str, object]]) -> str | None:
+        # Each plot may combine several physical quantities with their own
+        # y-axis. Series without enough finite samples are skipped.
         fig, base_ax = plt.subplots(figsize=(9.0, 5.2), dpi=150)
         axis_map: dict[str, object] = {}
         for idx, axis_spec in enumerate(axes):
@@ -885,6 +901,8 @@ def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str
         plt.close(fig)
         return str(path)
 
+    # Frequently reused diagnostic channels. Unit conversions are applied here
+    # so the plot specifications below remain mostly declarative.
     piston_mm = _series(['free_piston_x_m'], scale=-1000.0, offset=54.04, fallback=x_m)
     transfer_mdot = _series(['transfer_slot_mdot_kg_per_s'])
     exhaust_mdot = _series(['exhaust_slot_mdot_kg_per_s'])
@@ -968,6 +986,7 @@ def write_free_piston_last_ut_ot_ut_diagnostic_plots(bundle, rows: list[dict[str
         path = _plot_multi_axis(filename, title, axes)
         if path is not None:
             written.append(path)
+    # Return only plots that actually contain at least one drawable series.
     return written
 
 

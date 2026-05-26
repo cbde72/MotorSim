@@ -871,6 +871,17 @@ class PropertyPanel(QWidget):
                 self._meta_spec(f"{prefix}.energy_coupling"),
                 self._meta_spec(f"{prefix}.stroke_reference_m"),
                 self._meta_spec(f"{prefix}.stroke_exponent"),
+                self._meta_spec(f"{prefix}.ignition_model"),
+                self._meta_spec(f"{prefix}.burn_model"),
+                self._meta_spec(f"{prefix}.beck_c1_s"),
+                self._meta_spec(f"{prefix}.beck_c2"),
+                self._meta_spec(f"{prefix}.beck_reference_pressure_bar"),
+                self._meta_spec(f"{prefix}.beck_reference_o2_percent"),
+                self._meta_spec(f"{prefix}.beck_cf_fuel_name"),
+                self._meta_spec(f"{prefix}.tau_activation_energy_J_per_kg"),
+                self._meta_spec(f"{prefix}.cool_flame_enabled"),
+                self._meta_spec(f"{prefix}.cool_flame_energy_fraction"),
+                self._meta_spec(f"{prefix}.cool_flame_duration_ms"),
             ]
             if include_angle_reference:
                 specs.append(self._meta_spec(f"{prefix}.angle_reference", choices=list(ANGLE_REFERENCES)))

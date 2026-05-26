@@ -26,7 +26,7 @@ SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
     ],
     'free_piston_a3': [
 # %%
-        '--config', str(PROJECT_ROOT / 'Projekte'/'variants' / 'free_piston_GenSet_V15.yaml'),
+        '--config', str(PROJECT_ROOT / 'Projekte'/'variants' / 'free_piston_GenSet_V18.yaml'),
 
         '--project', str(Path(DEFAULT_PROJECT)),
         #'--no-excel',

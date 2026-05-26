@@ -10,7 +10,7 @@ from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cyl
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
 from thermo0d.model.free_piston.combustion_latch import free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector
 from thermo0d.physics.flow import de_st_venant_wantzel_signed
-from thermo0d.physics.combustion import combustion_duration_mode_from_row, vibe_fraction_and_rate, vibe_heat_release_rate_with_total_energy, vibe_time_fraction_and_rate, vibe_time_heat_release_rate_with_total_energy
+from thermo0d.physics.combustion import combustion_duration_mode_from_row, vibe_beck_time_fraction_and_rate, vibe_beck_time_heat_release_rate_with_total_energy, vibe_fraction_and_rate, vibe_heat_release_rate_with_total_energy, vibe_time_fraction_and_rate, vibe_time_heat_release_rate_with_total_energy
 from thermo0d.physics.openings import connection_area_and_coefficients
 from thermo0d.physics.source_terms import volume_energy_source_terms
 from thermo0d.physics.thermo import safe_pressure_from_ideal_gas, safe_temperature_from_state
@@ -208,6 +208,10 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     runtime_soc_active_by_vol = getattr(fp, 'runtime_soc_active_by_vol', np.zeros(0, dtype=np.int64))
     runtime_soc_time_by_vol_s = getattr(fp, 'runtime_soc_time_by_vol_s', np.zeros(0, dtype=np.float64))
     runtime_soc_energy_by_vol_J = getattr(fp, 'runtime_soc_energy_by_vol_J', np.zeros(0, dtype=np.float64))
+    runtime_cool_flame_active_by_vol = getattr(fp, 'runtime_cool_flame_active_by_vol', np.zeros(0, dtype=np.int64))
+    runtime_cool_flame_time_by_vol_s = getattr(fp, 'runtime_cool_flame_time_by_vol_s', np.zeros(0, dtype=np.float64))
+    runtime_cool_flame_energy_by_vol_J = getattr(fp, 'runtime_cool_flame_energy_by_vol_J', np.zeros(0, dtype=np.float64))
+    hcci_burn_model_by_vol = getattr(fp, 'hcci_burn_model_by_vol', np.zeros(0, dtype=np.int64))
     runtime_slotclose_charge_active_by_vol = getattr(fp, 'runtime_slotclose_charge_active_by_vol', np.zeros(0, dtype=np.int64))
     runtime_slotclose_charge_time_by_vol_s = getattr(fp, 'runtime_slotclose_charge_time_by_vol_s', np.zeros(0, dtype=np.float64))
     runtime_slotclose_charge_end_time_by_vol_s = getattr(fp, 'runtime_slotclose_charge_end_time_by_vol_s', np.zeros(0, dtype=np.float64))
@@ -654,14 +658,44 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             else:
                 q_total_active_J = float(runtime_soc_energy_J) if bool(runtime_soc_active) else 0.0
                 soc_time_s = float(runtime_soc_time_s)
-            qdot_comb = vibe_time_heat_release_rate_with_total_energy(
-                t_s,
-                soc_time_s,
-                float(comb_row[CombCol.DURATION_DEG]),
-                float(comb_row[CombCol.A]),
-                float(comb_row[CombCol.M]),
-                q_total_active_J,
-            )
+            use_vibe_beck = int(getattr(hcci_burn_model_by_vol, 'shape', (0,))[0]) > i and int(hcci_burn_model_by_vol[i]) == 1
+            if use_vibe_beck:
+                qdot_comb = vibe_beck_time_heat_release_rate_with_total_energy(
+                    t_s,
+                    soc_time_s,
+                    float(comb_row[CombCol.DURATION_DEG]),
+                    float(comb_row[CombCol.A]),
+                    float(comb_row[CombCol.M]),
+                    q_total_active_J,
+                )
+            else:
+                qdot_comb = vibe_time_heat_release_rate_with_total_energy(
+                    t_s,
+                    soc_time_s,
+                    float(comb_row[CombCol.DURATION_DEG]),
+                    float(comb_row[CombCol.A]),
+                    float(comb_row[CombCol.M]),
+                    q_total_active_J,
+                )
+            if int(getattr(runtime_cool_flame_active_by_vol, 'shape', (0,))[0]) > i and bool(runtime_cool_flame_active_by_vol[i]):
+                if use_vibe_beck:
+                    qdot_comb += vibe_beck_time_heat_release_rate_with_total_energy(
+                        t_s,
+                        float(runtime_cool_flame_time_by_vol_s[i]),
+                        float(fp.hcci_cool_flame_duration_by_vol_s[i]),
+                        float(fp.hcci_cool_flame_a_by_vol[i]),
+                        float(fp.hcci_cool_flame_m_by_vol[i]),
+                        float(runtime_cool_flame_energy_by_vol_J[i]),
+                    )
+                else:
+                    qdot_comb += vibe_time_heat_release_rate_with_total_energy(
+                        t_s,
+                        float(runtime_cool_flame_time_by_vol_s[i]),
+                        float(fp.hcci_cool_flame_duration_by_vol_s[i]),
+                        float(fp.hcci_cool_flame_a_by_vol[i]),
+                        float(fp.hcci_cool_flame_m_by_vol[i]),
+                        float(runtime_cool_flame_energy_by_vol_J[i]),
+                    )
         elif use_latched_fuel_combustion:
             comb_row = bundle.comb_matrix[comb_idx]
             if int(getattr(runtime_latch_valid_by_vol, 'shape', (0,))[0]) > i:
@@ -700,13 +734,23 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                     soc_time_for_conversion_s = float(runtime_soc_time_by_vol_s[i])
                 else:
                     soc_time_for_conversion_s = float(runtime_soc_time_s)
-                xb, dxb_dt = vibe_time_fraction_and_rate(
-                    t_s,
-                    soc_time_for_conversion_s,
-                    float(comb_row[CombCol.DURATION_DEG]),
-                    float(comb_row[CombCol.A]),
-                    float(comb_row[CombCol.M]),
-                )
+                use_vibe_beck = int(getattr(hcci_burn_model_by_vol, 'shape', (0,))[0]) > i and int(hcci_burn_model_by_vol[i]) == 1
+                if use_vibe_beck:
+                    xb, dxb_dt = vibe_beck_time_fraction_and_rate(
+                        t_s,
+                        soc_time_for_conversion_s,
+                        float(comb_row[CombCol.DURATION_DEG]),
+                        float(comb_row[CombCol.A]),
+                        float(comb_row[CombCol.M]),
+                    )
+                else:
+                    xb, dxb_dt = vibe_time_fraction_and_rate(
+                        t_s,
+                        soc_time_for_conversion_s,
+                        float(comb_row[CombCol.DURATION_DEG]),
+                        float(comb_row[CombCol.A]),
+                        float(comb_row[CombCol.M]),
+                    )
             else:
                 xb, dxb_dt = vibe_fraction_and_rate(
                     theta_local_deg_by_vol[i],

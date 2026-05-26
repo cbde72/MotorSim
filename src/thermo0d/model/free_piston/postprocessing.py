@@ -18,7 +18,7 @@ from thermo0d.model.free_piston.geometry import (
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
 from thermo0d.output.exporters import CsvExporter, ExcelExporter
 from thermo0d.output.service import PostprocessingArtifacts, PostprocessingService
-from thermo0d.physics.combustion import combustion_duration_mode_from_row, vibe_heat_release_rate, vibe_time_heat_release_rate_with_total_energy
+from thermo0d.physics.combustion import combustion_duration_mode_from_row, vibe_beck_time_heat_release_rate_with_total_energy, vibe_heat_release_rate, vibe_time_heat_release_rate_with_total_energy
 from thermo0d.physics.composition import burned_fraction_0to1, unburned_mass_kg
 from thermo0d.physics.quellen_props import lambda_from_air_and_fuel_mass, properties_from_mass_energy_components_quellen
 
@@ -100,6 +100,19 @@ def _compute_cylinder_added_energy_W(
     if duration_mode == int(CombDurationMode.TIME):
         if soc_time_s is None:
             return 0.0
+        hcci_burn_model_by_vol = getattr(fp, 'hcci_burn_model_by_vol', np.zeros(0, dtype=np.int64))
+        use_vibe_beck = cylinder_idx < int(getattr(hcci_burn_model_by_vol, 'shape', (0,))[0]) and int(hcci_burn_model_by_vol[cylinder_idx]) == 1
+        if use_vibe_beck:
+            return float(
+                vibe_beck_time_heat_release_rate_with_total_energy(
+                    t_s,
+                    float(soc_time_s),
+                    float(comb_row[CombCol.DURATION_DEG]),
+                    float(comb_row[CombCol.A]),
+                    float(comb_row[CombCol.M]),
+                    float(soc_energy_J),
+                )
+            )
         return float(
             vibe_time_heat_release_rate_with_total_energy(
                 t_s,

@@ -5,6 +5,7 @@ from typing import Annotated, Literal, Union
 import math
 
 from thermo0d.config.schema_meta import SOLVER_KINDS
+from thermo0d.physics.beck import BECK_COOL_FLAME_FUEL_NAMES
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator, model_validator
@@ -518,8 +519,8 @@ class VibeCombustionConfig(StrictBaseModel):
 
 class HcciDieselCombustionConfig(StrictBaseModel):
     model: Literal["hcci_diesel"]
-    ignition_model: Literal["livengood_wu"] = "livengood_wu"
-    burn_model: Literal["wiebe_autoignition"] = "wiebe_autoignition"
+    ignition_model: Literal["livengood_wu", "beck_2003_1_arrhenius", "beck_2003_two_stage"] = "livengood_wu"
+    burn_model: Literal["wiebe_autoignition", "vibe-beck"] = "wiebe_autoignition"
     duration_mode: Literal["time"] = "time"
     duration_s: StrictFloat | None = None
     duration_ms: StrictFloat | None = None
@@ -536,10 +537,35 @@ class HcciDieselCombustionConfig(StrictBaseModel):
     tau_A_s: StrictFloat = 2.5e-6
     tau_pressure_exponent: StrictFloat = 1.2
     tau_activation_temperature_K: StrictFloat = 15000.0
+    tau_activation_energy_J_per_kg: StrictFloat | None = None
     tau_reference_pressure_Pa: StrictFloat = 1000000.0
     tau_reference_lambda: StrictFloat = 1.4
     lambda_slowdown_exponent: StrictFloat = 0.7
     residual_slowdown_factor: StrictFloat = 1.5
+    beck_c1_s: StrictFloat = 1.0e-5
+    beck_c2: StrictFloat = -1.2
+    beck_reference_pressure_bar: StrictFloat = 1.0
+    beck_reference_o2_percent: StrictFloat = 20.94
+    beck_cf_fuel_name: StrictStr = "Diesel 2"
+    cool_flame_enabled: StrictBool = False
+    cool_flame_energy_fraction: StrictFloat = 0.08
+    cool_flame_duration_ms: StrictFloat = 0.3409
+    cool_flame_a: StrictFloat = 6.9
+    cool_flame_m: StrictFloat = 2.0
+    # Beck Tabelle 6.2, Diesel 2, dQBmax: c1..c5/c0 in model order.
+    cool_flame_dqmax_c1: StrictFloat = 0.363
+    cool_flame_dqmax_c2: StrictFloat = -0.333
+    cool_flame_dqmax_c3: StrictFloat = 1.424
+    cool_flame_dqmax_c4: StrictFloat = 0.155
+    cool_flame_dqmax_c5: StrictFloat = 0.0
+    cool_flame_dqmax_c0: StrictFloat = 7.5e-3
+    # Beck Tabelle 6.2, Diesel 2, Delta phi max.
+    cool_flame_duration_c1: StrictFloat = -0.071
+    cool_flame_duration_c2: StrictFloat = -8.5e-3
+    cool_flame_duration_c3: StrictFloat = 0.016
+    cool_flame_duration_c4: StrictFloat = -0.241
+    cool_flame_duration_c5: StrictFloat = -0.645
+    cool_flame_duration_c0: StrictFloat = 340.9
     start_temperature_min_K: StrictFloat = 780.0
     start_pressure_min_Pa: StrictFloat = 2000000.0
     max_ignition_delay_s: StrictFloat = 0.02
@@ -577,6 +603,8 @@ class HcciDieselCombustionConfig(StrictBaseModel):
             raise ValueError("tau_pressure_exponent must be >= 0")
         if self.tau_activation_temperature_K <= 0.0:
             raise ValueError("tau_activation_temperature_K must be > 0")
+        if self.tau_activation_energy_J_per_kg is not None and self.tau_activation_energy_J_per_kg <= 0.0:
+            raise ValueError("tau_activation_energy_J_per_kg must be > 0 when provided")
         if self.tau_reference_pressure_Pa <= 0.0:
             raise ValueError("tau_reference_pressure_Pa must be > 0")
         if self.tau_reference_lambda <= 0.0:
@@ -585,6 +613,22 @@ class HcciDieselCombustionConfig(StrictBaseModel):
             raise ValueError("lambda_slowdown_exponent must be >= 0")
         if self.residual_slowdown_factor < 1.0:
             raise ValueError("residual_slowdown_factor must be >= 1")
+        if self.beck_c1_s <= 0.0:
+            raise ValueError("beck_c1_s must be > 0")
+        if self.beck_reference_pressure_bar <= 0.0:
+            raise ValueError("beck_reference_pressure_bar must be > 0")
+        if self.beck_reference_o2_percent <= 0.0:
+            raise ValueError("beck_reference_o2_percent must be > 0")
+        if self.beck_cf_fuel_name not in BECK_COOL_FLAME_FUEL_NAMES:
+            raise ValueError("beck_cf_fuel_name must be one of: " + ", ".join(BECK_COOL_FLAME_FUEL_NAMES))
+        if not (0.0 < self.cool_flame_energy_fraction < 1.0):
+            raise ValueError("cool_flame_energy_fraction must be > 0 and < 1")
+        if self.cool_flame_duration_ms <= 0.0:
+            raise ValueError("cool_flame_duration_ms must be > 0")
+        if self.cool_flame_a <= 0.0:
+            raise ValueError("cool_flame_a must be > 0")
+        if self.cool_flame_m < 0.0:
+            raise ValueError("cool_flame_m must be >= 0")
         if self.start_temperature_min_K <= 0.0:
             raise ValueError("start_temperature_min_K must be > 0")
         if self.start_pressure_min_Pa <= 0.0:
