@@ -3,14 +3,14 @@
   config_schema_version: 8                                                                                                                                                    # Ziel-Schema der Config.
   loaded_config_schema_version: 8                                                                                                                                             # Schema nach Laden/Migration.
   migration_applied: false                                                                                                                                                    # Zeigt, ob beim Laden eine Migration angewendet wurde.
-test_description: "Free-piston with Vibe heat release on the compression stroke, direct added energy in J, hub scaling and controlled generator load near both dead centers"  # Freitext zur Beschreibung dieser Variante.
+test_description: "Free-piston V17 with oscillating rotary kinematics (-9..+9 deg) and HCCI Diesel"                                                        # Freitext zur Beschreibung dieser Variante.
 modeling:
   architecture: free_piston                                                                                                                                                   # Simulationsarchitektur, hier Freikolbenmodell.
 free_piston:
   initial_conditions:
     x0_m: 0.054                                                                                                                                                               # Startposition des Freikolbens in m.
-    # previous_auto_initial_state_from_last_compression_at_x0_m: v0_m_per_s: -5.1363259172878575
-    v0_m_per_s: -5.130036024060039                                                                                                                                            # Startgeschwindigkeit des Freikolbens in m/s.
+    # previous_auto_initial_state_from_last_compression_at_x0_m: v0_m_per_s: -5.130036024060039
+    v0_m_per_s: -5.037844182273213                                                                                                                                            # Startgeschwindigkeit des Freikolbens in m/s.
     combustion_state:
       burned_fraction_0to1: 0.0                                                                                                                                               # Verbrannter Massenanteil als Bruchteil 0..1.
       released_energy_J: 0.0                                                                                                                                                  # Bereits freigesetzte Verbrennungsenergie beim Start.
@@ -18,11 +18,16 @@ free_piston:
       injection_armed: false                                                                                                                                                  # Startzustand der Einspritzfreigabe.
       burned_mass_percent: 0.0                                                                                                                                                # Verbrannter Massenanteil in Prozent.
   mechanics:
+    kinematics_type: oscillating_rotary                                                                                                                                       # Mechanikmodus: linear oder rotatorisch hin-und-her schwingend.
     moving_mass_kg: 11.8                                                                                                                                                      # Bewegte Freikolbenmasse.
     piston_diameter_m: 0.0605                                                                                                                                                 # Kolbendurchmesser fuer wirksame Flaeche.
     compression_ratio: 50                                                                                                                                                     # Geometrisches Verdichtungsverhaeltnis.
     x_min_m: 0.0                                                                                                                                                              # Minimale Kolbenposition, nahe OT.
     x_max_m: 0.10807                                                                                                                                                          # Maximale Kolbenposition, nahe UT.
+    angle_min_deg: -9.0                                                                                                                                                       # Minimaler Schwingwinkel des rotatorischen Kolbens.
+    angle_max_deg: 9.0                                                                                                                                                        # Maximaler Schwingwinkel des rotatorischen Kolbens.
+    effective_radius_m: 0.34399749399882257                                                                                                                                   # Wirkradius fuer x_equiv = r * (phi - phi_min); erhaelt V14-Hub.
+    rotary_inertia_kg_m2: 1.3963444553541455                                                                                                                                  # Traegheitsmoment; hier m*r^2 passend zur V14-Ersatzmasse.
   friction:
     model: coulomb_viscous                                                                                                                                                    # Auswahl des jeweiligen Teilmodells.
     fc_N: 80.0                                                                                                                                                                # Coulomb-Reibkraft.
@@ -159,16 +164,16 @@ preprocessing:
         slot_open_threshold_m2: 1.0e-07                                                                                                                                       # Flaechenschwelle fuer Schlitz offen.
         slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
         compression_velocity_threshold_m_per_s: 0.02                                                                                                                          # Mindest-Kompressionsgeschwindigkeit fuer Latch.
-        tau_A_s: 1.0e-07                                                                                                                                                      # Vorzeitfaktor der HCCI-Zuendverzugszeit.
+        tau_A_s: 2.5e-06                                                                                                                                                      # Vorzeitfaktor der HCCI-Zuendverzugszeit.
         tau_pressure_exponent: 1.2                                                                                                                                            # Druckexponent der HCCI-Zuendverzugszeit.
-        tau_activation_temperature_K: 6000.0                                                                                                                                  # Aktivierungstemperatur des HCCI-Zuendmodells.
+        tau_activation_temperature_K: 5000.0                                                                                                                                 # Aktivierungstemperatur des HCCI-Zuendmodells.
         tau_reference_pressure_Pa: 1000000.0                                                                                                                                  # Referenzdruck fuer HCCI-Zuendverzug.
         tau_reference_lambda: 1.4                                                                                                                                             # Referenz-Lambda fuer HCCI-Zuendverzug.
         lambda_slowdown_exponent: 0.7                                                                                                                                         # Lambda-Abmagerungsfaktor fuer HCCI-Verzug.
         residual_slowdown_factor: 1.5                                                                                                                                         # Verlangsamung durch Restgasanteil.
-        start_temperature_min_K: 500.0                                                                                                                                        # Mindesttemperatur fuer HCCI-SOC.
-        start_pressure_min_Pa: 500000.0                                                                                                                                       # Mindestdruck fuer HCCI-SOC.
-        max_ignition_delay_s: 0.003                                                                                                                                           # Maximal erlaubter HCCI-Zuendverzug.
+        start_temperature_min_K: 580.0                                                                                                                                        # Mindesttemperatur fuer HCCI-SOC.
+        start_pressure_min_Pa: 500000.0                                                                                                                                      # Mindestdruck fuer HCCI-SOC.
+        max_ignition_delay_s: 0.002                                                                                                                                            # Maximal erlaubter HCCI-Zuendverzug.
     connections:
       compressor_in_check_valve:
         type: check_valve                                                                                                                                                     # Typ des Volumens, der Verbindung oder Kinematik.
@@ -219,6 +224,8 @@ preprocessing:
         diameter_mm: 14.0                                                                                                                                                     # Durchmesser fuer Orifice oder Rueckschlagventil.
         forward_cd: 0.98                                                                                                                                                      # Durchflussbeiwert in Vorwaertsrichtung.
         reverse_cd: 0.98                                                                                                                                                      # Durchflussbeiwert in Rueckwaertsrichtung.
+  
+  ############ Zusammen bau der Volumen und Verbindungsdefinitionen ############
   volumes:
   - name: cylinder_1                                                                                                                                                          # Eindeutiger Name dieses Volumens oder dieser Verbindung.
     ref: cylinder_free_piston                                                                                                                                                 # Referenz auf zentral definiertes Submodel.
@@ -313,7 +320,7 @@ simulation:
   dt_s: 1.0e-05                                                                                                                                                               # Integrationszeitschritt in s.
   total_cycles: 3                                                                                                                                                             # Anzahl simulierter Zyklen.
   save_last_cycles: 2                                                                                                                                                         # Anzahl zu speichernder letzter Zyklen.
-  simulationtime: 1.0                                                                                                                                                         # Simulationsdauer in s.
+  simulationtime: 0.2                                                                                                                                                         # Simulationsdauer in s.
   solver:
     kind: rk4                                                                                                                                                                 # Numerischer Integrator.
     rtol: 1.0e-05                                                                                                                                                             # Relative Solver-Toleranz.
@@ -321,10 +328,10 @@ simulation:
 postprocessing:
   auto_update_initial_conditions: false                                                                                                                                        # Schreibt Startwerte aus letztem Lauf zurueck.
   csv_enabled: true                                                                                                                                                           # Aktiviert Haupt-CSV-Ausgabe.
-  csv_path: results/free_piston_GenSet_V15.csv                                                                                                                                # Pfad der Haupt-CSV relativ zum Projekt.
+  csv_path: results/free_piston_GenSet_V16.csv                                                                                                                                # Pfad der Haupt-CSV relativ zum Projekt.
   csv_separator: ;                                                                                                                                                            # Trennzeichen der CSV-Datei.
   excel_enabled: false                                                                                                                                                        # Aktiviert Excel-Ausgabe.
-  excel_path: results/free_piston_GenSet_V15.xlsx                                                                                                                             # Pfad der Excel-Datei relativ zum Projekt.
+  excel_path: results/free_piston_GenSet_V16.xlsx                                                                                                                             # Pfad der Excel-Datei relativ zum Projekt.
   sampling:
     mode: time                                                                                                                                                                # Auswahl des lokalen Modus.
     step_s: 0.0001                                                                                                                                                            # Zeitliche Ausgabeschrittweite.
@@ -348,7 +355,7 @@ postprocessing:
       - enabled: true                                                                                                                                                         # Schaltet diesen Block aktiv oder inaktiv.
         path: plot_CFG/plot-v11_hub.yaml                                                                                                                                      # Pfad zur Plot-Layout-Datei.
         prefix: plot_v11_hub                                                                                                                                                  # Dateipraefix fuer erzeugte Plot-Ausgaben.
-      - enabled: true                                                                                                                                                        # Schaltet diesen Block aktiv oder inaktiv.
+      - enabled: false                                                                                                                                                        # Schaltet diesen Block aktiv oder inaktiv.
         path: plot_CFG/plot-v11_Energy.yaml                                                                                                                                   # Pfad zur Plot-Layout-Datei.
         prefix: plot_fp_energy                                                                                                                                                # Dateipraefix fuer erzeugte Plot-Ausgaben.
       - enabled: true                                                                                                                                                         # Schaltet diesen Block aktiv oder inaktiv.

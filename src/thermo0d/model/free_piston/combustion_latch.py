@@ -711,14 +711,6 @@ def _update_hcci_diesel_autoignition_state(bundle, t_s: float, y_state: np.ndarr
             fuel_mass_kg=fuel_mass,
             afr_stoich=afr,
         )
-        lam = lambda_from_air_and_fuel_mass(air_mass, fuel_mass, afr)
-        pressure_factor = (max(float(fp.hcci_reference_pressure_by_vol_Pa[cyl]), 1.0) / max(pressure_Pa, 1.0)) ** float(fp.hcci_pressure_exponent_by_vol[cyl])
-        temp_factor = float(np.exp(float(fp.hcci_activation_temperature_by_vol_K[cyl]) / max(temp_K, 1.0)))
-        lambda_factor = (max(lam, 1.0e-12) / max(float(fp.hcci_reference_lambda_by_vol[cyl]), 1.0e-12)) ** float(fp.hcci_lambda_slowdown_exponent_by_vol[cyl])
-        residual_fraction = max(min(residual_mass / max(mass, 1.0e-18), 1.0), 0.0)
-        residual_factor = 1.0 + (float(fp.hcci_residual_slowdown_factor_by_vol[cyl]) - 1.0) * residual_fraction
-        tau_s = max(float(fp.hcci_tau_A_by_vol_s[cyl]) * pressure_factor * temp_factor * lambda_factor * residual_factor, 1.0e-9)
-        tau_s = min(tau_s, float(fp.hcci_max_ignition_delay_by_vol_s[cyl]))
         fp.runtime_hcci_tau_by_vol_s[cyl] = tau_s
         if _hcci_two_stage_enabled(fp, cyl) and not bool(fp.runtime_cool_flame_done_by_vol[cyl]):
             tau_s = _hcci_ignition_delay_s(
@@ -884,14 +876,6 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
                         bundle, cyl_idx, pressure_Pa, temp_K, air_mass, fuel_mass, residual_mass, mass, afr, q_total_J
                     )
                 continue
-            lam = lambda_from_air_and_fuel_mass(air_mass, fuel_mass, afr)
-            pressure_factor = (max(float(fp.hcci_reference_pressure_by_vol_Pa[cyl_idx]), 1.0) / max(pressure_Pa, 1.0)) ** float(fp.hcci_pressure_exponent_by_vol[cyl_idx])
-            temp_factor = float(np.exp(float(fp.hcci_activation_temperature_by_vol_K[cyl_idx]) / max(temp_K, 1.0)))
-            lambda_factor = (max(lam, 1.0e-12) / max(float(fp.hcci_reference_lambda_by_vol[cyl_idx]), 1.0e-12)) ** float(fp.hcci_lambda_slowdown_exponent_by_vol[cyl_idx])
-            residual_fraction = max(min(residual_mass / max(mass, 1.0e-18), 1.0), 0.0)
-            residual_factor = 1.0 + (float(fp.hcci_residual_slowdown_factor_by_vol[cyl_idx]) - 1.0) * residual_fraction
-            tau_s = max(float(fp.hcci_tau_A_by_vol_s[cyl_idx]) * pressure_factor * temp_factor * lambda_factor * residual_factor, 1.0e-9)
-            tau_s = min(tau_s, float(fp.hcci_max_ignition_delay_by_vol_s[cyl_idx]))
             hcci_integral += dt_s / max(tau_s, 1.0e-12)
             if hcci_integral >= 1.0:
                 duration_s = _time_mode_duration_s(bundle, cyl_idx)

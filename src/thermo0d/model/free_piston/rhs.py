@@ -23,6 +23,9 @@ F_COMB = int(FeatureCol.COMBUSTION)
 F_EVAP = int(FeatureCol.EVAPORATION)
 F_PV = int(FeatureCol.PV_WORK)
 
+EMPTY_FLOAT = np.zeros(0, dtype=np.float64)
+EMPTY_INT = np.zeros(0, dtype=np.int64)
+
 
 def _coulomb_viscous_force(fc_N: float, cv_Ns_per_m: float, v_m_per_s: float) -> float:
     if abs(v_m_per_s) < 1.0e-15:
@@ -46,6 +49,28 @@ def _stateful_bounce_index(bundle) -> int:
         if int(bundle.vol_matrix[i, VolumeCol.TYPE]) == VolumeType.BOUNCE_CHAMBER:
             return i
     return -1
+
+
+def _state_index_arrays(bundle, n_vol: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    cached = getattr(bundle, '_free_piston_rhs_state_indices', None)
+    if cached is not None:
+        mass_indices, energy_indices, burned_indices, air_indices, liquid_indices = cached
+        if int(getattr(mass_indices, 'shape', (0,))[0]) == int(n_vol):
+            return cached
+
+    layout = bundle.state_layout
+    cached = (
+        np.asarray([int(layout.mass_index(i)) for i in range(n_vol)], dtype=np.int32),
+        np.asarray([int(layout.energy_index(i)) for i in range(n_vol)], dtype=np.int32),
+        np.asarray([int(layout.burned_mass_index(i)) for i in range(n_vol)], dtype=np.int32),
+        np.asarray([int(layout.air_mass_index(i)) for i in range(n_vol)], dtype=np.int32),
+        np.asarray([int(layout.liquid_fuel_mass_index(i)) for i in range(n_vol)], dtype=np.int32),
+    )
+    try:
+        setattr(bundle, '_free_piston_rhs_state_indices', cached)
+    except Exception:
+        pass
+    return cached
 
 
 
@@ -195,27 +220,27 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     runtime_injector_time_s = fp.runtime_injector_time_s if hasattr(fp, 'runtime_injector_time_s') else 0.0
     runtime_injector_end_time_s = fp.runtime_injector_end_time_s if hasattr(fp, 'runtime_injector_end_time_s') else 0.0
     runtime_injector_rate_kg_per_s = fp.runtime_injector_rate_kg_per_s if hasattr(fp, 'runtime_injector_rate_kg_per_s') else 0.0
-    runtime_injector_active_by_vol = getattr(fp, 'runtime_injector_active_by_vol', np.zeros(0, dtype=np.int64))
-    runtime_injector_time_by_vol_s = getattr(fp, 'runtime_injector_time_by_vol_s', np.zeros(0, dtype=np.float64))
-    runtime_injector_end_time_by_vol_s = getattr(fp, 'runtime_injector_end_time_by_vol_s', np.zeros(0, dtype=np.float64))
-    runtime_injector_rate_by_vol_kg_per_s = getattr(fp, 'runtime_injector_rate_by_vol_kg_per_s', np.zeros(0, dtype=np.float64))
+    runtime_injector_active_by_vol = getattr(fp, 'runtime_injector_active_by_vol', EMPTY_INT)
+    runtime_injector_time_by_vol_s = getattr(fp, 'runtime_injector_time_by_vol_s', EMPTY_FLOAT)
+    runtime_injector_end_time_by_vol_s = getattr(fp, 'runtime_injector_end_time_by_vol_s', EMPTY_FLOAT)
+    runtime_injector_rate_by_vol_kg_per_s = getattr(fp, 'runtime_injector_rate_by_vol_kg_per_s', EMPTY_FLOAT)
     runtime_slotclose_charge_active = fp.runtime_slotclose_charge_active if hasattr(fp, 'runtime_slotclose_charge_active') else False
     runtime_slotclose_charge_time_s = fp.runtime_slotclose_charge_time_s if hasattr(fp, 'runtime_slotclose_charge_time_s') else 0.0
     runtime_slotclose_charge_end_time_s = fp.runtime_slotclose_charge_end_time_s if hasattr(fp, 'runtime_slotclose_charge_end_time_s') else 0.0
     runtime_slotclose_charge_rate_kg_per_s = fp.runtime_slotclose_charge_rate_kg_per_s if hasattr(fp, 'runtime_slotclose_charge_rate_kg_per_s') else 0.0
-    runtime_latch_valid_by_vol = getattr(fp, 'runtime_latch_valid_by_vol', np.zeros(0, dtype=np.int64))
-    runtime_latched_energy_by_vol_J = getattr(fp, 'runtime_latched_energy_by_vol_J', np.zeros(0, dtype=np.float64))
-    runtime_soc_active_by_vol = getattr(fp, 'runtime_soc_active_by_vol', np.zeros(0, dtype=np.int64))
-    runtime_soc_time_by_vol_s = getattr(fp, 'runtime_soc_time_by_vol_s', np.zeros(0, dtype=np.float64))
-    runtime_soc_energy_by_vol_J = getattr(fp, 'runtime_soc_energy_by_vol_J', np.zeros(0, dtype=np.float64))
-    runtime_cool_flame_active_by_vol = getattr(fp, 'runtime_cool_flame_active_by_vol', np.zeros(0, dtype=np.int64))
-    runtime_cool_flame_time_by_vol_s = getattr(fp, 'runtime_cool_flame_time_by_vol_s', np.zeros(0, dtype=np.float64))
-    runtime_cool_flame_energy_by_vol_J = getattr(fp, 'runtime_cool_flame_energy_by_vol_J', np.zeros(0, dtype=np.float64))
-    hcci_burn_model_by_vol = getattr(fp, 'hcci_burn_model_by_vol', np.zeros(0, dtype=np.int64))
-    runtime_slotclose_charge_active_by_vol = getattr(fp, 'runtime_slotclose_charge_active_by_vol', np.zeros(0, dtype=np.int64))
-    runtime_slotclose_charge_time_by_vol_s = getattr(fp, 'runtime_slotclose_charge_time_by_vol_s', np.zeros(0, dtype=np.float64))
-    runtime_slotclose_charge_end_time_by_vol_s = getattr(fp, 'runtime_slotclose_charge_end_time_by_vol_s', np.zeros(0, dtype=np.float64))
-    runtime_slotclose_charge_rate_by_vol_kg_per_s = getattr(fp, 'runtime_slotclose_charge_rate_by_vol_kg_per_s', np.zeros(0, dtype=np.float64))
+    runtime_latch_valid_by_vol = getattr(fp, 'runtime_latch_valid_by_vol', EMPTY_INT)
+    runtime_latched_energy_by_vol_J = getattr(fp, 'runtime_latched_energy_by_vol_J', EMPTY_FLOAT)
+    runtime_soc_active_by_vol = getattr(fp, 'runtime_soc_active_by_vol', EMPTY_INT)
+    runtime_soc_time_by_vol_s = getattr(fp, 'runtime_soc_time_by_vol_s', EMPTY_FLOAT)
+    runtime_soc_energy_by_vol_J = getattr(fp, 'runtime_soc_energy_by_vol_J', EMPTY_FLOAT)
+    runtime_cool_flame_active_by_vol = getattr(fp, 'runtime_cool_flame_active_by_vol', EMPTY_INT)
+    runtime_cool_flame_time_by_vol_s = getattr(fp, 'runtime_cool_flame_time_by_vol_s', EMPTY_FLOAT)
+    runtime_cool_flame_energy_by_vol_J = getattr(fp, 'runtime_cool_flame_energy_by_vol_J', EMPTY_FLOAT)
+    hcci_burn_model_by_vol = getattr(fp, 'hcci_burn_model_by_vol', EMPTY_INT)
+    runtime_slotclose_charge_active_by_vol = getattr(fp, 'runtime_slotclose_charge_active_by_vol', EMPTY_INT)
+    runtime_slotclose_charge_time_by_vol_s = getattr(fp, 'runtime_slotclose_charge_time_by_vol_s', EMPTY_FLOAT)
+    runtime_slotclose_charge_end_time_by_vol_s = getattr(fp, 'runtime_slotclose_charge_end_time_by_vol_s', EMPTY_FLOAT)
+    runtime_slotclose_charge_rate_by_vol_kg_per_s = getattr(fp, 'runtime_slotclose_charge_rate_by_vol_kg_per_s', EMPTY_FLOAT)
     if hasattr(fp, 'runtime_combustion_fuel_burn_rate_kg_per_s'):
         fp.runtime_combustion_fuel_burn_rate_kg_per_s = 0.0
         fp.runtime_combustion_air_consumption_rate_kg_per_s = 0.0
@@ -237,11 +262,7 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     cyl_U_idx = int(bundle.state_layout.energy_index(cylinder_idx))
 
     n_vol = int(bundle.vol_matrix.shape[0])
-    mass_indices = np.array([int(bundle.state_layout.mass_index(i)) for i in range(n_vol)], dtype=np.int32)
-    energy_indices = np.array([int(bundle.state_layout.energy_index(i)) for i in range(n_vol)], dtype=np.int32)
-    burned_indices = np.array([int(bundle.state_layout.burned_mass_index(i)) for i in range(n_vol)], dtype=np.int32)
-    air_indices = np.array([int(bundle.state_layout.air_mass_index(i)) for i in range(n_vol)], dtype=np.int32)
-    liquid_indices = np.array([int(bundle.state_layout.liquid_fuel_mass_index(i)) for i in range(n_vol)], dtype=np.int32)
+    mass_indices, energy_indices, burned_indices, air_indices, liquid_indices = _state_index_arrays(bundle, n_vol)
 
     bounce_idx = _stateful_bounce_index(bundle)
 
