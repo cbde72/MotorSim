@@ -4,7 +4,7 @@
 Diesel-HCCI single-zone model with Cantera, crank-slider compression and
 Woschni-like wall heat transfer.
 
-Optimierte und stabilisierte Version (Radau-Solver & NaN-Protection).
+Vorbereitet für den zweistufigen NTC-Mechanismus (NC12H26_NTC.yaml).
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ except ImportError as exc:
 class EngineConfig:
     # Geometrie
     bore_m: float = 0.070
-    stroke_m: float = 0.080          
+    stroke_m: float = 0.080
     conrod_m: float = 0.140
     compression_ratio: float = 50.0
 
@@ -55,13 +55,14 @@ class EngineConfig:
 
     # Homogenes Gemisch
     lambda_air: float = 3.0
-    fuel_species: str = "c12h26"     # n-Dodecan als Diesel-Surrogat
+    fuel_species: str = "NC12H26"     # Großbuchstaben-Schreibweise für NTC-Modelle
     fuel_C: int = 12
     fuel_H: int = 26
 
-    # Cantera Chemie-Einstellungen
-    mechanism: str = "nDodecane_Reitz.yaml"
-    phase_name: str = "nDodecane_IG"   # Nutzt die ideale Gasphase des Mechanismus
+    # Cantera Chemie-Einstellungen für deinen neuen NTC-Mechanismus
+    mechanism: str =r"C:\Py_Scripte\0_MotorSim_V03\Projekte\data\NC12H26_NTC.yaml"
+    #mechanism: str = "NC12H26_NTC.yaml"
+    phase_name: str = "gas"           # Falls Fehler auftritt, eventuell in "nDodecane_IG" ändern
 
     # Woschni-Wandwärmeübergang
     wall_temperature_K: float = 420.0
@@ -70,11 +71,11 @@ class EngineConfig:
     h_min_W_m2K: float = 20.0
     h_max_W_m2K: float = 5000.0
 
-    # Numerik (Toleranzen)
-    rtol: float = 1.0e-8
-    atol_T: float = 0.1
+    # Numerik (Toleranzen für optimierte Performance)
+    rtol: float = 1.0e-6
+    atol_T: float = 0.5
     atol_Y: float = 1.0e-10
-    max_step_deg: float = 1
+    max_step_deg: float = 2.0
 
     # Ausgabe
     output_dir: str = "hcci_output"
@@ -123,10 +124,7 @@ def species_index_ci(gas: ct.Solution, name: str) -> int:
     lower = {s.lower(): i for i, s in enumerate(gas.species_names)}
     key = name.lower()
     if key not in lower:
-        raise KeyError(
-            f"Species '{name}' not found in mechanism.\n"
-            f"First available species: {gas.species_names[:50]}"
-        )
+        raise KeyError(f"Species '{name}' not found in mechanism. Available: {gas.species_names[:10]}...")
     return lower[key]
 
 
@@ -206,33 +204,36 @@ def make_rhs(gas: ct.Solution, geom: CrankSlider, cfg: EngineConfig, m_total: fl
     omega = 2.0 * math.pi * cfg.rpm / 60.0
 
     def rhs(theta_rad: float, y: np.ndarray) -> np.ndarray:
-        # Abfangen unphysikalischer Solver-Testwerte (NaN / Inf Schutz)
         if not np.isfinite(y).all():
             return np.zeros_like(y)
 
         T = max(float(y[0]), 250.0)
-        Y = np.maximum(y[1:], 1.0e-20) # Floor verhindert mathematisches Vakuum
-        
+
+        # Radikalspuren-Filter zur Entlastung des Lösers
+        Y = y[1:]
+        Y[Y < 1.0e-12] = 0.0
+        Y = np.maximum(Y, 0.0)
+
         sum_Y = np.sum(Y)
         if sum_Y <= 0.0 or not np.isfinite(sum_Y):
             return np.zeros_like(y)
-            
+
         Y /= sum_Y
 
         V = geom.volume(theta_rad)
         rho = m_total / V
-        
+
         try:
             gas.TDY = T, rho, Y
         except Exception:
             return np.zeros_like(y)
 
-        wdot = gas.net_production_rates         # kmol/m3/s
-        dYdt = wdot * MW / rho                  # 1/s
-        dYdt -= Y * np.sum(dYdt)                # Massenerhaltungskorrektur
+        wdot = gas.net_production_rates
+        dYdt = wdot * MW / rho
+        dYdt -= Y * np.sum(dYdt)
 
-        u_mass = gas.partial_molar_int_energies / MW  # J/kg pro Spezies
-        chem_u_term = V * np.dot(u_mass * MW, wdot)   # J/s
+        u_mass = gas.partial_molar_int_energies / MW
+        chem_u_term = V * np.dot(u_mass * MW, wdot)
 
         dVdt = geom.dV_dtheta(theta_rad) * omega
         h = woschni_h(gas, geom, cfg)
@@ -244,10 +245,10 @@ def make_rhs(gas: ct.Solution, geom: CrankSlider, cfg: EngineConfig, m_total: fl
         out = np.empty_like(y)
         out[0] = dTdt / omega
         out[1:] = dYdt / omega
-        
+
         if not np.isfinite(out).all():
             return np.zeros_like(y)
-            
+
         return out
 
     return rhs
@@ -300,38 +301,35 @@ def main(cfg: EngineConfig = CFG) -> int:
     outdir = Path(cfg.output_dir)
     outdir.mkdir(parents=True, exist_ok=True)
 
-    # Initialisiere Phase aus YAML
+    # Überprüfen, ob die Datei im Verzeichnis existiert
+    if not Path(cfg.mechanism).exists():
+        print(f"HINWEIS: '{cfg.mechanism}' wurde nicht im lokalen Verzeichnis gefunden.")
+        print("Es wird versucht, die Datei aus dem Cantera-Standard-Datenpfad zu laden...\n")
+
     gas = ct.Solution(cfg.mechanism, cfg.phase_name)
     geom = CrankSlider(cfg.bore_m, cfg.stroke_m, cfg.conrod_m, cfg.compression_ratio)
     T0, Y0, p0, m_total, m_fuel = build_initial_state(gas, geom, cfg)
 
     y0 = np.r_[T0, Y0]
-    
-    # Strukturiertes Toleranz-Array erzeugen
-    atol = np.zeros_like(y0)
-    atol[0] = cfg.atol_T     # Temperatur-Schranke (0.1 K)
-    atol[1:] = cfg.atol_Y    # Spezies-Schranke (1e-15)
 
-    print("=== Diesel-HCCI Setup ===")
+    atol = np.zeros_like(y0)
+    atol[0] = cfg.atol_T
+    atol[1:] = cfg.atol_Y
+
+    print("=== Diesel-HCCI Setup (NTC-Modus) ===")
     print(f"Mechanismus:       {cfg.mechanism}")
     print(f"Phase:             {cfg.phase_name}")
-    print(f"Bohrung:           {cfg.bore_m*1000:.1f} mm")
-    print(f"Hub:               {cfg.stroke_m*1000:.1f} mm")
-    print(f"Verdichtung (CR):  {cfg.compression_ratio:.1f}")
-    print(f"Hubvolumen:        {geom.Vs*1e6:.2f} cm³")
-    print(f"Zylinderluftmasse: {cfg.m_fresh_air_kg*1e6:.2f} mg")
-    print(f"Kraftstoffmasse:   {m_fuel*1e6:.3f} mg")
-    print(f"Lambda:            {cfg.lambda_air:.2f}")
+    print(f"Kraftstoff-Spezies:{cfg.fuel_species}")
     print(f"Anfangsdruck:      {p0/1e5:.3f} bar")
 
     rhs = make_rhs(gas, geom, cfg, m_total)
-    
+
     print("\nStarte Integration (Verfahren: Radau)...")
     sol = solve_ivp(
         rhs,
         (math.radians(cfg.theta_start_deg), math.radians(cfg.theta_end_deg)),
         y0,
-        method="Radau",  # Radau löst das "num_jac" Overflow-Problem von BDF
+        method="Radau",
         rtol=cfg.rtol,
         atol=atol,
         max_step=math.radians(cfg.max_step_deg),
@@ -352,8 +350,6 @@ def main(cfg: EngineConfig = CFG) -> int:
     print(f"Rechenschritte:     {len(sol.t)}")
     print(f"p_max:              {df.pressure_bar.iloc[i_pmax]:.2f} bar bei {df.theta_deg.iloc[i_pmax]:.2f} °KW")
     print(f"T_max:              {df.temperature_K.iloc[i_tmax]:.1f} K bei {df.theta_deg.iloc[i_tmax]:.2f} °KW")
-    print(f"Enddruck (UT):      {df.pressure_bar.iloc[-1]:.2f} bar")
-    print(f"Ausgabeordner:      {outdir.resolve()}")
 
     return 0
 
