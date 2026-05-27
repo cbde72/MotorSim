@@ -169,6 +169,10 @@ class FreePistonModelData:
     hcci_hot_flame_activation_energy_by_vol_J_per_kg: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     hcci_cool_flame_energy_fraction_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     hcci_cool_flame_duration_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    hcci_cool_flame_burn_model_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    hcci_cool_flame_a_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    hcci_cool_flame_m_by_vol: np.ndarray = field(default_factory=lambda: np.full(0, 2.0, dtype=np.float64))
+    hcci_cool_flame_shape_m_by_vol: np.ndarray = field(default_factory=lambda: np.full(0, 2.0, dtype=np.float64))
     hcci_cf_c_dq_by_vol: np.ndarray = field(default_factory=lambda: np.zeros((0, 6), dtype=np.float64))
     hcci_cf_c_dt_by_vol: np.ndarray = field(default_factory=lambda: np.zeros((0, 6), dtype=np.float64))
     hcci_reference_pressure_by_vol_bar: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
@@ -176,6 +180,9 @@ class FreePistonModelData:
     runtime_hcci_integral_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     runtime_hcci_last_update_time_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     runtime_hcci_tau_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_cool_flame_peak_delay_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_cool_flame_qdot_peak_by_vol_W: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    runtime_cool_flame_duration_model_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     runtime_scavenging_transfer_in_kg_per_s: float = 0.0
     runtime_scavenging_exhaust_out_kg_per_s: float = 0.0
     runtime_scavenging_burned_correction_kg_per_s: float = 0.0

@@ -12,7 +12,7 @@ from thermo0d.model.free_piston.forces import compute_load_info
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_equivalent_linear_kinematics, free_piston_is_compression_stroke, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
 try:
-    from thermo0d.model.free_piston.combustion_latch import _hcci_ignition_delay_s, free_piston_combustion_enabled, free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector, replay_free_piston_combustion_latch_series, replay_free_piston_time_combustion_series
+    from thermo0d.model.free_piston.combustion_latch import _hcci_ignition_delay_s, free_piston_combustion_enabled, free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector, replay_free_piston_combustion_latch_series, replay_free_piston_cool_flame_series, replay_free_piston_time_combustion_series
 except Exception:  # pragma: no cover - compatibility for project states without latch patch
     _hcci_ignition_delay_s = None
     free_piston_combustion_enabled = None
@@ -20,12 +20,13 @@ except Exception:  # pragma: no cover - compatibility for project states without
     free_piston_uses_slot_closure_lambda = None
     free_piston_uses_vapor_injector = None
     replay_free_piston_combustion_latch_series = None
+    replay_free_piston_cool_flame_series = None
     replay_free_piston_time_combustion_series = None
 try:
     from thermo0d.physics.kinematics import global_theta_and_rate_from_time
 except ImportError:
     global_theta_and_rate_from_time = None
-from thermo0d.physics.combustion import combustion_duration_mode_from_row, vibe_beck_time_fraction_and_rate, vibe_beck_time_heat_release_rate_with_total_energy, vibe_fraction_and_rate, vibe_heat_release_rate_with_total_energy, vibe_time_fraction_and_rate, vibe_time_heat_release_rate_with_total_energy
+from thermo0d.physics.combustion import beck_vibe_cf_peak_heat_release_rate, combustion_duration_mode_from_row, gamma_peak_heat_release_rate, vibe_beck_time_fraction_and_rate, vibe_beck_time_heat_release_rate_with_total_energy, vibe_fraction_and_rate, vibe_heat_release_rate_with_total_energy, vibe_time_fraction_and_rate, vibe_time_heat_release_rate_with_total_energy
 from thermo0d.physics.rhs import _evaluate_check_valve_area, _evaluate_orifice_area, _evaluate_slot_state, _evaluate_valve_state
 from thermo0d.physics.source_terms import cylinder_energy_source_terms_from_context
 from thermo0d.physics.composition import burned_fraction_0to1, unburned_mass_kg
@@ -209,6 +210,18 @@ def _replay_free_piston_time_combustion_for_cylinder(bundle, t_arr: np.ndarray, 
         np.asarray(soc_energy_hist, dtype=np.float64),
         np.asarray(soc_active_hist, dtype=np.float64),
     )
+
+
+def _replay_free_piston_cool_flame_for_cylinder(bundle, t_arr: np.ndarray, y_arr: np.ndarray, latched_energy_hist: np.ndarray | None, cylinder_idx: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    n_samples = int(t_arr.shape[0]) if t_arr.ndim == 1 else 0
+    zeros = np.zeros(n_samples, dtype=np.float64)
+    if replay_free_piston_cool_flame_series is None:
+        return zeros.copy(), zeros.copy(), zeros.copy(), zeros.copy(), zeros.copy(), zeros.copy()
+    try:
+        out = replay_free_piston_cool_flame_series(bundle, t_arr, y_arr, latched_energy_hist, int(cylinder_idx))
+    except Exception:
+        return zeros.copy(), zeros.copy(), zeros.copy(), zeros.copy(), zeros.copy(), zeros.copy()
+    return tuple(np.asarray(item, dtype=np.float64) for item in out)  # type: ignore[return-value]
 
 
 def _lambda_from_air_and_fuel(air_mass_kg: float, fuel_mass_kg: float, stoich_afr_kg_air_per_kg_fuel: float) -> float:
@@ -517,6 +530,7 @@ class SignalReconstructionService:
             soc_active_hist = np.zeros(n_samples, dtype=np.float64)
         cylinder_latch_histories: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
         cylinder_soc_histories: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
+        cylinder_cool_flame_histories: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
         if use_fp_latched_fuel:
             for cyl_idx in getattr(bundle, 'cylinder_indices', []) or []:
                 cyl = int(cyl_idx)
@@ -525,6 +539,7 @@ class SignalReconstructionService:
                 latch_hist = _replay_free_piston_combustion_history_for_cylinder(bundle, y_arr, cyl)
                 cylinder_latch_histories[cyl] = latch_hist
                 cylinder_soc_histories[cyl] = _replay_free_piston_time_combustion_for_cylinder(bundle, t_arr, y_arr, latch_hist[2], cyl)
+                cylinder_cool_flame_histories[cyl] = _replay_free_piston_cool_flame_for_cylinder(bundle, t_arr, y_arr, latch_hist[2], cyl)
         environment_is_fixed = getattr(bundle, 'environment_is_fixed', None)
         environment_pressures_pa = getattr(bundle, 'environment_pressures_pa', None)
         environment_temperatures_K = getattr(bundle, 'environment_temperatures_K', None)
@@ -1143,6 +1158,32 @@ class SignalReconstructionService:
                                 float(comb_row[CombCol.M]),
                                 float(cyl_soc_energy_hist[k]),
                             )
+                        cf_hist = cylinder_cool_flame_histories.get(i)
+                        if cf_hist is not None and float(cf_hist[2][k]) > 0.0:
+                            cf_model_arr = getattr(fp, 'hcci_cool_flame_burn_model_by_vol', np.zeros(0, dtype=np.int64)) if fp is not None else np.zeros(0, dtype=np.int64)
+                            use_cf_vibe_beck = i < int(getattr(cf_model_arr, 'shape', (0,))[0]) and int(cf_model_arr[i]) == 1
+                            if use_cf_vibe_beck:
+                                cf_m_arr = getattr(fp, 'hcci_cool_flame_m_by_vol', np.zeros(0, dtype=np.float64)) if fp is not None else np.zeros(0, dtype=np.float64)
+                                cf_m = float(cf_m_arr[i]) if i < int(getattr(cf_m_arr, 'shape', (0,))[0]) and float(cf_m_arr[i]) >= 0.0 else float(comb_row[CombCol.M])
+                                added_energy_w += beck_vibe_cf_peak_heat_release_rate(
+                                    t_arr[k],
+                                    float(cf_hist[0][k]),
+                                    float(cf_hist[4][k]),
+                                    float(cf_hist[5][k]),
+                                    cf_m,
+                                    float(cf_hist[3][k]),
+                                )
+                            else:
+                                shape_arr = getattr(fp, 'hcci_cool_flame_shape_m_by_vol', np.zeros(0, dtype=np.float64)) if fp is not None else np.zeros(0, dtype=np.float64)
+                                shape_m = float(shape_arr[i]) if i < int(getattr(shape_arr, 'shape', (0,))[0]) and float(shape_arr[i]) > 0.0 else 2.0
+                                added_energy_w += gamma_peak_heat_release_rate(
+                                    t_arr[k],
+                                    float(cf_hist[0][k]),
+                                    float(cf_hist[4][k]),
+                                    float(cf_hist[5][k]),
+                                    shape_m,
+                                    float(cf_hist[3][k]),
+                                )
                     elif use_fp_latched_fuel:
                         if free_piston_reference_is_active(int(comb_row[CombCol.REF_TYPE]), float(piston_x_by_vol[i]), float(piston_v_by_vol[i]), fp.x_min_m, fp.x_max_m):
                             added_energy_w = vibe_heat_release_rate_with_total_energy(
@@ -1165,6 +1206,12 @@ class SignalReconstructionService:
                 combustion_fraction_rate_1_per_s = 0.0
                 combustion_soc_time_s = 0.0
                 combustion_soc_energy_J = 0.0
+                cool_flame_time_s = 0.0
+                cool_flame_energy_J = 0.0
+                cool_flame_qdot_peak_W = 0.0
+                cool_flame_peak_delay_s = 0.0
+                cool_flame_duration_s = 0.0
+                cool_flame_qdot_W = 0.0
                 hcci_ignition_delay_s = 0.0
                 hcci_cool_ignition_delay_s = 0.0
                 hcci_integral_0to1 = float(hcci_integral_by_vol[i])
@@ -1197,6 +1244,37 @@ class SignalReconstructionService:
                                     float(comb_row[CombCol.DURATION_DEG]),
                                     float(comb_row[CombCol.A]),
                                     float(comb_row[CombCol.M]),
+                                )
+                        cf_hist = cylinder_cool_flame_histories.get(i)
+                        if cf_hist is not None and float(cf_hist[2][k]) > 0.0:
+                            cool_flame_time_s = float(cf_hist[0][k])
+                            cool_flame_energy_J = float(cf_hist[1][k])
+                            cool_flame_duration_s = float(cf_hist[3][k])
+                            cool_flame_peak_delay_s = float(cf_hist[4][k])
+                            cool_flame_qdot_peak_W = float(cf_hist[5][k])
+                            cf_model_arr = getattr(fp, 'hcci_cool_flame_burn_model_by_vol', np.zeros(0, dtype=np.int64)) if fp is not None else np.zeros(0, dtype=np.int64)
+                            use_cf_vibe_beck = i < int(getattr(cf_model_arr, 'shape', (0,))[0]) and int(cf_model_arr[i]) == 1
+                            if use_cf_vibe_beck:
+                                cf_m_arr = getattr(fp, 'hcci_cool_flame_m_by_vol', np.zeros(0, dtype=np.float64)) if fp is not None else np.zeros(0, dtype=np.float64)
+                                cf_m = float(cf_m_arr[i]) if i < int(getattr(cf_m_arr, 'shape', (0,))[0]) and float(cf_m_arr[i]) >= 0.0 else float(comb_row[CombCol.M])
+                                cool_flame_qdot_W = beck_vibe_cf_peak_heat_release_rate(
+                                    t_arr[k],
+                                    cool_flame_time_s,
+                                    cool_flame_peak_delay_s,
+                                    cool_flame_qdot_peak_W,
+                                    cf_m,
+                                    cool_flame_duration_s,
+                                )
+                            else:
+                                shape_arr = getattr(fp, 'hcci_cool_flame_shape_m_by_vol', np.zeros(0, dtype=np.float64)) if fp is not None else np.zeros(0, dtype=np.float64)
+                                shape_m = float(shape_arr[i]) if i < int(getattr(shape_arr, 'shape', (0,))[0]) and float(shape_arr[i]) > 0.0 else 2.0
+                                cool_flame_qdot_W = gamma_peak_heat_release_rate(
+                                    t_arr[k],
+                                    cool_flame_time_s,
+                                    cool_flame_peak_delay_s,
+                                    cool_flame_qdot_peak_W,
+                                    shape_m,
+                                    cool_flame_duration_s,
                                 )
                     else:
                         combustion_fraction, combustion_fraction_rate_1_per_s = vibe_fraction_and_rate(
@@ -1266,6 +1344,12 @@ class SignalReconstructionService:
                 cls._ensure_float_column(columns, f'{name}_combustion_fraction_rate_1_per_s', n_samples)[k] = float(combustion_fraction_rate_1_per_s)
                 cls._ensure_float_column(columns, f'{name}_combustion_soc_time_s', n_samples)[k] = float(combustion_soc_time_s)
                 cls._ensure_float_column(columns, f'{name}_combustion_soc_energy_J', n_samples)[k] = float(combustion_soc_energy_J)
+                cls._ensure_float_column(columns, f'{name}_cool_flame_time_s', n_samples)[k] = float(cool_flame_time_s)
+                cls._ensure_float_column(columns, f'{name}_cool_flame_energy_J', n_samples)[k] = float(cool_flame_energy_J)
+                cls._ensure_float_column(columns, f'{name}_cool_flame_qdot_W', n_samples)[k] = float(cool_flame_qdot_W)
+                cls._ensure_float_column(columns, f'{name}_cool_flame_qdot_peak_W', n_samples)[k] = float(cool_flame_qdot_peak_W)
+                cls._ensure_float_column(columns, f'{name}_cool_flame_peak_delay_s', n_samples)[k] = float(cool_flame_peak_delay_s)
+                cls._ensure_float_column(columns, f'{name}_cool_flame_duration_s', n_samples)[k] = float(cool_flame_duration_s)
                 cls._ensure_float_column(columns, f'{name}_hcci_ignition_delay_s', n_samples)[k] = float(hcci_ignition_delay_s)
                 cls._ensure_float_column(columns, f'{name}_hcci_cool_ignition_delay_s', n_samples)[k] = float(hcci_cool_ignition_delay_s)
                 cls._ensure_float_column(columns, f'{name}_hcci_ignition_integral_0to1', n_samples)[k] = float(hcci_integral_0to1)

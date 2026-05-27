@@ -548,6 +548,7 @@ class HcciDieselCombustionConfig(StrictBaseModel):
     beck_reference_o2_percent: StrictFloat = 20.94
     beck_cf_fuel_name: StrictStr = "Diesel 2"
     cool_flame_enabled: StrictBool = False
+    cool_flame_burn_model: Literal["gamma", "beck-vibe_CF", "vibe-beck"] = "gamma"
     cool_flame_energy_fraction: StrictFloat = 0.08
     cool_flame_duration_ms: StrictFloat = 0.3409
     cool_flame_a: StrictFloat = 6.9

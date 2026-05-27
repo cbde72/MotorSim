@@ -273,6 +273,45 @@ def vibe_time_heat_release_rate_with_total_energy(
 
 
 @nb.njit(cache=True)
+def gamma_peak_heat_release_rate_numba(
+    t_s: float,
+    start_time_s: float,
+    peak_delay_s: float,
+    qdot_peak_W: float,
+    shape_m: float,
+    duration_s: float,
+) -> float:
+    if qdot_peak_W <= 0.0 or peak_delay_s <= 1.0e-18 or duration_s <= 1.0e-18:
+        return 0.0
+    tau_s = t_s - start_time_s
+    if tau_s < 0.0 or tau_s > duration_s:
+        return 0.0
+    x = tau_s / peak_delay_s
+    if x <= 0.0:
+        return 0.0
+    m = max(shape_m, 1.0e-6)
+    return qdot_peak_W * (x ** m) * math.exp(m * (1.0 - x))
+
+
+def gamma_peak_heat_release_rate(
+    t_s: float,
+    start_time_s: float,
+    peak_delay_s: float,
+    qdot_peak_W: float,
+    shape_m: float,
+    duration_s: float,
+) -> float:
+    return gamma_peak_heat_release_rate_numba(
+        float(t_s),
+        float(start_time_s),
+        float(peak_delay_s),
+        float(qdot_peak_W),
+        float(shape_m),
+        float(duration_s),
+    )
+
+
+@nb.njit(cache=True)
 def vibe_beck_time_fraction_and_rate_numba(
     t_s: float,
     soc_time_s: float,
@@ -319,6 +358,45 @@ def vibe_beck_time_heat_release_rate_with_total_energy(
         float(a),
         float(m),
         float(q_total_J),
+    )
+
+
+@nb.njit(cache=True)
+def beck_vibe_cf_peak_heat_release_rate_numba(
+    t_s: float,
+    start_time_s: float,
+    peak_delay_s: float,
+    qdot_peak_W: float,
+    m: float,
+    duration_s: float,
+) -> float:
+    if qdot_peak_W <= 0.0 or peak_delay_s <= 1.0e-18 or duration_s <= 1.0e-18:
+        return 0.0
+    tau_s = t_s - start_time_s
+    if tau_s < 0.0 or tau_s > duration_s:
+        return 0.0
+    x = tau_s / peak_delay_s
+    if x <= 0.0:
+        return 0.0
+    shape_m = max(m, 1.0e-6)
+    return qdot_peak_W * (x ** shape_m) * math.exp((shape_m / (shape_m + 1.0)) * (1.0 - (x ** (shape_m + 1.0))))
+
+
+def beck_vibe_cf_peak_heat_release_rate(
+    t_s: float,
+    start_time_s: float,
+    peak_delay_s: float,
+    qdot_peak_W: float,
+    m: float,
+    duration_s: float,
+) -> float:
+    return beck_vibe_cf_peak_heat_release_rate_numba(
+        float(t_s),
+        float(start_time_s),
+        float(peak_delay_s),
+        float(qdot_peak_W),
+        float(m),
+        float(duration_s),
     )
 
 

@@ -525,6 +525,10 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     hcci_hot_flame_activation_energy_by_vol_J_per_kg = np.zeros(n_vol, dtype=np.float64)
     hcci_cool_flame_energy_fraction_by_vol = np.zeros(n_vol, dtype=np.float64)
     hcci_cool_flame_duration_by_vol_s = np.zeros(n_vol, dtype=np.float64)
+    hcci_cool_flame_burn_model_by_vol = np.zeros(n_vol, dtype=np.int64)
+    hcci_cool_flame_a_by_vol = np.zeros(n_vol, dtype=np.float64)
+    hcci_cool_flame_m_by_vol = np.full(n_vol, 2.0, dtype=np.float64)
+    hcci_cool_flame_shape_m_by_vol = np.full(n_vol, 2.0, dtype=np.float64)
     hcci_cf_c_dq_by_vol = np.zeros((n_vol, 6), dtype=np.float64)
     hcci_cf_c_dt_by_vol = np.zeros((n_vol, 6), dtype=np.float64)
     hcci_reference_pressure_by_vol_bar = np.zeros(n_vol, dtype=np.float64)
@@ -802,6 +806,12 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             hcci_reference_o2_by_vol_percent[int(cyl_i)] = float(combustion_cfg_local.beck_reference_o2_percent)
             hcci_cool_flame_energy_fraction_by_vol[int(cyl_i)] = float(combustion_cfg_local.cool_flame_energy_fraction)
             hcci_cool_flame_duration_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.cool_flame_duration_ms) * 1.0e-3
+            cool_flame_burn_model = str(combustion_cfg_local.cool_flame_burn_model)
+            hcci_cool_flame_burn_model_by_vol[int(cyl_i)] = 1 if cool_flame_burn_model in ("beck-vibe_CF", "vibe-beck") else 0
+            hcci_cool_flame_a_by_vol[int(cyl_i)] = float(combustion_cfg_local.cool_flame_a)
+            cool_flame_m = 1.7 if cool_flame_burn_model == "beck-vibe_CF" else float(combustion_cfg_local.cool_flame_m)
+            hcci_cool_flame_m_by_vol[int(cyl_i)] = float(cool_flame_m)
+            hcci_cool_flame_shape_m_by_vol[int(cyl_i)] = float(cool_flame_m)
             
             beck_params = beck_cool_flame_fuel_parameters(combustion_cfg_local.beck_cf_fuel_name)
             hcci_cool_flame_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(beck_params.cool_flame_activation_energy_J_per_kg)
@@ -1013,6 +1023,10 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         hcci_hot_flame_activation_energy_by_vol_J_per_kg=hcci_hot_flame_activation_energy_by_vol_J_per_kg,
         hcci_cool_flame_energy_fraction_by_vol=hcci_cool_flame_energy_fraction_by_vol,
         hcci_cool_flame_duration_by_vol_s=hcci_cool_flame_duration_by_vol_s,
+        hcci_cool_flame_burn_model_by_vol=hcci_cool_flame_burn_model_by_vol,
+        hcci_cool_flame_a_by_vol=hcci_cool_flame_a_by_vol,
+        hcci_cool_flame_m_by_vol=hcci_cool_flame_m_by_vol,
+        hcci_cool_flame_shape_m_by_vol=hcci_cool_flame_shape_m_by_vol,
         hcci_cf_c_dq_by_vol=hcci_cf_c_dq_by_vol,
         hcci_cf_c_dt_by_vol=hcci_cf_c_dt_by_vol,
         hcci_reference_pressure_by_vol_bar=hcci_reference_pressure_by_vol_bar,

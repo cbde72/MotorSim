@@ -377,6 +377,45 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
                 return float(end_value - start_value)
         return None
 
+    def _event_index_from_time_or_integral(
+        segment_rows: list[dict[str, float | int]],
+        *,
+        event_time_keys: list[str],
+        integral_keys: list[str],
+        t_values_s: np.ndarray,
+        segment_start_idx: int,
+    ) -> int | None:
+        event_time_s: float | None = None
+        for row in segment_rows:
+            event_time_s = _last_finite_value([row], event_time_keys, positive=True)
+            if event_time_s is not None:
+                break
+        if event_time_s is not None and segment_start_idx < int(t_values_s.shape[0]):
+            local_t = t_values_s[segment_start_idx:segment_start_idx + len(segment_rows)]
+            mask = np.isfinite(local_t)
+            if int(np.count_nonzero(mask)) > 0:
+                candidates = np.where(mask)[0]
+                best_local = int(candidates[int(np.argmin(np.abs(local_t[mask] - event_time_s)))])
+                return int(segment_start_idx + best_local)
+
+        best_idx: int | None = None
+        best_value = -1.0
+        prev_value: float | None = None
+        for local_idx, row in enumerate(segment_rows):
+            value = _last_finite_value([row], integral_keys)
+            if value is None:
+                continue
+            value = max(0.0, min(1.0, float(value)))
+            if prev_value is not None and prev_value > 0.65 and value < prev_value:
+                return int(segment_start_idx + local_idx)
+            if value > best_value:
+                best_value = value
+                best_idx = int(segment_start_idx + local_idx)
+            prev_value = value
+        if best_idx is not None and best_value > 0.65:
+            return best_idx
+        return None
+
     def _format_value(value: float | None, unit: str = "", digits: int = 2) -> str:
         if value is None or not math.isfinite(float(value)):
             return "n/v"
@@ -458,6 +497,20 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
         duration_s = float(t_s[ut2] - t_s[ut1])
     frequency_hz = 1.0 / duration_s if duration_s is not None and duration_s > 1.0e-15 else None
     indicated_power_W = piston_work_J / duration_s if duration_s is not None and duration_s > 1.0e-15 else None
+    cold_flame_idx = _event_index_from_time_or_integral(
+        segment_rows,
+        event_time_keys=[f"{cyl_name}_cool_flame_time_s", "cylinder_cool_flame_time_s"],
+        integral_keys=[f"{cyl_name}_hcci_cool_ignition_integral_0to1", "cylinder_hcci_cool_ignition_integral_0to1"],
+        t_values_s=t_s,
+        segment_start_idx=ut1,
+    )
+    hot_flame_idx = _event_index_from_time_or_integral(
+        segment_rows,
+        event_time_keys=[f"{cyl_name}_combustion_soc_time_s", "cylinder_combustion_soc_time_s"],
+        integral_keys=[f"{cyl_name}_hcci_ignition_integral_0to1", "cylinder_hcci_ignition_integral_0to1"],
+        t_values_s=t_s,
+        segment_start_idx=ut1,
+    )
     added_energy_J = _integrate_over_time(added_energy_W, t_s, ut1, ut2)
     if added_energy_J is None:
         added_energy_J = _cycle_window_delta(segment_rows, [f"{cyl_name}_added_energy_cycle_J", "cylinder_added_energy_cycle_J"])
@@ -582,6 +635,16 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
     ax.annotate('UT', (V_m3[ut1] * 1.0e6, p_pa[ut1] / 1.0e5), xytext=(6, 6), textcoords='offset points')
     ax.annotate('OT', (V_m3[ot] * 1.0e6, p_pa[ot] / 1.0e5), xytext=(6, 6), textcoords='offset points')
     ax.annotate('UT', (V_m3[ut2] * 1.0e6, p_pa[ut2] / 1.0e5), xytext=(6, 6), textcoords='offset points')
+    if cold_flame_idx is not None and ut1 <= cold_flame_idx <= ut2:
+        cf_x = V_m3[cold_flame_idx] * 1.0e6
+        cf_y = p_pa[cold_flame_idx] / 1.0e5
+        ax.scatter([cf_x], [cf_y], s=42.0, color='#f97316', edgecolors='black', linewidths=0.8, zorder=5)
+        ax.annotate('CF ZI=1', (cf_x, cf_y), xytext=(7, -14), textcoords='offset points', color='#c2410c', fontsize=8)
+    if hot_flame_idx is not None and ut1 <= hot_flame_idx <= ut2:
+        hf_x = V_m3[hot_flame_idx] * 1.0e6
+        hf_y = p_pa[hot_flame_idx] / 1.0e5
+        ax.scatter([hf_x], [hf_y], s=42.0, color='#dc2626', edgecolors='black', linewidths=0.8, zorder=5)
+        ax.annotate('HF ZI=1', (hf_x, hf_y), xytext=(7, 9), textcoords='offset points', color='#b91c1c', fontsize=8)
     ax.set_xlabel('Zylindervolumen [cm³]')
     ax.set_ylabel('Zylinderdruck [bar]')
     ax.set_title(f'{cyl_name}: Druck-Volumen - letzter UT-OT-UT-Zyklus')

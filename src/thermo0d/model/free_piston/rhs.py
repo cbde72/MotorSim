@@ -10,7 +10,7 @@ from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cyl
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
 from thermo0d.model.free_piston.combustion_latch import free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector
 from thermo0d.physics.flow import de_st_venant_wantzel_signed
-from thermo0d.physics.combustion import combustion_duration_mode_from_row, vibe_beck_time_fraction_and_rate, vibe_beck_time_heat_release_rate_with_total_energy, vibe_fraction_and_rate, vibe_heat_release_rate_with_total_energy, vibe_time_fraction_and_rate, vibe_time_heat_release_rate_with_total_energy
+from thermo0d.physics.combustion import beck_vibe_cf_peak_heat_release_rate, combustion_duration_mode_from_row, gamma_peak_heat_release_rate, vibe_beck_time_fraction_and_rate, vibe_beck_time_heat_release_rate_with_total_energy, vibe_fraction_and_rate, vibe_heat_release_rate_with_total_energy, vibe_time_fraction_and_rate, vibe_time_heat_release_rate_with_total_energy
 from thermo0d.physics.openings import connection_area_and_coefficients
 from thermo0d.physics.source_terms import volume_energy_source_terms
 from thermo0d.physics.thermo import safe_pressure_from_ideal_gas, safe_temperature_from_state
@@ -236,6 +236,9 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     runtime_cool_flame_active_by_vol = getattr(fp, 'runtime_cool_flame_active_by_vol', EMPTY_INT)
     runtime_cool_flame_time_by_vol_s = getattr(fp, 'runtime_cool_flame_time_by_vol_s', EMPTY_FLOAT)
     runtime_cool_flame_energy_by_vol_J = getattr(fp, 'runtime_cool_flame_energy_by_vol_J', EMPTY_FLOAT)
+    runtime_cool_flame_peak_delay_by_vol_s = getattr(fp, 'runtime_cool_flame_peak_delay_by_vol_s', EMPTY_FLOAT)
+    runtime_cool_flame_qdot_peak_by_vol_W = getattr(fp, 'runtime_cool_flame_qdot_peak_by_vol_W', EMPTY_FLOAT)
+    runtime_cool_flame_duration_model_by_vol_s = getattr(fp, 'runtime_cool_flame_duration_model_by_vol_s', EMPTY_FLOAT)
     hcci_burn_model_by_vol = getattr(fp, 'hcci_burn_model_by_vol', EMPTY_INT)
     runtime_slotclose_charge_active_by_vol = getattr(fp, 'runtime_slotclose_charge_active_by_vol', EMPTY_INT)
     runtime_slotclose_charge_time_by_vol_s = getattr(fp, 'runtime_slotclose_charge_time_by_vol_s', EMPTY_FLOAT)
@@ -705,7 +708,32 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
                 cf_a = float(cf_a_arr[i]) if cf_a_arr is not None and i < cf_a_arr.shape[0] else float(comb_row[CombCol.A])
                 cf_m_arr = getattr(fp, 'hcci_cool_flame_m_by_vol', None)
                 cf_m = float(cf_m_arr[i]) if cf_m_arr is not None and i < cf_m_arr.shape[0] else float(comb_row[CombCol.M])
-                if use_vibe_beck:
+                cf_burn_model_arr = getattr(fp, 'hcci_cool_flame_burn_model_by_vol', EMPTY_INT)
+                use_cf_vibe_beck = i < int(getattr(cf_burn_model_arr, 'shape', (0,))[0]) and int(cf_burn_model_arr[i]) == 1
+                peak_delay_s = float(runtime_cool_flame_peak_delay_by_vol_s[i]) if i < int(getattr(runtime_cool_flame_peak_delay_by_vol_s, 'shape', (0,))[0]) else 0.0
+                qdot_peak_W = float(runtime_cool_flame_qdot_peak_by_vol_W[i]) if i < int(getattr(runtime_cool_flame_qdot_peak_by_vol_W, 'shape', (0,))[0]) else 0.0
+                duration_model_s = float(runtime_cool_flame_duration_model_by_vol_s[i]) if i < int(getattr(runtime_cool_flame_duration_model_by_vol_s, 'shape', (0,))[0]) else 0.0
+                if use_cf_vibe_beck:
+                    qdot_comb += beck_vibe_cf_peak_heat_release_rate(
+                        t_s,
+                        float(runtime_cool_flame_time_by_vol_s[i]),
+                        peak_delay_s,
+                        qdot_peak_W,
+                        cf_m,
+                        duration_model_s if duration_model_s > 0.0 else float(fp.hcci_cool_flame_duration_by_vol_s[i]),
+                    )
+                elif qdot_peak_W > 0.0 and peak_delay_s > 0.0 and duration_model_s > 0.0:
+                    shape_arr = getattr(fp, 'hcci_cool_flame_shape_m_by_vol', EMPTY_FLOAT)
+                    shape_m = float(shape_arr[i]) if i < int(getattr(shape_arr, 'shape', (0,))[0]) and float(shape_arr[i]) > 0.0 else 2.0
+                    qdot_comb += gamma_peak_heat_release_rate(
+                        t_s,
+                        float(runtime_cool_flame_time_by_vol_s[i]),
+                        peak_delay_s,
+                        qdot_peak_W,
+                        shape_m,
+                        duration_model_s,
+                    )
+                elif use_vibe_beck:
                     qdot_comb += vibe_beck_time_heat_release_rate_with_total_energy(
                         t_s,
                         float(runtime_cool_flame_time_by_vol_s[i]),

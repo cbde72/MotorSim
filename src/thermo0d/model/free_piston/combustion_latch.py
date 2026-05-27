@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 from thermo0d.config.constants import CombCol, CombDurationMode, CombStartMode, ConnCol, ConnectionType, FeatureCol, VolumeCol
@@ -115,7 +117,7 @@ def _hcci_cool_flame_energy_J(fp, cyl: int, q_total_J: float) -> float:
     return max(float(q_total_J) * min(max(fraction, 0.0), 0.95), 0.0)
 
 
-def _compute_dynamic_cool_flame(bundle, cyl: int, p_Pa: float, temp_K: float, air_mass_kg: float, fuel_mass_kg: float, residual_mass_kg: float, mass_kg: float, afr_stoich: float, q_total_J: float) -> tuple[float, float]:
+def _compute_dynamic_cool_flame_legacy_linear(bundle, cyl: int, p_Pa: float, temp_K: float, air_mass_kg: float, fuel_mass_kg: float, residual_mass_kg: float, mass_kg: float, afr_stoich: float, q_total_J: float) -> tuple[float, float]:
     """Dynamische Auswertung der Cool Flame Parameter nach Beck (2003, Kap. 6)."""
     fp = bundle.free_piston
     if not getattr(fp, 'hcci_cool_flame_dynamic_enabled', True):
@@ -157,6 +159,108 @@ def _compute_dynamic_cool_flame(bundle, cyl: int, p_Pa: float, temp_K: float, ai
     cool_energy_J = max(0.0, min(cool_energy_J, float(q_total_J) * 0.15))
 
     return cool_energy_J, cool_duration_s
+
+
+def _gamma_pulse_energy_J(qdot_peak_W: float, peak_delay_s: float, duration_s: float, shape_m: float) -> float:
+    if qdot_peak_W <= 0.0 or peak_delay_s <= 1.0e-18 or duration_s <= 1.0e-18:
+        return 0.0
+    samples = 96
+    total = 0.0
+    prev_t = 0.0
+    prev_q = 0.0
+    m = max(float(shape_m), 1.0e-6)
+    for idx in range(1, samples + 1):
+        t_i = duration_s * float(idx) / float(samples)
+        x = t_i / peak_delay_s
+        q_i = qdot_peak_W * (x ** m) * math.exp(m * (1.0 - x)) if x > 0.0 else 0.0
+        total += 0.5 * (prev_q + q_i) * (t_i - prev_t)
+        prev_t = t_i
+        prev_q = q_i
+    return float(total)
+
+
+def _beck_vibe_cf_pulse_energy_J(qdot_peak_W: float, peak_delay_s: float, duration_s: float, shape_m: float) -> float:
+    if qdot_peak_W <= 0.0 or peak_delay_s <= 1.0e-18 or duration_s <= 1.0e-18:
+        return 0.0
+    samples = 96
+    total = 0.0
+    prev_t = 0.0
+    prev_q = 0.0
+    m = max(float(shape_m), 1.0e-6)
+    for idx in range(1, samples + 1):
+        t_i = duration_s * float(idx) / float(samples)
+        x = t_i / peak_delay_s
+        q_i = qdot_peak_W * (x ** m) * math.exp((m / (m + 1.0)) * (1.0 - (x ** (m + 1.0)))) if x > 0.0 else 0.0
+        total += 0.5 * (prev_q + q_i) * (t_i - prev_t)
+        prev_t = t_i
+        prev_q = q_i
+    return float(total)
+
+
+def _beck_empirical_cold_flame_parameters(
+    bundle,
+    cyl: int,
+    p_Pa: float,
+    temp_K: float,
+    air_mass_kg: float,
+    fuel_mass_kg: float,
+    residual_mass_kg: float,
+    mass_kg: float,
+    afr_stoich: float,
+    q_total_J: float,
+) -> tuple[float, float, float, float]:
+    fp = bundle.free_piston
+    o2_ref = max(float(fp.hcci_reference_o2_by_vol_percent[cyl]), 1.0e-12)
+    o2_es = _hcci_charge_o2_percent(float(air_mass_kg), float(residual_mass_kg), o2_ref)
+    temp_ref_K = max(float(fp.hcci_start_temperature_min_by_vol_K[cyl]), 1.0)
+    n_rpm = 60.0 / float(bundle.cycle_period_s) if float(bundle.cycle_period_s) > 1.0e-12 else 3000.0
+    n_ref_rpm = 3000.0
+    q_ref_J = max(float(q_total_J), 1.0e-12)
+    q_fuel_J = max(float(fuel_mass_kg) * float(getattr(fp, 'combustion_lhv_J_per_kg', 0.0) or 0.0), q_ref_J)
+    c_dt = fp.hcci_cf_c_dt_by_vol[cyl] if cyl < int(getattr(fp.hcci_cf_c_dt_by_vol, 'shape', (0, 0))[0]) else np.zeros(6, dtype=np.float64)
+    c_dq = fp.hcci_cf_c_dq_by_vol[cyl] if cyl < int(getattr(fp.hcci_cf_c_dq_by_vol, 'shape', (0, 0))[0]) else np.zeros(6, dtype=np.float64)
+    if not np.any(c_dt):
+        c_dt = np.array([-0.071, -8.5e-3, 0.016, -0.241, -0.645, 340.9], dtype=np.float64)
+    if not np.any(c_dq):
+        c_dq = np.array([0.363, 0.0, -0.333, 1.424, 0.155, 7.5e-3], dtype=np.float64)
+
+    def _factor(coeffs: np.ndarray, fallback_c0: float, include_o2_exp: bool) -> float:
+        c1, c2, c3, c4, c5, c0 = [float(v) for v in coeffs]
+        base = abs(c0) if abs(c0) > 1.0e-30 else fallback_c0
+        o2_ratio = max(o2_es - 8.0, 1.0e-12) / max(o2_ref - 8.0, 1.0e-12)
+        temp_ratio = max(float(temp_K), 1.0) / temp_ref_K
+        fuel_ratio = q_fuel_J / q_ref_J
+        speed_ratio = n_rpm / max(n_ref_rpm, 1.0e-12)
+        o2_exp = math.exp(c2 * (o2_es - o2_ref)) if include_o2_exp else 1.0
+        return float(base * (o2_ratio ** c1) * o2_exp * (temp_ratio ** c3) * (fuel_ratio ** c4) * (speed_ratio ** c5))
+
+    peak_delay_s = max(_factor(c_dt, 340.9, True) * 1.0e-6, 1.0e-6)
+    qdot_ref_W = q_ref_J / max(peak_delay_s, 1.0e-9)
+    qdot_peak_W = max(qdot_ref_W * _factor(c_dq, 7.5e-3, False), 0.0)
+    shape_m_arr = getattr(fp, 'hcci_cool_flame_shape_m_by_vol', np.zeros(0, dtype=np.float64))
+    shape_m = float(shape_m_arr[cyl]) if cyl < int(getattr(shape_m_arr, 'shape', (0,))[0]) and float(shape_m_arr[cyl]) > 0.0 else 2.0
+    duration_s = max(4.0 * peak_delay_s, peak_delay_s + float(fp.hcci_cool_flame_duration_by_vol_s[cyl]))
+    burn_model_arr = getattr(fp, 'hcci_cool_flame_burn_model_by_vol', np.zeros(0, dtype=np.int64))
+    use_beck_cf_vibe = cyl < int(getattr(burn_model_arr, 'shape', (0,))[0]) and int(burn_model_arr[cyl]) == 1
+    energy_J = _beck_vibe_cf_pulse_energy_J(qdot_peak_W, peak_delay_s, duration_s, shape_m) if use_beck_cf_vibe else _gamma_pulse_energy_J(qdot_peak_W, peak_delay_s, duration_s, shape_m)
+    cap_fraction = max(float(fp.hcci_cool_flame_energy_fraction_by_vol[cyl]), 0.0)
+    cap_J = max(0.0, min(float(q_total_J) * cap_fraction, float(q_total_J) * 0.15))
+    if cap_J > 0.0 and energy_J > cap_J:
+        scale = cap_J / max(energy_J, 1.0e-18)
+        qdot_peak_W *= scale
+        energy_J = cap_J
+    return float(energy_J), float(duration_s), float(peak_delay_s), float(qdot_peak_W)
+
+
+def _compute_dynamic_cool_flame(bundle, cyl: int, p_Pa: float, temp_K: float, air_mass_kg: float, fuel_mass_kg: float, residual_mass_kg: float, mass_kg: float, afr_stoich: float, q_total_J: float) -> tuple[float, float, float, float]:
+    fp = bundle.free_piston
+    if not getattr(fp, 'hcci_cool_flame_dynamic_enabled', True):
+        energy_J = _hcci_cool_flame_energy_J(fp, cyl, q_total_J)
+        duration_s = float(fp.hcci_cool_flame_duration_by_vol_s[cyl])
+        peak_delay_s = max(0.25 * duration_s, 1.0e-6)
+        qdot_peak_W = energy_J / max(peak_delay_s, 1.0e-9)
+        return float(energy_J), float(duration_s), float(peak_delay_s), float(qdot_peak_W)
+    return _beck_empirical_cold_flame_parameters(bundle, cyl, p_Pa, temp_K, air_mass_kg, fuel_mass_kg, residual_mass_kg, mass_kg, afr_stoich, q_total_J)
 
 def _fueling_mode_for_cylinder(bundle, cylinder_idx: int) -> int:
     fp = getattr(bundle, 'free_piston', None)
@@ -289,6 +393,9 @@ def _ensure_runtime_arrays(bundle) -> None:
         'runtime_cool_flame_time_by_vol_s',
         'runtime_cool_flame_end_time_by_vol_s',
         'runtime_cool_flame_energy_by_vol_J',
+        'runtime_cool_flame_peak_delay_by_vol_s',
+        'runtime_cool_flame_qdot_peak_by_vol_W',
+        'runtime_cool_flame_duration_model_by_vol_s',
         'runtime_cf_integral_by_vol',
         'runtime_cf_tau_by_vol_s',
         'runtime_hf_integral_by_vol',
@@ -729,7 +836,7 @@ def _update_hcci_diesel_autoignition_state(bundle, t_s: float, y_state: np.ndarr
             fp.runtime_hcci_cool_tau_by_vol_s[cyl] = tau_s
             fp.runtime_hcci_cool_integral_by_vol[cyl] += dt_s / max(tau_s, 1.0e-12)
             if fp.runtime_hcci_cool_integral_by_vol[cyl] >= 1.0:
-                cool_energy_J, cool_duration_s = _compute_dynamic_cool_flame(
+                cool_energy_J, cool_duration_s, cool_peak_delay_s, cool_qdot_peak_W = _compute_dynamic_cool_flame(
                     bundle, cyl, pressure_Pa, temp_K, air_mass, fuel_mass, residual_mass, mass, afr, q_total_J
                 )
                 if cool_energy_J > 0.0 and cool_duration_s > 0.0:
@@ -738,6 +845,9 @@ def _update_hcci_diesel_autoignition_state(bundle, t_s: float, y_state: np.ndarr
                     fp.runtime_cool_flame_time_by_vol_s[cyl] = float(t_s)
                     fp.runtime_cool_flame_end_time_by_vol_s[cyl] = float(t_s + cool_duration_s)
                     fp.runtime_cool_flame_energy_by_vol_J[cyl] = float(cool_energy_J)
+                    fp.runtime_cool_flame_peak_delay_by_vol_s[cyl] = float(cool_peak_delay_s)
+                    fp.runtime_cool_flame_qdot_peak_by_vol_W[cyl] = float(cool_qdot_peak_W)
+                    fp.runtime_cool_flame_duration_model_by_vol_s[cyl] = float(cool_duration_s)
                 else:
                     fp.runtime_cool_flame_done_by_vol[cyl] = 1
                 fp.runtime_hcci_cool_integral_by_vol[cyl] = 0.0
@@ -872,7 +982,7 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
                 if hcci_cool_integral >= 1.0:
                     cool_done = True
                     hcci_cool_integral = 0.0
-                    cool_energy_latched_J, _ = _compute_dynamic_cool_flame(
+                    cool_energy_latched_J, _cool_duration_s, _cool_peak_delay_s, _cool_qdot_peak_W = _compute_dynamic_cool_flame(
                         bundle, cyl_idx, pressure_Pa, temp_K, air_mass, fuel_mass, residual_mass, mass, afr, q_total_J
                     )
                 continue
@@ -938,6 +1048,111 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
             soc_energy_hist[k] = soc_energy_J
             active_hist[k] = 1.0
     return soc_time_hist, soc_energy_hist, active_hist
+
+
+def replay_free_piston_cool_flame_series(bundle, t: np.ndarray, y: np.ndarray, latched_energy_hist: np.ndarray | None = None, cylinder_idx: int | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    n = int(t.shape[0]) if t.ndim == 1 else 0
+    cf_time_hist = np.zeros(n, dtype=np.float64)
+    cf_energy_hist = np.zeros(n, dtype=np.float64)
+    cf_active_hist = np.zeros(n, dtype=np.float64)
+    cf_duration_hist = np.zeros(n, dtype=np.float64)
+    cf_peak_delay_hist = np.zeros(n, dtype=np.float64)
+    cf_qdot_peak_hist = np.zeros(n, dtype=np.float64)
+    if not free_piston_uses_time_vibe(bundle):
+        return cf_time_hist, cf_energy_hist, cf_active_hist, cf_duration_hist, cf_peak_delay_hist, cf_qdot_peak_hist
+
+    fp = bundle.free_piston
+    cyl_idx = int(cylinder_idx) if cylinder_idx is not None else int(bundle.cylinder_indices[0])
+    comb_row = _comb_row_for_cylinder(bundle, cyl_idx)
+    if comb_row is None or _comb_start_mode(bundle, cyl_idx) != int(CombStartMode.AUTOIGNITION) or not _hcci_two_stage_enabled(fp, cyl_idx):
+        return cf_time_hist, cf_energy_hist, cf_active_hist, cf_duration_hist, cf_peak_delay_hist, cf_qdot_peak_hist
+
+    cv_default = float(bundle.gas_props[1])
+    use_promo_thermo = bundle.gas_props.shape[0] > 4 and float(bundle.gas_props[4]) >= 0.5
+    cool_integral = 0.0
+    cool_done = False
+    active = False
+    cf_time_s = 0.0
+    cf_end_s = 0.0
+    cf_energy_J = 0.0
+    cf_duration_s = 0.0
+    cf_peak_delay_s = 0.0
+    cf_qdot_peak_W = 0.0
+    last_t = float(t[0]) if n > 0 else 0.0
+    for k in range(n):
+        t_k = float(t[k])
+        dt_s = max(0.0, t_k - last_t)
+        last_t = t_k
+        if active and t_k >= cf_end_s - 1.0e-15:
+            active = False
+        if active:
+            cf_time_hist[k] = cf_time_s
+            cf_energy_hist[k] = cf_energy_J
+            cf_active_hist[k] = 1.0
+            cf_duration_hist[k] = cf_duration_s
+            cf_peak_delay_hist[k] = cf_peak_delay_s
+            cf_qdot_peak_hist[k] = cf_qdot_peak_W
+            continue
+
+        x_m, v_m_per_s = _local_piston_kinematics_for_volume(bundle, y[:, k], cyl_idx)
+        if not free_piston_is_compression_stroke(v_m_per_s, x_m, fp.x_min_m, fp.x_max_m):
+            cool_integral = 0.0
+            cool_done = False
+            continue
+        q_total_J = float(latched_energy_hist[k]) if latched_energy_hist is not None else float(comb_row[int(CombCol.FUEL_MASS_PER_CYCLE)] * comb_row[int(CombCol.LHV)])
+        if q_total_J <= 0.0 or cool_done:
+            continue
+        mass = float(bundle.state_layout.gas_mass_from_state(y[:, k], cyl_idx))
+        energy = float(y[int(bundle.state_layout.energy_index(cyl_idx)), k])
+        air_mass = float(bundle.state_layout.air_mass_from_state(y[:, k], cyl_idx))
+        burned_mass = float(bundle.state_layout.burned_mass_from_state(y[:, k], cyl_idx))
+        lhv = float(bundle.combustion_lhv_by_vol[cyl_idx]) if getattr(bundle, 'combustion_lhv_by_vol', None) is not None and cyl_idx < int(bundle.combustion_lhv_by_vol.shape[0]) else float(getattr(fp, 'combustion_lhv_J_per_kg', 0.0) or 0.0)
+        comb_eff = float(bundle.combustion_efficiency_by_vol[cyl_idx]) if getattr(bundle, 'combustion_efficiency_by_vol', None) is not None and cyl_idx < int(bundle.combustion_efficiency_by_vol.shape[0]) else float(getattr(fp, 'combustion_efficiency_0to1', 1.0) or 1.0)
+        fuel_mass = q_total_J / max(lhv * comb_eff, 1.0e-18)
+        if mass <= 1.0e-18 or air_mass <= 1.0e-18 or fuel_mass <= 1.0e-18:
+            continue
+        volume = cylinder_volume_from_position(fp.clearance_volume_m3, fp.piston_area_m2, x_m, fp.x_min_m, fp.x_max_m)
+        if use_promo_thermo:
+            fuel_vapor_mass = float(bundle.state_layout.fuel_vapor_mass_from_state(y[:, k], cyl_idx))
+            temp_K, _cp, cv_i, gas_constant_i, _kappa = properties_from_mass_energy_components_quellen(mass, energy, air_mass, fuel_vapor_mass, burned_mass, cv_default)
+            pressure_Pa = pressure_from_state(mass, energy, volume, gas_constant_i, cv_i)
+        else:
+            temp_K = max(energy / max(mass * cv_default, 1.0e-18), 1.0)
+            pressure_Pa = pressure_from_state(mass, energy, volume, float(bundle.gas_props[2]), cv_default)
+        if temp_K < float(fp.hcci_start_temperature_min_by_vol_K[cyl_idx]) or pressure_Pa < float(fp.hcci_start_pressure_min_by_vol_Pa[cyl_idx]):
+            continue
+        afr = float(bundle.combustion_afr_stoich_by_vol[cyl_idx]) if getattr(bundle, 'combustion_afr_stoich_by_vol', None) is not None and cyl_idx < int(bundle.combustion_afr_stoich_by_vol.shape[0]) else float(getattr(fp, 'combustion_afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5)
+        tau_s = _hcci_ignition_delay_s(
+            fp,
+            cyl_idx,
+            stage='cool',
+            pressure_Pa=pressure_Pa,
+            temp_K=temp_K,
+            volume_m3=volume,
+            mass_kg=mass,
+            air_mass_kg=air_mass,
+            burned_mass_kg=burned_mass,
+            fuel_mass_kg=fuel_mass,
+            afr_stoich=afr,
+        )
+        cool_integral += dt_s / max(tau_s, 1.0e-12)
+        if cool_integral >= 1.0:
+            cf_energy_J, cf_duration_s, cf_peak_delay_s, cf_qdot_peak_W = _compute_dynamic_cool_flame(
+                bundle, cyl_idx, pressure_Pa, temp_K, air_mass, fuel_mass, burned_mass, mass, afr, q_total_J
+            )
+            cool_integral = 0.0
+            cool_done = True
+            if cf_energy_J > 0.0 and cf_duration_s > 0.0:
+                active = True
+                cf_time_s = t_k
+                cf_end_s = t_k + cf_duration_s
+                cf_time_hist[k] = cf_time_s
+                cf_energy_hist[k] = cf_energy_J
+                cf_active_hist[k] = 1.0
+                cf_duration_hist[k] = cf_duration_s
+                cf_peak_delay_hist[k] = cf_peak_delay_s
+                cf_qdot_peak_hist[k] = cf_qdot_peak_W
+    return cf_time_hist, cf_energy_hist, cf_active_hist, cf_duration_hist, cf_peak_delay_hist, cf_qdot_peak_hist
 
 
 def _cylinder_slot_area_sum_m2(bundle, x_m: float, cylinder_idx: int | None = None) -> float:
