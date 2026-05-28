@@ -210,3 +210,17 @@ class FeatureCol(IntEnum):
     COMBUSTION = 2
     EVAPORATION = 3
     PV_WORK = 4
+
+
+class WallTemperatureCol(IntEnum):
+    AREA = 0
+    CONDUCTANCE = 1
+    COOLANT_TEMP = 2
+    RELAXATION = 3
+    ENABLED = 4
+
+
+class WallTemperatureZone(IntEnum):
+    CYLINDER = 0
+    HEAD = 1
+    PISTON = 2

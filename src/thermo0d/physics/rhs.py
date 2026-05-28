@@ -33,6 +33,8 @@ from thermo0d.config.constants import (
     VolumeCol,
     VolumeType,
     WallCol,
+    WallTemperatureCol,
+    WallTemperatureZone,
 )
 from thermo0d.physics.flow import de_st_venant_wantzel_signed, interpolate_piecewise
 from thermo0d.physics.thermo import safe_pressure_from_ideal_gas, safe_temperature_from_state
@@ -84,6 +86,10 @@ W_C2 = int(WallCol.C2)
 W_C3 = int(WallCol.C3)
 W_TEMP = int(WallCol.WALL_TEMP)
 W_AREA = int(WallCol.WALL_AREA)
+
+WT_AREA = int(WallTemperatureCol.AREA)
+WT_ENABLED = int(WallTemperatureCol.ENABLED)
+WT_ZONE_COUNT = len(WallTemperatureZone)
 
 B_START = int(CombCol.START_DEG)
 B_DURATION = int(CombCol.DURATION_DEG)
@@ -372,6 +378,9 @@ def rhs_thermo_numba(
     feature_flags: np.ndarray,
     wall_bore_by_vol: np.ndarray,
     wall_ups_by_vol: np.ndarray,
+    wall_temperature_enabled: int,
+    wall_temperature_state_index_by_vol: np.ndarray,
+    wall_temperature_params_by_vol: np.ndarray,
     environment_is_fixed: np.ndarray,
     environment_pressures_pa: np.ndarray,
     environment_temperatures_K: np.ndarray,
@@ -400,6 +409,29 @@ def rhs_thermo_numba(
 
     n_vol = vol_matrix.shape[0]
     dy = np.zeros_like(y)
+    wall_temp_eff_by_vol = np.empty(0, dtype=np.float64)
+    wall_area_eff_by_vol = np.empty(0, dtype=np.float64)
+    if wall_temperature_enabled == 1:
+        wall_temp_eff_by_vol = np.zeros(n_vol, dtype=np.float64)
+        wall_area_eff_by_vol = np.zeros(n_vol, dtype=np.float64)
+        for i in range(n_vol):
+            wall_row_idx = int(vol_matrix[i, V_WALL])
+            if wall_row_idx >= 0 and wall_row_idx < wall_matrix.shape[0]:
+                wall_temp_eff_by_vol[i] = wall_matrix[wall_row_idx, W_TEMP]
+                wall_area_eff_by_vol[i] = wall_matrix[wall_row_idx, W_AREA]
+            if wall_temperature_state_index_by_vol.shape[0] > i:
+                if wall_row_idx >= 0 and wall_row_idx < wall_matrix.shape[0]:
+                    total_area = 0.0
+                    weighted_temp = 0.0
+                    for zone in range(WT_ZONE_COUNT):
+                        wall_state_idx = int(wall_temperature_state_index_by_vol[i, zone])
+                        if wall_state_idx >= 0 and wall_temperature_params_by_vol[i, zone, WT_ENABLED] > 0.5:
+                            area = wall_temperature_params_by_vol[i, zone, WT_AREA]
+                            total_area += area
+                            weighted_temp += area * y[wall_state_idx]
+                    if total_area > 1.0e-18:
+                        wall_area_eff_by_vol[i] = total_area
+                        wall_temp_eff_by_vol[i] = weighted_temp / total_area
     pressures = np.zeros(n_vol, dtype=np.float64)
     temperatures = np.zeros(n_vol, dtype=np.float64)
     volumes = np.zeros(n_vol, dtype=np.float64)
@@ -617,7 +649,7 @@ def rhs_thermo_numba(
         theta_deg = theta_deg_by_vol[i]
         dtheta_dt_deg_s = dtheta_dt_by_vol[i]
         cycle_deg = cycle_deg_by_vol[i]
-        pdv_power, qdot_wall, _htc_wall, _wall_velocity, qdot_comb, qdot_evap = volume_energy_source_terms(
+        pdv_power, qdot_wall, htc_wall, _wall_velocity, qdot_comb, qdot_evap = volume_energy_source_terms(
             vol_type,
             int(vol_row[V_WALL]),
             int(vol_row[V_COMB]),
@@ -643,6 +675,8 @@ def rhs_thermo_numba(
             dtheta_dt_deg_s,
             cycle_deg,
         )
+        if wall_temperature_enabled == 1 and enable_wall and int(vol_row[V_WALL]) >= 0 and wall_area_eff_by_vol[i] > 0.0:
+            qdot_wall = htc_wall * wall_area_eff_by_vol[i] * (wall_temp_eff_by_vol[i] - temperatures[i])
         dy[energy_idx] = dy[energy_idx] - pdv_power + qdot_wall + qdot_comb - qdot_evap
 
         evap_idx = int(vol_row[V_EVAP])
@@ -910,6 +944,17 @@ class RHSWrapper:
         self._environment_temperatures_K = bundle.environment_temperatures_K if bundle.environment_temperatures_K is not None else np.zeros(bundle.vol_matrix.shape[0], dtype=np.float64)
         self._combustion_fuel_mass_by_vol = bundle.combustion_fuel_mass_by_vol if getattr(bundle, 'combustion_fuel_mass_by_vol', None) is not None else np.zeros(bundle.vol_matrix.shape[0], dtype=np.float64)
         self._combustion_afr_stoich_by_vol = bundle.combustion_afr_stoich_by_vol if getattr(bundle, 'combustion_afr_stoich_by_vol', None) is not None else np.full(bundle.vol_matrix.shape[0], 14.5, dtype=np.float64)
+        self._wall_temperature_state_index_by_vol = (
+            bundle.wall_temperature_state_index_by_vol
+            if getattr(bundle, 'wall_temperature_state_index_by_vol', None) is not None
+            else np.full((bundle.vol_matrix.shape[0], WT_ZONE_COUNT), -1, dtype=np.int64)
+        )
+        self._wall_temperature_params_by_vol = (
+            bundle.wall_temperature_params_by_vol
+            if getattr(bundle, 'wall_temperature_params_by_vol', None) is not None
+            else np.zeros((bundle.vol_matrix.shape[0], WT_ZONE_COUNT, len(WallTemperatureCol)), dtype=np.float64)
+        )
+        self._wall_temperature_enabled = 1 if bool(getattr(bundle, 'wall_temperature_enabled', False)) else 0
 
     def __call__(self, t: float, y: np.ndarray) -> np.ndarray:
         b = self.bundle
@@ -929,6 +974,9 @@ class RHSWrapper:
             b.feature_flags,
             self._wall_bore_by_vol,
             self._wall_ups_by_vol,
+            self._wall_temperature_enabled,
+            self._wall_temperature_state_index_by_vol,
+            self._wall_temperature_params_by_vol,
             self._environment_is_fixed,
             self._environment_pressures_pa,
             self._environment_temperatures_K,
@@ -955,6 +1003,9 @@ class RHSWrapper:
             self._feature_flags_nonflow,
             self._wall_bore_by_vol,
             self._wall_ups_by_vol,
+            self._wall_temperature_enabled,
+            self._wall_temperature_state_index_by_vol,
+            self._wall_temperature_params_by_vol,
             self._environment_is_fixed,
             self._environment_pressures_pa,
             self._environment_temperatures_K,

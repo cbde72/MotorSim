@@ -148,6 +148,9 @@ def resolve_preprocessing_submodel_references(config_data: Mapping[str, Any] | N
         submodels = {}
     volume_library = submodels.get("volumes") if isinstance(submodels.get("volumes"), Mapping) else {}
     wall_heat_library = submodels.get("wall_heat") if isinstance(submodels.get("wall_heat"), Mapping) else {}
+    if isinstance(submodels, dict) and "wall_temperatur" in submodels and "wall_temperature" not in submodels:
+        submodels["wall_temperature"] = submodels.pop("wall_temperatur")
+    wall_temperature_library = submodels.get("wall_temperature") if isinstance(submodels.get("wall_temperature"), Mapping) else {}
     combustion_library = submodels.get("combustion") if isinstance(submodels.get("combustion"), Mapping) else {}
     connection_library = submodels.get("connections") if isinstance(submodels.get("connections"), Mapping) else {}
     volumes = preprocessing.get("volumes")
@@ -181,6 +184,19 @@ def resolve_preprocessing_submodel_references(config_data: Mapping[str, Any] | N
                     legacy_ref=legacy_wall_heat_ref,
                     context=f"preprocessing.volumes[{index}] {vol_name}.wall_heat",
                 )
+            if "wall_temperatur" in volume and "wall_temperature" not in volume:
+                volume["wall_temperature"] = volume.pop("wall_temperatur")
+            wall_temperature_config = volume.get("wall_temperature")
+            wall_temperature_ref_present = isinstance(wall_temperature_config, Mapping) and ("ref" in wall_temperature_config or "reference" in wall_temperature_config)
+            legacy_wall_temperature_ref = volume.pop("wall_temperature_ref", None)
+            legacy_wall_temperatur_ref = volume.pop("wall_temperatur_ref", None)
+            if wall_temperature_ref_present or legacy_wall_temperature_ref is not None or legacy_wall_temperatur_ref is not None:
+                volume["wall_temperature"] = _resolve_submodel_reference(
+                    library=wall_temperature_library,
+                    local_config=wall_temperature_config,
+                    legacy_ref=legacy_wall_temperature_ref if legacy_wall_temperature_ref is not None else legacy_wall_temperatur_ref,
+                    context=f"preprocessing.volumes[{index}] {vol_name}.wall_temperature",
+                )
             combustion_config = volume.get("combustion")
             combustion_ref_present = isinstance(combustion_config, Mapping) and ("ref" in combustion_config or "reference" in combustion_config)
             legacy_combustion_ref = volume.pop("combustion_ref", None)
@@ -209,6 +225,17 @@ def resolve_preprocessing_submodel_references(config_data: Mapping[str, Any] | N
     return out
 
 
+def _rename_cool_flame_burn_model_values(value: Any) -> None:
+    if isinstance(value, dict):
+        if value.get("cool_flame_burn_model") == "beck-vibe_CF":
+            value["cool_flame_burn_model"] = "vibe-beck_CF"
+        for child in value.values():
+            _rename_cool_flame_burn_model_values(child)
+    elif isinstance(value, list):
+        for child in value:
+            _rename_cool_flame_burn_model_values(child)
+
+
 def migrate_config_data(config_data: Mapping[str, Any] | None) -> dict[str, Any]:
     """Migrate older config dicts to the current schema in memory.
 
@@ -217,6 +244,7 @@ def migrate_config_data(config_data: Mapping[str, Any] | None) -> dict[str, Any]
     """
     previous_schema = config_schema_version_from_document(config_data)
     out = _deepcopy_mapping(config_data)
+    _rename_cool_flame_burn_model_values(out)
 
     out.setdefault("modeling", {"architecture": "classic"})
 
@@ -339,7 +367,7 @@ def normalize_config_data(config_data: Mapping[str, Any] | None) -> dict[str, An
     pre = out.setdefault("preprocessing", {})
     pre.setdefault("gas_properties", {"cp_J_per_kgK": 1005.0, "cv_J_per_kgK": 718.0, "R_J_per_kgK": 287.0, "thermo_model": "constant"})
     pre.setdefault("features", {"mass_flow": True, "wall_heat": False, "combustion": False, "evaporation": False, "pv_work": True})
-    pre.setdefault("submodels", {"volumes": {}, "wall_heat": {}, "combustion": {}, "connections": {}})
+    pre.setdefault("submodels", {"volumes": {}, "wall_heat": {}, "wall_temperature": {}, "combustion": {}, "connections": {}})
     pre.setdefault("engine", {"cycle_type": "4t", "speed_rpm": 3000.0})
     pre.setdefault("volumes", [])
     pre.setdefault("connections", [])

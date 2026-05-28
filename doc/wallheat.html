@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dynamisches Wandtemperaturmodell</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --paper: #ffffff;
+      --ink: #17212b;
+      --muted: #5d6875;
+      --line: #d9dee6;
+      --accent: #1f6f8b;
+      --accent-soft: #e4f2f7;
+      --code: #eef1f5;
+      --warn: #fff4df;
+      --warn-line: #e0b45d;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.58;
+    }
+
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 40px 22px 64px;
+    }
+
+    header {
+      padding: 34px 0 28px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 38px 0 14px;
+      font-size: 1.45rem;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 1.1rem;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    ul {
+      margin: 0 0 16px 1.3rem;
+      padding: 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      padding: 0.12rem 0.28rem;
+      border-radius: 4px;
+      background: var(--code);
+      font-family: Consolas, "Liberation Mono", monospace;
+      font-size: 0.94em;
+    }
+
+    .lead {
+      max-width: 780px;
+      color: var(--muted);
+      font-size: 1.1rem;
+    }
+
+    .paper {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 26px;
+      margin: 22px 0;
+      box-shadow: 0 10px 24px rgba(23, 33, 43, 0.06);
+    }
+
+    .formula {
+      overflow-x: auto;
+      margin: 18px 0;
+      padding: 18px;
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      border-radius: 0 8px 8px 0;
+    }
+
+    math {
+      font-size: 1.12rem;
+    }
+
+    .note {
+      margin: 18px 0;
+      padding: 14px 16px;
+      border-left: 4px solid var(--warn-line);
+      background: var(--warn);
+      border-radius: 0 8px 8px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 24px;
+      background: var(--paper);
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #edf0f4;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 680px) {
+      main {
+        padding: 24px 14px 44px;
+      }
+
+      .paper {
+        padding: 18px;
+      }
+
+      th,
+      td {
+        padding: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Dynamisches Wandtemperaturmodell</h1>
+      <p class="lead">
+        Vorschlag fuer ein Wandtemperaturmodell, bei dem sich die Wandtemperatur nicht als feste Randbedingung,
+        sondern aus einer Waermebilanz automatisch einstellt.
+      </p>
+    </header>
+
+    <section class="paper">
+      <h2>1. Grundidee</h2>
+      <p>
+        In vielen einfachen Motormodellen wird die Wandtemperatur als konstanter Wert vorgegeben, zum Beispiel
+        <code>T_wall = 450 K</code>. Das ist numerisch einfach, aber physikalisch unbefriedigend: Die Wand kann sich
+        dadurch nicht auf Last, Drehzahl, Verbrennung, Kuehlung oder Einschwingvorgaenge einstellen.
+      </p>
+      <p>
+        Besser ist es, die Wand als thermischen Speicher zu modellieren. Die Wand besitzt eine effektive
+        Waermekapazitaet. Wenn mehr Waerme vom Gas in die Wand gelangt als ueber Kuehlung und Umgebung abgefuehrt wird,
+        steigt die Wandtemperatur. Wird mehr Waerme abgefuehrt als zugefuehrt, sinkt sie.
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <msub><mi>C</mi><mtext>wall</mtext></msub>
+            <mo>&InvisibleTimes;</mo>
+            <mfrac>
+              <mrow><mi>d</mi><msub><mi>T</mi><mtext>wall</mtext></msub></mrow>
+              <mrow><mi>d</mi><mi>t</mi></mrow>
+            </mfrac>
+            <mo>=</mo>
+            <msub><mover><mi>Q</mi><mo>.</mo></mover><mtext>gas-wall</mtext></msub>
+            <mo>-</mo>
+            <msub><mover><mi>Q</mi><mo>.</mo></mover><mtext>cool</mtext></msub>
+            <mo>-</mo>
+            <msub><mover><mi>Q</mi><mo>.</mo></mover><mtext>amb</mtext></msub>
+          </mrow>
+        </math>
+      </div>
+
+      <p>
+        Dabei ist <code>C_wall</code> die effektive Waermekapazitaet der Wand. Sie ist das Produkt aus effektiver
+        Wandmasse und spezifischer Waermekapazitaet.
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <msub><mi>C</mi><mtext>wall</mtext></msub>
+            <mo>=</mo>
+            <msub><mi>m</mi><mtext>wall</mtext></msub>
+            <mo>&InvisibleTimes;</mo>
+            <msub><mi>c</mi><mtext>wall</mtext></msub>
+          </mrow>
+        </math>
+      </div>
+    </section>
+
+    <section class="paper">
+      <h2>2. Waermeuebergang vom Gas zur Wand</h2>
+      <p>
+        Der Waermestrom vom Brennraumgas zur Wand kann mit einem Newtonschen Waermeuebergang beschrieben werden.
+        Entscheidend ist die Temperaturdifferenz zwischen Gas und Wand sowie der Waermeuebergangskoeffizient
+        <code>h_gas</code>.
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <msub><mover><mi>Q</mi><mo>.</mo></mover><mtext>gas-wall</mtext></msub>
+            <mo>=</mo>
+            <msub><mi>h</mi><mtext>gas</mtext></msub>
+            <mo>&InvisibleTimes;</mo>
+            <msub><mi>A</mi><mtext>wall</mtext></msub>
+            <mo>&InvisibleTimes;</mo>
+            <mfenced>
+              <mrow>
+                <msub><mi>T</mi><mtext>gas</mtext></msub>
+                <mo>-</mo>
+                <msub><mi>T</mi><mtext>wall</mtext></msub>
+              </mrow>
+            </mfenced>
+          </mrow>
+        </math>
+      </div>
+
+      <p>
+        Ist das Gas heisser als die Wand, ist dieser Waermestrom positiv und heizt die Wand auf. Ist die Wand
+        heisser als das Gas, kann der Term auch negativ werden. Dann gibt die Wand Waerme an das Gas zurueck,
+        zum Beispiel waehrend der Ansaug- oder Verdichtungsphase bei niedriger Gastemperatur.
+      </p>
+
+      <h3>Moegliche Wahl fuer <code>h_gas</code></h3>
+      <p>
+        Fuer einen ersten stabilen Ansatz kann <code>h_gas</code> konstant gewaehlt werden. Spaeter kann man ihn
+        durch eine Korrelation ersetzen, zum Beispiel Woschni, Hohenberg oder eine eigene empirische Funktion.
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <msub><mi>h</mi><mtext>gas</mtext></msub>
+            <mo>=</mo>
+            <msub><mi>h</mi><mtext>gas,0</mtext></msub>
+          </mrow>
+        </math>
+      </div>
+
+      <p>
+        Eine einfache dynamische Erweiterung waere eine Abhaengigkeit von Druck und Temperatur:
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <msub><mi>h</mi><mtext>gas</mtext></msub>
+            <mo>=</mo>
+            <msub><mi>h</mi><mtext>ref</mtext></msub>
+            <mo>&InvisibleTimes;</mo>
+            <msup>
+              <mfenced>
+                <mfrac>
+                  <msub><mi>p</mi><mtext>gas</mtext></msub>
+                  <msub><mi>p</mi><mtext>ref</mtext></msub>
+                </mfrac>
+              </mfenced>
+              <mi>a</mi>
+            </msup>
+            <mo>&InvisibleTimes;</mo>
+            <msup>
+              <mfenced>
+                <mfrac>
+                  <msub><mi>T</mi><mtext>gas</mtext></msub>
+                  <msub><mi>T</mi><mtext>ref</mtext></msub>
+                </mfrac>
+              </mfenced>
+              <mi>b</mi>
+            </msup>
+          </mrow>
+        </math>
+      </div>
+    </section>
+
+    <section class="paper">
+      <h2>3. Waermeabgabe an Kuehlmittel</h2>
+      <p>
+        Die Wand gibt Waerme an ein Kuehlmedium ab. Das kann Wasser, Oel, Luft oder in einem sehr einfachen Modell
+        eine fest vorgegebene Umgebungstemperatur sein. Auch hier reicht fuer den Anfang ein Newtonscher Ansatz.
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <msub><mover><mi>Q</mi><mo>.</mo></mover><mtext>cool</mtext></msub>
+            <mo>=</mo>
+            <msub><mi>h</mi><mtext>cool</mtext></msub>
+            <mo>&InvisibleTimes;</mo>
+            <msub><mi>A</mi><mtext>cool</mtext></msub>
+            <mo>&InvisibleTimes;</mo>
+            <mfenced>
+              <mrow>
+                <msub><mi>T</mi><mtext>wall</mtext></msub>
+                <mo>-</mo>
+                <msub><mi>T</mi><mtext>cool</mtext></msub>
+              </mrow>
+            </mfenced>
+          </mrow>
+        </math>
+      </div>
+
+      <p>
+        Dieser Term ist positiv, wenn die Wand waermer als das Kuehlmittel ist. Er wird in der Wandbilanz deshalb
+        abgezogen.
+      </p>
+    </section>
+
+    <section class="paper">
+      <h2>4. Optionale Waermeabgabe an Umgebung</h2>
+      <p>
+        Wenn das Modell einen Zylinder, einen Zylinderkopf oder ein Gehaeuse mit Kontakt zur Umgebung beschreibt,
+        kann zusaetzlich ein Waermeverlust an die Umgebung modelliert werden. Fuer ein erstes Brennraummodell ist
+        dieser Term optional.
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <msub><mover><mi>Q</mi><mo>.</mo></mover><mtext>amb</mtext></msub>
+            <mo>=</mo>
+            <msub><mi>h</mi><mtext>amb</mtext></msub>
+            <mo>&InvisibleTimes;</mo>
+            <msub><mi>A</mi><mtext>amb</mtext></msub>
+            <mo>&InvisibleTimes;</mo>
+            <mfenced>
+              <mrow>
+                <msub><mi>T</mi><mtext>wall</mtext></msub>
+                <mo>-</mo>
+                <msub><mi>T</mi><mtext>amb</mtext></msub>
+              </mrow>
+            </mfenced>
+          </mrow>
+        </math>
+      </div>
+    </section>
+
+    <section class="paper">
+      <h2>5. Empfohlenes Minimalmodell</h2>
+      <p>
+        Fuer deine Simulation wuerde ich mit einem Ein-Knoten-Wandmodell starten. Es besitzt genau eine dynamische
+        Wandtemperatur <code>T_wall</code>. Diese Temperatur repraesentiert eine gemittelte thermische Temperatur
+        der relevanten Brennraumwand.
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <mfrac>
+              <mrow><mi>d</mi><msub><mi>T</mi><mtext>wall</mtext></msub></mrow>
+              <mrow><mi>d</mi><mi>t</mi></mrow>
+            </mfrac>
+            <mo>=</mo>
+            <mfrac>
+              <mrow>
+                <msub><mi>h</mi><mtext>gas</mtext></msub>
+                <msub><mi>A</mi><mtext>wall</mtext></msub>
+                <mfenced>
+                  <mrow>
+                    <msub><mi>T</mi><mtext>gas</mtext></msub>
+                    <mo>-</mo>
+                    <msub><mi>T</mi><mtext>wall</mtext></msub>
+                  </mrow>
+                </mfenced>
+                <mo>-</mo>
+                <msub><mi>h</mi><mtext>cool</mtext></msub>
+                <msub><mi>A</mi><mtext>cool</mtext></msub>
+                <mfenced>
+                  <mrow>
+                    <msub><mi>T</mi><mtext>wall</mtext></msub>
+                    <mo>-</mo>
+                    <msub><mi>T</mi><mtext>cool</mtext></msub>
+                  </mrow>
+                </mfenced>
+              </mrow>
+              <msub><mi>C</mi><mtext>wall</mtext></msub>
+            </mfrac>
+          </mrow>
+        </math>
+      </div>
+
+      <p>
+        Dieses Modell ist klein genug, um gut in einen vorhandenen ODE-Zustandsvektor aufgenommen zu werden.
+        Gleichzeitig ist es schon deutlich besser als eine konstante Wandtemperatur, weil die Wandtemperatur auf
+        die Betriebsbedingungen reagiert.
+      </p>
+
+      <div class="note">
+        <strong>Praktischer Hinweis:</strong>
+        Die Wandtemperatur ist meist traeger als Druck, Gastemperatur oder Kolbenbewegung. Deshalb sollte
+        <code>C_wall</code> nicht zu klein gewaehlt werden, sonst folgt die Wand unrealistisch schnell jeder
+        einzelnen Verbrennungsspitze.
+      </div>
+    </section>
+
+    <section class="paper">
+      <h2>6. Stationaere Gleichgewichtstemperatur</h2>
+      <p>
+        Die Wandtemperatur stellt sich automatisch ein, wenn die zeitliche Aenderung im Mittel verschwindet.
+        Im einfachsten stationaeren Fall gilt:
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <mfrac>
+              <mrow><mi>d</mi><msub><mi>T</mi><mtext>wall</mtext></msub></mrow>
+              <mrow><mi>d</mi><mi>t</mi></mrow>
+            </mfrac>
+            <mo>=</mo>
+            <mn>0</mn>
+          </mrow>
+        </math>
+      </div>
+
+      <p>
+        Ohne Umgebungsterm folgt daraus:
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <msub><mi>h</mi><mtext>gas</mtext></msub>
+            <msub><mi>A</mi><mtext>wall</mtext></msub>
+            <mfenced>
+              <mrow>
+                <msub><mi>T</mi><mtext>gas</mtext></msub>
+                <mo>-</mo>
+                <msub><mi>T</mi><mtext>wall</mtext></msub>
+              </mrow>
+            </mfenced>
+            <mo>=</mo>
+            <msub><mi>h</mi><mtext>cool</mtext></msub>
+            <msub><mi>A</mi><mtext>cool</mtext></msub>
+            <mfenced>
+              <mrow>
+                <msub><mi>T</mi><mtext>wall</mtext></msub>
+                <mo>-</mo>
+                <msub><mi>T</mi><mtext>cool</mtext></msub>
+              </mrow>
+            </mfenced>
+          </mrow>
+        </math>
+      </div>
+
+      <p>
+        Aufgeloest nach der stationaeren Wandtemperatur:
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <msub><mi>T</mi><mtext>wall,ss</mtext></msub>
+            <mo>=</mo>
+            <mfrac>
+              <mrow>
+                <msub><mi>h</mi><mtext>gas</mtext></msub>
+                <msub><mi>A</mi><mtext>wall</mtext></msub>
+                <msub><mi>T</mi><mtext>gas</mtext></msub>
+                <mo>+</mo>
+                <msub><mi>h</mi><mtext>cool</mtext></msub>
+                <msub><mi>A</mi><mtext>cool</mtext></msub>
+                <msub><mi>T</mi><mtext>cool</mtext></msub>
+              </mrow>
+              <mrow>
+                <msub><mi>h</mi><mtext>gas</mtext></msub>
+                <msub><mi>A</mi><mtext>wall</mtext></msub>
+                <mo>+</mo>
+                <msub><mi>h</mi><mtext>cool</mtext></msub>
+                <msub><mi>A</mi><mtext>cool</mtext></msub>
+              </mrow>
+            </mfrac>
+          </mrow>
+        </math>
+      </div>
+
+      <p>
+        Diese Gleichung zeigt anschaulich: Die stationaere Wandtemperatur liegt zwischen Gastemperatur und
+        Kuehlmitteltemperatur. Je staerker die Gasseite gekoppelt ist, desto naeher liegt sie an der Gastemperatur.
+        Je staerker die Kuehlung ist, desto naeher liegt sie an der Kuehlmitteltemperatur.
+      </p>
+    </section>
+
+    <section class="paper">
+      <h2>7. Bedeutung der Parameter</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Bedeutung</th>
+            <th>Einheit</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>T_wall</code></td>
+            <td>Dynamische Wandtemperatur</td>
+            <td>K</td>
+          </tr>
+          <tr>
+            <td><code>T_gas</code></td>
+            <td>Momentane Gastemperatur im Brennraum</td>
+            <td>K</td>
+          </tr>
+          <tr>
+            <td><code>T_cool</code></td>
+            <td>Kuehlmitteltemperatur oder effektive Umgebungstemperatur der Rueckseite</td>
+            <td>K</td>
+          </tr>
+          <tr>
+            <td><code>C_wall</code></td>
+            <td>Effektive Waermekapazitaet der Wand</td>
+            <td>J/K</td>
+          </tr>
+          <tr>
+            <td><code>h_gas</code></td>
+            <td>Waermeuebergangskoeffizient Gas zu Wand</td>
+            <td>W/(m^2 K)</td>
+          </tr>
+          <tr>
+            <td><code>h_cool</code></td>
+            <td>Waermeuebergangskoeffizient Wand zu Kuehlmittel</td>
+            <td>W/(m^2 K)</td>
+          </tr>
+          <tr>
+            <td><code>A_wall</code></td>
+            <td>Waermeuebertragende Flaeche auf der Gasseite</td>
+            <td>m^2</td>
+          </tr>
+          <tr>
+            <td><code>A_cool</code></td>
+            <td>Waermeuebertragende Flaeche auf der Kuehlseite</td>
+            <td>m^2</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="paper">
+      <h2>8. Einbindung in eine Motorsimulation</h2>
+      <p>
+        In einem 0D-Motormodell wird <code>T_wall</code> als zusaetzlicher Zustand integriert. Der Zustandsvektor
+        enthaelt dann nicht nur Gasmasse, Energie, Druck oder Kolbenzustand, sondern auch die Wandtemperatur.
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <mi>y</mi>
+            <mo>=</mo>
+            <mfenced open="[" close="]">
+              <mrow>
+                <mi>...</mi>
+                <mo>,</mo>
+                <msub><mi>T</mi><mtext>wall</mtext></msub>
+              </mrow>
+            </mfenced>
+          </mrow>
+        </math>
+      </div>
+
+      <p>
+        In der rechten Seite der Differentialgleichungen wird zuerst der Waermestrom berechnet. Dieser Waermestrom
+        beeinflusst dann zwei Dinge:
+      </p>
+      <ul>
+        <li>Die Gasenergie verliert oder gewinnt Waerme ueber <code>Q_dot_gas-wall</code>.</li>
+        <li>Die Wandtemperatur aendert sich ueber die Wandbilanz.</li>
+      </ul>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <msub><mover><mi>Q</mi><mo>.</mo></mover><mtext>gas</mtext></msub>
+            <mo>=</mo>
+            <mo>-</mo>
+            <msub><mover><mi>Q</mi><mo>.</mo></mover><mtext>gas-wall</mtext></msub>
+          </mrow>
+        </math>
+      </div>
+
+      <p>
+        Damit bleibt die Energieflussrichtung konsistent: Was das Gas an die Wand verliert, taucht als Zufluss in
+        der Wandbilanz auf.
+      </p>
+    </section>
+
+    <section class="paper">
+      <h2>9. Erweiterung auf mehrere Wandzonen</h2>
+      <p>
+        Das Ein-Knoten-Modell ist der beste Startpunkt. Wenn mehr Genauigkeit noetig ist, kann man die Wand in
+        mehrere Zonen aufteilen:
+      </p>
+      <ul>
+        <li><code>T_wall_head</code> fuer den Zylinderkopf</li>
+        <li><code>T_wall_liner</code> fuer die Zylinderlaufbahn</li>
+        <li><code>T_wall_piston</code> fuer den Kolbenboden</li>
+      </ul>
+      <p>
+        Jede Zone bekommt eigene Flaechen, Waermekapazitaeten und Kuehlanbindungen. Die Struktur bleibt gleich,
+        nur die Bilanz wird pro Wandzone separat geschrieben.
+      </p>
+
+      <div class="formula">
+        <math display="block">
+          <mrow>
+            <msub><mi>C</mi><mi>i</mi></msub>
+            <mo>&InvisibleTimes;</mo>
+            <mfrac>
+              <mrow><mi>d</mi><msub><mi>T</mi><mi>i</mi></msub></mrow>
+              <mrow><mi>d</mi><mi>t</mi></mrow>
+            </mfrac>
+            <mo>=</mo>
+            <msub><mi>h</mi><mtext>gas,i</mtext></msub>
+            <msub><mi>A</mi><mtext>gas,i</mtext></msub>
+            <mfenced>
+              <mrow>
+                <msub><mi>T</mi><mtext>gas</mtext></msub>
+                <mo>-</mo>
+                <msub><mi>T</mi><mi>i</mi></msub>
+              </mrow>
+            </mfenced>
+            <mo>-</mo>
+            <msub><mi>h</mi><mtext>cool,i</mtext></msub>
+            <msub><mi>A</mi><mtext>cool,i</mtext></msub>
+            <mfenced>
+              <mrow>
+                <msub><mi>T</mi><mi>i</mi></msub>
+                <mo>-</mo>
+                <msub><mi>T</mi><mtext>cool</mtext></msub>
+              </mrow>
+            </mfenced>
+          </mrow>
+        </math>
+      </div>
+
+      <p class="small">
+        Der Index <code>i</code> steht hier fuer eine Wandzone, zum Beispiel Kopf, Laufbahn oder Kolben.
+      </p>
+    </section>
+
+    <section class="paper">
+      <h2>10. Empfehlung</h2>
+      <p>
+        Fuer die erste Implementierung empfehle ich:
+      </p>
+      <ul>
+        <li>Eine einzige dynamische Wandtemperatur <code>T_wall</code>.</li>
+        <li>Konstante Startwerte fuer <code>h_gas</code>, <code>h_cool</code>, <code>A_wall</code> und <code>C_wall</code>.</li>
+        <li><code>T_cool</code> als vorgegebene Kuehlmitteltemperatur.</li>
+        <li>Nach mehreren Motorzyklen pruefen, ob sich <code>T_wall</code> zyklisch einschwingt.</li>
+      </ul>
+      <p>
+        Danach kann man das Modell schrittweise verbessern, ohne die Grundstruktur zu aendern: erst
+        <code>h_gas</code> dynamisch machen, dann mehrere Wandzonen einfuehren, danach optional ein eigenes
+        Kuehlmittelmodell ergaenzen.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

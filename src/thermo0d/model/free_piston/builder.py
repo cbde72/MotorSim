@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 
 from thermo0d.compute.jacobian import build_rhs_jacobian_sparsity, greedy_color_columns
-from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, CombStartMode, CombustionModel, ConnCol, ConnectionType, CycleType, EvapCol, HeatTransferModel, VolumeCol, VolumeType, WallCol, WallRefCol
-from thermo0d.config.models import BounceChamberVolumeConfig, CylinderVolumeConfig, DisabledSubmodelConfig, EnvironmentVolumeConfig, HcciDieselCombustionConfig, PlenumVolumeConfig, VibeCombustionConfig, WoschniHeatTransferConfig
+from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, CombStartMode, CombustionModel, ConnCol, ConnectionType, CycleType, EvapCol, HeatTransferModel, VolumeCol, VolumeType, WallCol, WallRefCol, WallTemperatureCol, WallTemperatureZone
+from thermo0d.config.models import BounceChamberVolumeConfig, CycleAverageWallTemperatureConfig, CylinderVolumeConfig, DisabledSubmodelConfig, EnvironmentVolumeConfig, HcciDieselCombustionConfig, PlenumVolumeConfig, VibeCombustionConfig, WoschniHeatTransferConfig
 from thermo0d.core.model_bundle import FreePistonModelData, ModelBundle
 from thermo0d.model.free_piston.combustion_latch import bootstrap_free_piston_combustion_latch
 from thermo0d.core.state_layout import StateLayout
@@ -43,6 +43,14 @@ def _initial_cylinder_burned_fraction_0to1(fp, cylinder_vol: CylinderVolumeConfi
     else:
         value = float(getattr(cylinder_vol, "initial_burned_fraction_0to1", 0.0) or 0.0)
     return min(max(value, 0.0), 1.0)
+
+
+def _wall_temperature_zones(cfg: CycleAverageWallTemperatureConfig):
+    return (
+        (WallTemperatureZone.CYLINDER, "cylinder", cfg.cylinder),
+        (WallTemperatureZone.HEAD, "head", cfg.head),
+        (WallTemperatureZone.PISTON, "piston", cfg.piston),
+    )
 
 
 class _ResolvedBounceGeometry:
@@ -714,6 +722,12 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     wall_rows: list[np.ndarray] = []
     wall_ref_rows: list[np.ndarray] = []
     wall_ref_safe_rows: list[np.ndarray] = []
+    n_wall_zones = len(WallTemperatureZone)
+    wall_temperature_state_index_by_vol = np.full((n_vol, n_wall_zones), -1, dtype=np.int64)
+    wall_temperature_average_state_index_by_vol = np.full((n_vol, 2), -1, dtype=np.int64)
+    wall_temperature_params_by_vol = np.zeros((n_vol, n_wall_zones, len(WallTemperatureCol)), dtype=np.float64)
+    wall_temperature_initials: list[tuple[int, str, float]] = []
+    wall_temperature_average_initials: list[tuple[int, str, float]] = []
     for cyl_i in cylinder_indices:
         cyl_cfg_i = cylinder_cfg_by_index.get(int(cyl_i), cylinder_cfg_for_submodels)
         wall_matrix_i, wall_ref_matrix_i, wall_ref_matrix_safe_i, wall_idx_i = _build_free_piston_wall_matrices(
@@ -722,13 +736,53 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             fp,
         )
         if wall_idx_i >= 0 and wall_matrix_i.shape[0] > 0:
+            wall_row = np.asarray(wall_matrix_i[wall_idx_i], dtype=np.float64)
+            if cyl_cfg_i is not None and isinstance(getattr(cyl_cfg_i, "wall_temperature", None), CycleAverageWallTemperatureConfig):
+                wall_temp_cfg = cyl_cfg_i.wall_temperature
+                total_area = 0.0
+                weighted_temp = 0.0
+                base_state_idx = state_layout.total_size + len(wall_temperature_initials) + len(wall_temperature_average_initials)
+                for local_zone_offset, (zone_enum, zone_name, zone_cfg) in enumerate(_wall_temperature_zones(wall_temp_cfg)):
+                    zone = int(zone_enum)
+                    state_idx = base_state_idx + local_zone_offset
+                    wall_temperature_state_index_by_vol[int(cyl_i), zone] = state_idx
+                    wall_temperature_params_by_vol[int(cyl_i), zone, WallTemperatureCol.AREA] = float(zone_cfg.area_m2)
+                    wall_temperature_params_by_vol[int(cyl_i), zone, WallTemperatureCol.CONDUCTANCE] = float(zone_cfg.lambda_W_per_mK) / float(zone_cfg.wall_thickness_m)
+                    wall_temperature_params_by_vol[int(cyl_i), zone, WallTemperatureCol.COOLANT_TEMP] = float(zone_cfg.coolant_temperature_K)
+                    wall_temperature_params_by_vol[int(cyl_i), zone, WallTemperatureCol.RELAXATION] = float(wall_temp_cfg.relaxation)
+                    wall_temperature_params_by_vol[int(cyl_i), zone, WallTemperatureCol.ENABLED] = 1.0
+                    wall_temperature_initials.append((int(cyl_i), str(zone_name), float(zone_cfg.initial_temperature_K)))
+                    total_area += float(zone_cfg.area_m2)
+                    weighted_temp += float(zone_cfg.area_m2) * float(zone_cfg.initial_temperature_K)
+                avg_base_idx = base_state_idx + n_wall_zones
+                wall_temperature_average_state_index_by_vol[int(cyl_i), 0] = avg_base_idx
+                wall_temperature_average_state_index_by_vol[int(cyl_i), 1] = avg_base_idx + 1
+                wall_temperature_average_initials.append((int(cyl_i), "alpha_avg_W_per_m2K", 0.0))
+                wall_temperature_average_initials.append((int(cyl_i), "T_alpha_avg_KW_per_m2K", 0.0))
+                if total_area > 0.0:
+                    wall_row[WallCol.WALL_AREA] = total_area
+                    wall_row[WallCol.WALL_TEMP] = weighted_temp / total_area
             vol_matrix[int(cyl_i), VolumeCol.WALL_ROW] = float(len(wall_rows))
-            wall_rows.append(np.asarray(wall_matrix_i[wall_idx_i], dtype=np.float64))
+            wall_rows.append(wall_row)
             wall_ref_rows.append(np.asarray(wall_ref_matrix_i[0], dtype=np.float64))
             wall_ref_safe_rows.append(np.asarray(wall_ref_matrix_safe_i[0], dtype=np.float64))
     wall_matrix = np.asarray(wall_rows, dtype=np.float64) if wall_rows else np.zeros((0, len(WallCol)), dtype=np.float64)
     wall_ref_matrix = np.asarray(wall_ref_rows, dtype=np.float64) if wall_ref_rows else np.zeros((0, len(WallRefCol)), dtype=np.float64)
     wall_ref_matrix_safe = np.asarray(wall_ref_safe_rows, dtype=np.float64) if wall_ref_safe_rows else np.zeros((1, len(WallRefCol)), dtype=np.float64)
+    wall_temperature_extra_state_count = len(wall_temperature_initials) + len(wall_temperature_average_initials)
+    if wall_temperature_extra_state_count:
+        old_size = y_init.size
+        extra_labels = [f"{volume_names[i]}_wall_{zone_name}_temperature_K" for i, zone_name, _temp in wall_temperature_initials]
+        extra_labels += [f"{volume_names[i]}_wall_temperature_{avg_name}" for i, avg_name, _value in wall_temperature_average_initials]
+        state_layout = state_layout.with_extra_states(extra_labels)
+        y_ext = np.zeros(state_layout.total_size, dtype=np.float64)
+        y_ext[:old_size] = y_init
+        for offset, (_vol_i, _zone_name, temp) in enumerate(wall_temperature_initials):
+            y_ext[old_size + offset] = temp
+        avg_offset0 = old_size + len(wall_temperature_initials)
+        for offset, (_vol_i, _avg_name, value) in enumerate(wall_temperature_average_initials):
+            y_ext[avg_offset0 + offset] = value
+        y_init = y_ext
     comb_matrix = np.zeros((0, len(CombCol)), dtype=np.float64)
     comb_rows: list[np.ndarray] = []
     nominal_stroke_m = float(fp.mechanics.x_max_m) - float(fp.mechanics.x_min_m)
@@ -807,9 +861,9 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             hcci_cool_flame_energy_fraction_by_vol[int(cyl_i)] = float(combustion_cfg_local.cool_flame_energy_fraction)
             hcci_cool_flame_duration_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.cool_flame_duration_ms) * 1.0e-3
             cool_flame_burn_model = str(combustion_cfg_local.cool_flame_burn_model)
-            hcci_cool_flame_burn_model_by_vol[int(cyl_i)] = 1 if cool_flame_burn_model in ("beck-vibe_CF", "vibe-beck") else 0
+            hcci_cool_flame_burn_model_by_vol[int(cyl_i)] = 1 if cool_flame_burn_model in ("vibe-beck_CF", "vibe-beck") else 0
             hcci_cool_flame_a_by_vol[int(cyl_i)] = float(combustion_cfg_local.cool_flame_a)
-            cool_flame_m = 1.7 if cool_flame_burn_model == "beck-vibe_CF" else float(combustion_cfg_local.cool_flame_m)
+            cool_flame_m = 1.7 if cool_flame_burn_model == "vibe-beck_CF" else float(combustion_cfg_local.cool_flame_m)
             hcci_cool_flame_m_by_vol[int(cyl_i)] = float(cool_flame_m)
             hcci_cool_flame_shape_m_by_vol[int(cyl_i)] = float(cool_flame_m)
             
@@ -865,7 +919,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     feature_flags = build_feature_flags(config)
     simulation = build_simulation_options(config, cycle_period_s)
     postprocessing = build_postprocessing_options(config)
-    jac_sparsity = build_rhs_jacobian_sparsity(n_vol, conn_matrix, feature_flags, extra_state_count=2 * mechanical_dofs, dense_extra_coupling=True)
+    jac_sparsity = build_rhs_jacobian_sparsity(n_vol, conn_matrix, feature_flags, extra_state_count=2 * mechanical_dofs + wall_temperature_extra_state_count, dense_extra_coupling=True)
     jac_color_groups = greedy_color_columns(jac_sparsity)
 
     wall_bore_by_vol = np.zeros(n_vol, dtype=np.float64)
@@ -1056,6 +1110,10 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         wall_ref_matrix_safe=wall_ref_matrix_safe,
         wall_bore_by_vol=wall_bore_by_vol,
         wall_ups_by_vol=wall_ups_by_vol,
+        wall_temperature_enabled=bool(wall_temperature_extra_state_count),
+        wall_temperature_state_index_by_vol=wall_temperature_state_index_by_vol,
+        wall_temperature_average_state_index_by_vol=wall_temperature_average_state_index_by_vol,
+        wall_temperature_params_by_vol=wall_temperature_params_by_vol,
         comb_matrix=comb_matrix,
         evap_matrix=evap_matrix,
         lift_table=lift_table,

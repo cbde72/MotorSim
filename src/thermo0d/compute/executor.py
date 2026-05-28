@@ -18,6 +18,7 @@ from thermo0d.compute.solvers import SolverFactory
 from thermo0d.output.console import ConsoleCycleReporter
 from thermo0d.physics.rhs import RHSWrapper
 from thermo0d.model.free_piston.combustion_latch import free_piston_uses_slot_closure_lambda, free_piston_uses_time_vibe, free_piston_uses_vapor_injector, update_free_piston_combustion_latch_state
+from thermo0d.model.wall_temperature import apply_wall_temperature_cycle_update, build_fixed_step_wall_temperature_callback, has_wall_temperature_model, wall_temperature_cycle_period_s
 
 
 @dataclass(slots=True)
@@ -92,13 +93,16 @@ def integrate_prebuilt_system(bundle, rhs, *, enable_cycle_reporting: bool) -> S
     cycle_summary_enabled = bool(getattr(bundle.postprocessing, 'console_cycle_summary_enabled', True)) and bool(enable_cycle_reporting)
     solver_kind = str(bundle.simulation.solver_kind)
 
-    if cycle_summary_enabled and solver_kind.startswith('scipy_'):
+    if solver_kind.startswith('scipy_') and has_wall_temperature_model(bundle) and getattr(bundle, 'architecture', 'classic') != 'free_piston':
+        t_res, y_res = _run_scipy_with_wall_temperature_segments(bundle, solver, rhs, t_eval, dict(solver_kwargs))
+    elif cycle_summary_enabled and solver_kind.startswith('scipy_'):
         t_res, y_res, live_cycle_summaries_printed = _run_scipy_with_live_cycle_reporting(bundle, solver, rhs, t_eval, dict(solver_kwargs))
     else:
         runtime_callback = _build_free_piston_runtime_callback(bundle)
         if solver_kind in {'euler', 'rk4'}:
             cycle_callback = _build_fixed_step_cycle_callback(bundle, t_eval) if cycle_summary_enabled else None
-            solver_kwargs['step_callback'] = _compose_step_callbacks(runtime_callback, cycle_callback)
+            wall_temperature_callback = build_fixed_step_wall_temperature_callback(bundle, t_eval)
+            solver_kwargs['step_callback'] = _compose_step_callbacks(runtime_callback, wall_temperature_callback, cycle_callback)
             live_cycle_summaries_printed = cycle_callback is not None
         elif solver_kind.startswith('scipy_') and runtime_callback is not None:
             solver_kwargs['accepted_step_callback'] = _build_free_piston_accepted_step_callback(bundle)
@@ -225,6 +229,43 @@ def _run_scipy_with_live_cycle_reporting(bundle, solver, rhs, t_eval: np.ndarray
         return result.t, result.y, False
 
     return np.concatenate(t_parts), np.concatenate(y_parts, axis=1), printed
+
+
+def _run_scipy_with_wall_temperature_segments(bundle, solver, rhs, t_eval: np.ndarray, solver_kwargs: dict) -> tuple[np.ndarray, np.ndarray]:
+    wall_period_s = wall_temperature_cycle_period_s(bundle)
+    if wall_period_s <= 1.0e-15 or t_eval.size <= 1:
+        result = solver(rhs, bundle.y_init.copy(), t_eval, bundle.simulation.rtol, bundle.simulation.atol, **solver_kwargs)
+        return result.t, result.y
+
+    t_start = float(t_eval[0])
+    t_end = float(t_eval[-1])
+    boundaries = [t_start]
+    next_boundary = wall_period_s * (np.floor(t_start / wall_period_s) + 1.0)
+    while next_boundary < t_end - 1.0e-12:
+        boundaries.append(float(next_boundary))
+        next_boundary += wall_period_s
+    boundaries.append(t_end)
+
+    y_start = bundle.y_init.copy()
+    t_parts: list[np.ndarray] = []
+    y_parts: list[np.ndarray] = []
+    for part_idx in range(len(boundaries) - 1):
+        a = float(boundaries[part_idx])
+        b = float(boundaries[part_idx + 1])
+        inner = t_eval[(t_eval > a + 1.0e-12) & (t_eval < b - 1.0e-12)]
+        seg_t_eval = np.concatenate((np.array([a], dtype=np.float64), inner, np.array([b], dtype=np.float64)))
+        seg_result = solver(rhs, y_start.copy(), seg_t_eval, bundle.simulation.rtol, bundle.simulation.atol, **solver_kwargs)
+        if float(seg_result.t[-1] - seg_result.t[0]) >= 0.999 * wall_period_s:
+            apply_wall_temperature_cycle_update(bundle, seg_result.t, seg_result.y, 0, int(seg_result.t.size - 1))
+        if part_idx == 0:
+            t_parts.append(seg_result.t)
+            y_parts.append(seg_result.y)
+        else:
+            t_parts.append(seg_result.t[1:])
+            y_parts.append(seg_result.y[:, 1:])
+        y_start = seg_result.y[:, -1].copy()
+
+    return np.concatenate(t_parts), np.concatenate(y_parts, axis=1)
 
 
 class SimulationExecutor:

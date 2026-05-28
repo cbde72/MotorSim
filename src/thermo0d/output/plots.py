@@ -377,6 +377,30 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
                 return float(end_value - start_value)
         return None
 
+    def _sum_optional_integrals(values_list: list[np.ndarray | None], time_s: np.ndarray, start: int, stop: int) -> float | None:
+        total = 0.0
+        used = False
+        for values in values_list:
+            if values is None:
+                continue
+            value = _integrate_over_time(values, time_s, start, stop)
+            if value is None:
+                continue
+            total += value
+            used = True
+        return total if used else None
+
+    def _sum_optional_cycle_deltas(segment_rows: list[dict[str, float | int]], key_groups: list[list[str]]) -> float | None:
+        total = 0.0
+        used = False
+        for keys in key_groups:
+            value = _cycle_window_delta(segment_rows, keys)
+            if value is None:
+                continue
+            total += value
+            used = True
+        return total if used else None
+
     def _event_index_from_time_or_integral(
         segment_rows: list[dict[str, float | int]],
         *,
@@ -488,7 +512,15 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
 
     t_s = _optional_arr(["t_s"])
     added_energy_W = _optional_arr([f"{cyl_name}_added_energy_W", "cylinder_added_energy_W"])
-    wall_heat_W = _optional_arr([f"{cyl_name}_wall_heat_W", "cylinder_wall_heat_W"])
+    wall_heat_W = _optional_arr([
+        f"{cyl_name}_wall_heat_W",
+        f"{cyl_name}_wall_heat_zones_sum_W",
+        "cylinder_wall_heat_W",
+        "cylinder_wall_heat_zones_sum_W",
+    ])
+    wall_cylinder_heat_W = _optional_arr([f"{cyl_name}_wall_cylinder_heat_W", "cylinder_wall_cylinder_heat_W"])
+    wall_head_heat_W = _optional_arr([f"{cyl_name}_wall_head_heat_W", "cylinder_wall_head_heat_W"])
+    wall_piston_heat_W = _optional_arr([f"{cyl_name}_wall_piston_heat_W", "cylinder_wall_piston_heat_W"])
     piston_work_J = float(np.trapezoid(p_pa[seg], V_m3[seg]))
     swept_volume_m3 = float(np.max(V_m3[seg]) - np.min(V_m3[seg]))
     pmi_bar = piston_work_J / swept_volume_m3 / 1.0e5 if swept_volume_m3 > 1.0e-18 else None
@@ -521,9 +553,31 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
             "free_piston_combustion_energy_latched_J",
         ], positive=True)
     wall_heat_net_J = _integrate_over_time(wall_heat_W, t_s, ut1, ut2)
+    if wall_heat_net_J is None or abs(wall_heat_net_J) <= 1.0e-12:
+        zone_wall_heat_net_J = _sum_optional_integrals(
+            [wall_cylinder_heat_W, wall_head_heat_W, wall_piston_heat_W],
+            t_s,
+            ut1,
+            ut2,
+        )
+        if zone_wall_heat_net_J is not None:
+            wall_heat_net_J = zone_wall_heat_net_J
     if wall_heat_net_J is None:
-        wall_heat_net_J = _cycle_window_delta(segment_rows, [f"{cyl_name}_wall_heat_cycle_J", "cylinder_wall_heat_cycle_J"])
-    wall_heat_loss_J = max(0.0, -wall_heat_net_J) if wall_heat_net_J is not None else None
+        wall_heat_net_J = _cycle_window_delta(segment_rows, [
+            f"{cyl_name}_wall_heat_cycle_J",
+            f"{cyl_name}_wall_heat_zones_sum_cycle_J",
+            "cylinder_wall_heat_cycle_J",
+            "cylinder_wall_heat_zones_sum_cycle_J",
+        ])
+    if wall_heat_net_J is None or abs(wall_heat_net_J) <= 1.0e-12:
+        zone_wall_heat_net_J = _sum_optional_cycle_deltas(segment_rows, [
+            [f"{cyl_name}_wall_cylinder_heat_cycle_J", "cylinder_wall_cylinder_heat_cycle_J"],
+            [f"{cyl_name}_wall_head_heat_cycle_J", "cylinder_wall_head_heat_cycle_J"],
+            [f"{cyl_name}_wall_piston_heat_cycle_J", "cylinder_wall_piston_heat_cycle_J"],
+        ])
+        if zone_wall_heat_net_J is not None:
+            wall_heat_net_J = zone_wall_heat_net_J
+    wall_heat_loss_J = abs(wall_heat_net_J) if wall_heat_net_J is not None else None
     lambda_latch_value = _last_finite_value(segment_rows, [
         f"{cyl_name}_lambda",
         "cylinder_lambda",

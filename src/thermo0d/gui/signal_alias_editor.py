@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Any
 
 import yaml
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QAction, QActionGroup
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QApplication,
@@ -15,6 +17,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPushButton,
     QSizePolicy,
@@ -171,6 +174,10 @@ class SignalAliasEditor(QMainWindow):
         self.table.verticalHeader().setVisible(False)
         self.table.setSortingEnabled(True)
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_table_context_menu)
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.controls_dock = self._create_dock("Projekt", self.controls_panel)
@@ -191,6 +198,9 @@ class SignalAliasEditor(QMainWindow):
         self.filter_edit = QLineEdit()
         self.filter_edit.setPlaceholderText("Filter nach Signal, Quelle, Einheit oder Name …")
         self.filter_edit.textChanged.connect(self.apply_filter)
+        self.family_filter_combo = QComboBox()
+        self.family_filter_combo.setMinimumWidth(160)
+        self.family_filter_combo.currentTextChanged.connect(self.apply_filter)
         save_btn = QPushButton("Speichern")
         save_btn.clicked.connect(self.save_file)
         export_btn = QPushButton("Export-Datei")
@@ -199,6 +209,8 @@ class SignalAliasEditor(QMainWindow):
         top.addWidget(self.path_label, 1)
         top.addWidget(QLabel("Filter:"))
         top.addWidget(self.filter_edit, 1)
+        top.addWidget(QLabel("Familie:"))
+        top.addWidget(self.family_filter_combo)
         top.addWidget(save_btn)
         top.addWidget(export_btn)
         layout.addLayout(top)
@@ -376,18 +388,42 @@ class SignalAliasEditor(QMainWindow):
                 self.table.setItem(row_index, col, item)
         self.table.resizeColumnsToContents()
         self.table.setSortingEnabled(True)
+        self._refresh_family_filter_options()
         self.apply_filter()
 
     def apply_filter(self) -> None:
         needle = self.filter_edit.text().strip().lower()
+        family_filter = self.family_filter_combo.currentData() if hasattr(self, 'family_filter_combo') else None
+        family_filter = str(family_filter or "").strip()
         searchable_columns = [1, 2, 4, 5, 6, 7, 8, 9, 10]
         for row in range(self.table.rowCount()):
             row_text = " | ".join(
                 (self.table.item(row, col).text() if self.table.item(row, col) else "")
                 for col in searchable_columns
             ).lower()
-            self.table.setRowHidden(row, bool(needle) and needle not in row_text)
+            row_family = self.table.item(row, 7).text().strip() if self.table.item(row, 7) else ""
+            text_hidden = bool(needle) and needle not in row_text
+            family_hidden = bool(family_filter) and row_family != family_filter
+            self.table.setRowHidden(row, text_hidden or family_hidden)
         self._update_statusbar_fields()
+
+    def _refresh_family_filter_options(self) -> None:
+        if not hasattr(self, 'family_filter_combo'):
+            return
+        current = str(self.family_filter_combo.currentData() or "")
+        families = sorted({
+            self.table.item(row, 7).text().strip()
+            for row in range(self.table.rowCount())
+            if self.table.item(row, 7) and self.table.item(row, 7).text().strip()
+        }, key=str.lower)
+        self.family_filter_combo.blockSignals(True)
+        self.family_filter_combo.clear()
+        self.family_filter_combo.addItem("Alle Familien", "")
+        for family in families:
+            self.family_filter_combo.addItem(family, family)
+        idx = self.family_filter_combo.findData(current)
+        self.family_filter_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.family_filter_combo.blockSignals(False)
 
     def _row_export_widget(self, row: int) -> QCheckBox | None:
         host = self.table.cellWidget(row, 0)
@@ -402,6 +438,127 @@ class SignalAliasEditor(QMainWindow):
     def _row_export_enabled(self, row: int) -> bool:
         widget = self._row_export_widget(row)
         return bool(widget.isChecked()) if widget is not None else False
+
+    def _set_row_export_enabled(self, row: int, enabled: bool = True) -> None:
+        widget = self._row_export_widget(row)
+        if widget is not None:
+            widget.setChecked(bool(enabled))
+
+    def _row_key(self, row: int) -> str:
+        item = self.table.item(row, 1)
+        return item.text().strip() if item is not None else ""
+
+    @staticmethod
+    def _component_parts_from_key(key: str) -> tuple[str, str, str] | None:
+        match = re.match(r"^(.+)_(\d+)_(.+)$", str(key).strip())
+        if not match:
+            return None
+        component_type = match.group(1)
+        component = f"{component_type}_{match.group(2)}"
+        suffix = match.group(3)
+        return component_type, component, suffix
+
+    def _selected_table_rows(self) -> list[int]:
+        rows = sorted({index.row() for index in self.table.selectionModel().selectedRows()})
+        if rows:
+            return rows
+        return sorted({item.row() for item in self.table.selectedItems()})
+
+    def _transfer_index(self) -> dict[str, dict[str, dict[str, int]]]:
+        index: dict[str, dict[str, dict[str, int]]] = {}
+        for row in range(self.table.rowCount()):
+            parts = self._component_parts_from_key(self._row_key(row))
+            if parts is None:
+                continue
+            component_type, component, suffix = parts
+            index.setdefault(component_type, {}).setdefault(component, {})[suffix] = row
+        return index
+
+    def _show_table_context_menu(self, pos) -> None:
+        clicked_index = self.table.indexAt(pos)
+        if clicked_index.isValid():
+            clicked_row = clicked_index.row()
+            if clicked_row not in self._selected_table_rows():
+                self.table.selectRow(clicked_row)
+
+        selected_rows = [row for row in self._selected_table_rows() if not self.table.isRowHidden(row)]
+        menu = QMenu(self)
+
+        export_selected = QAction("Ausgewählte Signale für Export markieren", self)
+        export_selected.setEnabled(bool(selected_rows))
+        export_selected.triggered.connect(lambda: self._mark_rows_for_export(selected_rows))
+        menu.addAction(export_selected)
+
+        clear_selected = QAction("Export-Markierung für Auswahl entfernen", self)
+        clear_selected.setEnabled(bool(selected_rows))
+        clear_selected.triggered.connect(lambda: self._mark_rows_for_export(selected_rows, enabled=False))
+        menu.addAction(clear_selected)
+        menu.addSeparator()
+
+        self._add_component_transfer_actions(menu, selected_rows)
+        menu.exec(self.table.viewport().mapToGlobal(pos))
+
+    def _mark_rows_for_export(self, rows: list[int], *, enabled: bool = True) -> None:
+        for row in rows:
+            self._set_row_export_enabled(row, enabled)
+        self._update_statusbar_fields()
+
+    def _add_component_transfer_actions(self, menu: QMenu, selected_rows: list[int]) -> None:
+        transfer_rows: list[tuple[int, str, str, str]] = []
+        for row in selected_rows:
+            parts = self._component_parts_from_key(self._row_key(row))
+            if parts is None:
+                continue
+            component_type, component, suffix = parts
+            transfer_rows.append((row, component_type, component, suffix))
+
+        if not transfer_rows:
+            action = QAction("Auf anderes Bauteil übertragen: keine Bauteil-Signale ausgewählt", self)
+            action.setEnabled(False)
+            menu.addAction(action)
+            return
+
+        source_components = {(component_type, component) for _, component_type, component, _ in transfer_rows}
+        if len(source_components) != 1:
+            action = QAction("Auf anderes Bauteil übertragen: bitte nur ein Quellbauteil auswählen", self)
+            action.setEnabled(False)
+            menu.addAction(action)
+            return
+
+        component_type, source_component = next(iter(source_components))
+        suffixes = [suffix for _, _, _, suffix in transfer_rows]
+        transfer_index = self._transfer_index()
+        candidates = []
+        for target_component, suffix_index in transfer_index.get(component_type, {}).items():
+            if target_component == source_component:
+                continue
+            target_rows = [suffix_index[suffix] for suffix in suffixes if suffix in suffix_index]
+            if target_rows:
+                candidates.append((target_component, target_rows, len(target_rows), len(suffixes)))
+
+        if not candidates:
+            action = QAction(f"Keine passenden {component_type}-Zielbauteile gefunden", self)
+            action.setEnabled(False)
+            menu.addAction(action)
+            return
+
+        transfer_menu = menu.addMenu(f"Export-Auswahl auf anderes {component_type}-Bauteil übertragen")
+        for target_component, target_rows, matched, total in sorted(candidates, key=lambda item: item[0]):
+            label = f"{target_component} markieren"
+            if matched != total:
+                label += f" ({matched}/{total} passende Signale)"
+            else:
+                label += f" ({matched} Signale)"
+            action = QAction(label, self)
+            rows_to_mark = list(dict.fromkeys(selected_rows + target_rows))
+            action.triggered.connect(
+                lambda checked=False, rows=rows_to_mark, target=list(target_rows), name=target_component: self._mark_component_transfer(rows, target, name)
+            )
+            transfer_menu.addAction(action)
+
+    def _mark_component_transfer(self, rows: list[int], target_rows: list[int], target_component: str) -> None:
+        self._mark_rows_for_export(rows, enabled=True)
+        self.statusBar().showMessage(f"Export-Auswahl auf {target_component} übertragen: {len(target_rows)} Signale markiert", 3500)
 
     def _collect_table(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []

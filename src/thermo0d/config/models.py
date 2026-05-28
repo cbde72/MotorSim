@@ -178,6 +178,10 @@ class PostprocessingConfig(StrictBaseModel):
     csv_enabled: StrictBool = True
     csv_path: StrictStr = "results/out.csv"
     csv_separator: StrictStr = ";"
+    csv_export_layout: StrictStr | None = None
+    csv_export_mode: Literal["auto", "all", "selected"] = "auto"
+    csv_export_missing_layout: Literal["warn_all", "fail"] = "warn_all"
+    csv_export_unknown_signals: Literal["warn_empty", "fail"] = "warn_empty"
     excel_enabled: StrictBool = False
     excel_path: StrictStr = "results/out.xlsx"
     sampling: SamplingConfig
@@ -195,6 +199,8 @@ class PostprocessingConfig(StrictBaseModel):
             raise ValueError("csv_separator must be a single character")
         if not self.csv_path.strip():
             raise ValueError("csv_path must not be empty")
+        if self.csv_export_layout is not None and not self.csv_export_layout.strip():
+            raise ValueError("csv_export_layout must not be empty when provided")
         if not self.excel_path.strip():
             raise ValueError("excel_path must not be empty")
         return self
@@ -347,6 +353,46 @@ class WoschniHeatTransferConfig(StrictBaseModel):
             raise ValueError("multiplier must be >= 0")
         if self.variant == "legacy" and (self.c1 is None or self.c2 is None or self.c3 is None):
             raise ValueError("variant=legacy requires c1, c2 and c3")
+        return self
+
+
+class DisabledWallTemperatureConfig(StrictBaseModel):
+    model: Literal["none"]
+
+
+class WallTemperatureZoneConfig(StrictBaseModel):
+    initial_temperature_K: StrictFloat
+    coolant_temperature_K: StrictFloat
+    lambda_W_per_mK: StrictFloat
+    wall_thickness_m: StrictFloat
+    area_m2: StrictFloat
+
+    @model_validator(mode="after")
+    def validate_values(self) -> "WallTemperatureZoneConfig":
+        if self.initial_temperature_K <= 0.0:
+            raise ValueError("initial_temperature_K must be > 0")
+        if self.coolant_temperature_K <= 0.0:
+            raise ValueError("coolant_temperature_K must be > 0")
+        if self.lambda_W_per_mK <= 0.0:
+            raise ValueError("lambda_W_per_mK must be > 0")
+        if self.wall_thickness_m <= 0.0:
+            raise ValueError("wall_thickness_m must be > 0")
+        if self.area_m2 <= 0.0:
+            raise ValueError("area_m2 must be > 0")
+        return self
+
+
+class CycleAverageWallTemperatureConfig(StrictBaseModel):
+    model: Literal["cycle_average"]
+    relaxation: StrictFloat = 0.3
+    cylinder: WallTemperatureZoneConfig
+    head: WallTemperatureZoneConfig
+    piston: WallTemperatureZoneConfig
+
+    @model_validator(mode="after")
+    def validate_values(self) -> "CycleAverageWallTemperatureConfig":
+        if self.relaxation <= 0.0:
+            raise ValueError("relaxation must be > 0")
         return self
 
 
@@ -548,7 +594,7 @@ class HcciDieselCombustionConfig(StrictBaseModel):
     beck_reference_o2_percent: StrictFloat = 20.94
     beck_cf_fuel_name: StrictStr = "Diesel 2"
     cool_flame_enabled: StrictBool = False
-    cool_flame_burn_model: Literal["gamma", "beck-vibe_CF", "vibe-beck"] = "gamma"
+    cool_flame_burn_model: Literal["gamma", "vibe-beck_CF", "vibe-beck"] = "gamma"
     cool_flame_energy_fraction: StrictFloat = 0.08
     cool_flame_duration_ms: StrictFloat = 0.3409
     cool_flame_a: StrictFloat = 6.9
@@ -649,6 +695,7 @@ class SimpleEvaporationConfig(StrictBaseModel):
 
 
 WallHeatConfig = Annotated[Union[DisabledSubmodelConfig, WoschniHeatTransferConfig], Field(discriminator="model")]
+WallTemperatureConfig = Annotated[Union[DisabledWallTemperatureConfig, CycleAverageWallTemperatureConfig], Field(discriminator="model")]
 CombustionConfig = Annotated[Union[DisabledCombustionConfig, VibeCombustionConfig, HcciDieselCombustionConfig], Field(discriminator="model")]
 EvaporationConfig = Annotated[Union[DisabledEvaporationConfig, SimpleEvaporationConfig], Field(discriminator="model")]
 
@@ -656,6 +703,7 @@ EvaporationConfig = Annotated[Union[DisabledEvaporationConfig, SimpleEvaporation
 class SubmodelLibraryConfig(StrictBaseModel):
     volumes: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
     wall_heat: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
+    wall_temperature: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
     combustion: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
     connections: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
 
@@ -679,6 +727,7 @@ class CylinderVolumeConfig(StrictBaseModel):
     initial_burned_mass_percent: StrictFloat | None = None
     kinematics: CrankSliderKinematicsConfig
     wall_heat: WallHeatConfig
+    wall_temperature: WallTemperatureConfig = Field(default_factory=lambda: DisabledWallTemperatureConfig(model="none"))
     combustion: CombustionConfig
     evaporation: EvaporationConfig
 
@@ -715,6 +764,7 @@ class PlenumVolumeConfig(StrictBaseModel):
     initial_burned_mass_percent: StrictFloat | None = None
     fixed_volume_m3: StrictFloat
     wall_heat: WallHeatConfig
+    wall_temperature: WallTemperatureConfig = Field(default_factory=lambda: DisabledWallTemperatureConfig(model="none"))
     combustion: CombustionConfig
     evaporation: EvaporationConfig
 

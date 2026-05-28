@@ -74,8 +74,38 @@ class PostprocessingService:
         csv_path = self._base_csv_path()
         return csv_path.with_suffix('.xlsx')
 
+    def _is_safe_layout_path(self, path: Path) -> bool:
+        resolved = path.resolve()
+        allowed_roots = [
+            self.config_path.parent.resolve(),
+            self.config_path.parent.parent.resolve(),
+            self._output_dir().resolve(),
+            Path.cwd().resolve(),
+        ]
+        for root in allowed_roots:
+            try:
+                resolved.relative_to(root)
+                return True
+            except ValueError:
+                continue
+        return False
+
+    def _configured_export_layout_path(self) -> Path | None:
+        raw = str(getattr(self.bundle.postprocessing, 'csv_export_layout', '') or '').strip()
+        if not raw:
+            return None
+        candidate = Path(raw).expanduser()
+        if not candidate.is_absolute():
+            candidate = self.config_path.parent / candidate
+        candidate = candidate.resolve()
+        if not self._is_safe_layout_path(candidate):
+            ConsoleArtifactReporter.print_status('csv:layout', 'warn', reason=f'unsafe-path: {candidate}')
+            return None
+        return candidate
+
     def _export_layout_candidates(self) -> list[Path]:
         names = ('thermo0d_signal_export_layout.csv',)
+        configured = self._configured_export_layout_path()
         dirs = [
             self.config_path.parent,
             self.config_path.parent.parent,
@@ -84,6 +114,9 @@ class PostprocessingService:
         ]
         candidates: list[Path] = []
         seen: set[Path] = set()
+        if configured is not None:
+            candidates.append(configured)
+            seen.add(configured)
         for base in dirs:
             for name in names:
                 candidate = (base / name).resolve()
@@ -94,13 +127,23 @@ class PostprocessingService:
         return candidates
 
     def _discover_export_layout_path(self) -> Path | None:
+        mode = str(getattr(self.bundle.postprocessing, 'csv_export_mode', 'auto') or 'auto').strip().lower()
+        if mode == 'all':
+            return None
         for candidate in self._export_layout_candidates():
             if candidate.exists() and candidate.is_file():
                 return candidate
+        if mode == 'selected':
+            policy = str(getattr(self.bundle.postprocessing, 'csv_export_missing_layout', 'warn_all') or 'warn_all').strip().lower()
+            message = 'CSV export mode selected, aber keine sichere Export-Layout-Datei gefunden.'
+            if policy == 'fail':
+                raise FileNotFoundError(message)
+            ConsoleArtifactReporter.print_status('csv:layout', 'warn', reason='missing-layout; exporting all columns')
         return None
 
-    def _load_export_layout_spec(self) -> ExportLayoutSpec | None:
-        path = self._discover_export_layout_path()
+    def _load_export_layout_spec(self, path: Path | None = None) -> ExportLayoutSpec | None:
+        if path is None:
+            path = self._discover_export_layout_path()
         if path is None:
             return None
         try:
@@ -172,8 +215,74 @@ class PostprocessingService:
             return rows
         return [{key: row.get(key) for key in keys} for row in rows]
 
-    def _prepare_export_rows(self, export_rows: list[dict[str, float | int]]) -> tuple[list[dict[str, float | int | None]], list[dict[str, float | int | None]], list[list[object]], list[str]]:
-        layout = self._load_export_layout_spec()
+    @staticmethod
+    def _expand_requested_export_keys(keys: list[str]) -> list[str]:
+        expanded = {str(key).strip() for key in keys if str(key).strip()}
+        direct_sources = {
+            '_wall_heat_cycle_J': '_wall_heat_W',
+            '_wall_cylinder_heat_cycle_J': '_wall_cylinder_heat_W',
+            '_wall_head_heat_cycle_J': '_wall_head_heat_W',
+            '_wall_piston_heat_cycle_J': '_wall_piston_heat_W',
+            '_wall_heat_zones_sum_cycle_J': '_wall_heat_zones_sum_W',
+            '_added_energy_cycle_J': '_added_energy_W',
+            '_enthalpy_in_cycle_J': '_enthalpy_in_W',
+            '_enthalpy_out_cycle_J': '_enthalpy_out_W',
+            '_piston_work_cycle_J': '_piston_work_W',
+            '_evaporation_sink_cycle_J': '_evaporation_sink_W',
+            '_mdot_in_cycle_kg': '_mdot_in_kg_per_s',
+            '_mdot_out_cycle_kg': '_mdot_out_kg_per_s',
+        }
+        for key in list(expanded):
+            for target_suffix, source_suffix in direct_sources.items():
+                if key.endswith(target_suffix):
+                    expanded.add(key[:-len(target_suffix)] + source_suffix)
+
+            energy_derived_suffixes = (
+                '_delta_U_cycle_J',
+                '_enthalpy_net_cycle_J',
+                '_energy_balance_residual_J',
+                '_indicated_power_W',
+            )
+            for target_suffix in energy_derived_suffixes:
+                if key.endswith(target_suffix):
+                    prefix = key[:-len(target_suffix)]
+                    for source_suffix in (
+                        '_U_J',
+                        '_enthalpy_in_W',
+                        '_enthalpy_out_W',
+                        '_wall_heat_W',
+                        '_added_energy_W',
+                        '_evaporation_sink_W',
+                        '_piston_work_W',
+                    ):
+                        expanded.add(prefix + source_suffix)
+
+            mass_derived_suffixes = ('_delta_m_cycle_kg', '_mass_balance_residual_kg')
+            for target_suffix in mass_derived_suffixes:
+                if key.endswith(target_suffix):
+                    prefix = key[:-len(target_suffix)]
+                    for source_suffix in ('_m_kg', '_mdot_in_kg_per_s', '_mdot_out_kg_per_s'):
+                        expanded.add(prefix + source_suffix)
+        return sorted(expanded)
+
+    def _validate_export_layout_keys(self, layout_keys: list[str], rows: list[dict[str, float | int]]) -> None:
+        if not layout_keys or not rows:
+            return
+        available = set(rows[0].keys())
+        missing = [key for key in layout_keys if key not in available]
+        if not missing:
+            return
+        preview = ', '.join(missing[:12])
+        suffix = '' if len(missing) <= 12 else f', ... +{len(missing) - 12}'
+        reason = f'{len(missing)} unknown signal(s): {preview}{suffix}'
+        policy = str(getattr(self.bundle.postprocessing, 'csv_export_unknown_signals', 'warn_empty') or 'warn_empty').strip().lower()
+        if policy == 'fail':
+            raise KeyError(reason)
+        ConsoleArtifactReporter.print_status('csv:layout', 'warn', reason=reason)
+
+    def _prepare_export_rows(self, export_rows: list[dict[str, float | int]], layout: ExportLayoutSpec | None = None) -> tuple[list[dict[str, float | int | None]], list[dict[str, float | int | None]], list[list[object]], list[str]]:
+        if layout is None:
+            layout = self._load_export_layout_spec()
         if layout is None or not layout.keys:
             return export_rows, convert_rows_to_engineering_units(export_rows), [], []
         filtered_rows = self._filter_rows_by_keys(export_rows, layout.keys)
@@ -348,6 +457,10 @@ class PostprocessingService:
         sample = rows[0]
         power_suffixes = {
             '_wall_heat_W': '_wall_heat_cycle_J',
+            '_wall_cylinder_heat_W': '_wall_cylinder_heat_cycle_J',
+            '_wall_head_heat_W': '_wall_head_heat_cycle_J',
+            '_wall_piston_heat_W': '_wall_piston_heat_cycle_J',
+            '_wall_heat_zones_sum_W': '_wall_heat_zones_sum_cycle_J',
             '_added_energy_W': '_added_energy_cycle_J',
             '_enthalpy_in_W': '_enthalpy_in_cycle_J',
             '_enthalpy_out_W': '_enthalpy_out_cycle_J',
@@ -497,7 +610,7 @@ class PostprocessingService:
         check_report_html_enabled = bool(getattr(self.bundle.postprocessing, 'check_report_html_enabled', False))
 
         export_layout_path = self._discover_export_layout_path()
-        export_layout_spec = self._load_export_layout_spec() if export_layout_path is not None else None
+        export_layout_spec = self._load_export_layout_spec(export_layout_path) if export_layout_path is not None else None
         export_layout_keys = list(export_layout_spec.keys) if export_layout_spec is not None else []
         if export_layout_path is not None and export_layout_keys:
             ConsoleProgressReporter.print(f'Postprocessing: verwende Export-Layout {export_layout_path.name} mit {len(export_layout_keys)} Spalten und 4 Kopfzeilen')
@@ -518,9 +631,17 @@ class PostprocessingService:
         export_rows: list[dict[str, float | int]] = []
         if self._needs_export_rows(excel):
             started = perf_counter()
-            export_series = SignalReconstructionService.build(self.bundle, sampled_t, sampled_y, sampled_cycles)
+            requested_export_keys = self._expand_requested_export_keys(export_layout_keys) if export_layout_keys else None
+            export_series = SignalReconstructionService.build(
+                self.bundle,
+                sampled_t,
+                sampled_y,
+                sampled_cycles,
+                requested_keys=requested_export_keys,
+            )
             raw_export_rows = ResultRowBuilder.from_reconstructed(export_series)
             export_rows = self._add_cycle_integrals(raw_export_rows)
+            self._validate_export_layout_keys(export_layout_keys, export_rows)
             timings['postprocessing:build-rows'] = perf_counter() - started
             ConsoleTimingReporter.print('postprocessing:build-rows', timings['postprocessing:build-rows'], rows=len(export_rows))
         else:
@@ -531,7 +652,7 @@ class PostprocessingService:
         filtered_csv_rows: list[dict[str, float | int]] = []
         export_header_rows: list[list[object]] = []
         if export_rows:
-            filtered_excel_rows, filtered_csv_rows, export_header_rows, _ = self._prepare_export_rows(export_rows)
+            filtered_excel_rows, filtered_csv_rows, export_header_rows, _ = self._prepare_export_rows(export_rows, export_layout_spec)
 
         csv_path: str | None = None
         if csv_enabled:

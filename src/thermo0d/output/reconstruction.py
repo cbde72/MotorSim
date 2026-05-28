@@ -5,7 +5,7 @@ import math
 
 import numpy as np
 
-from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnCol, ConnectionType, VolumeCol, VolumeType
+from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnCol, ConnectionType, VolumeCol, VolumeType, WallTemperatureCol, WallTemperatureZone
 from thermo0d.physics.flow import de_st_venant_wantzel_signed
 from thermo0d.physics.kinematics import cylinder_kinematic_state_from_time
 from thermo0d.model.free_piston.forces import compute_load_info
@@ -480,7 +480,7 @@ class SignalReconstructionService:
             columns[f'{name}_released_energy_window_J'] = total_J
 
     @classmethod
-    def build(cls, bundle, t: np.ndarray, y: np.ndarray, cycle_indices: np.ndarray) -> ReconstructedSeries:
+    def build(cls, bundle, t: np.ndarray, y: np.ndarray, cycle_indices: np.ndarray, requested_keys=None) -> ReconstructedSeries:
         cp_default = float(bundle.gas_props[0])
         cv_default = float(bundle.gas_props[1])
         gas_constant_default = float(bundle.gas_props[2])
@@ -490,6 +490,34 @@ class SignalReconstructionService:
         y_arr = np.asarray(y, dtype=np.float64)
         cycle_idx_arr = np.asarray(cycle_indices, dtype=np.int64)
         n_samples = int(t_arr.shape[0])
+        if requested_keys is None:
+            requested_iter = []
+        elif isinstance(requested_keys, str):
+            requested_iter = [requested_keys]
+        else:
+            requested_iter = requested_keys
+        requested_key_set = {
+            str(key).strip()
+            for key in requested_iter
+            if str(key).strip()
+        }
+        use_requested_filter = bool(requested_key_set)
+
+        def _requested_contains(*needles: str) -> bool:
+            if not use_requested_filter:
+                return True
+            return any(any(needle in key for needle in needles) for key in requested_key_set)
+
+        need_combustion_outputs = _requested_contains(
+            'combustion',
+            'lambda',
+            'cool_flame',
+            'hcci',
+            'slot_area',
+            'added_energy',
+            'burn_window',
+            'released_energy_window',
+        )
 
         vol_matrix = bundle.vol_matrix
         state_layout = bundle.state_layout if getattr(bundle, "state_layout", None) is not None else StateLayout.classic(int(vol_matrix.shape[0]))
@@ -520,9 +548,15 @@ class SignalReconstructionService:
                 or (free_piston_uses_vapor_injector is not None and bool(free_piston_uses_vapor_injector(bundle)))
             )
         )
-        latched_air_hist, latched_fuel_hist, latched_energy_hist, slot_area_hist = _replay_free_piston_combustion_history(bundle, y_arr)
+        if need_combustion_outputs:
+            latched_air_hist, latched_fuel_hist, latched_energy_hist, slot_area_hist = _replay_free_piston_combustion_history(bundle, y_arr)
+        else:
+            latched_air_hist = np.zeros(n_samples, dtype=np.float64)
+            latched_fuel_hist = np.zeros(n_samples, dtype=np.float64)
+            latched_energy_hist = np.zeros(n_samples, dtype=np.float64)
+            slot_area_hist = np.zeros(n_samples, dtype=np.float64)
         time_vibe_energy_hist = latched_energy_hist if use_fp_latched_fuel else None
-        if replay_free_piston_time_combustion_series is not None:
+        if need_combustion_outputs and replay_free_piston_time_combustion_series is not None:
             soc_time_hist, soc_energy_hist, soc_active_hist = replay_free_piston_time_combustion_series(bundle, t_arr, y_arr, time_vibe_energy_hist)
         else:
             soc_time_hist = np.zeros(n_samples, dtype=np.float64)
@@ -531,7 +565,7 @@ class SignalReconstructionService:
         cylinder_latch_histories: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
         cylinder_soc_histories: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
         cylinder_cool_flame_histories: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
-        if use_fp_latched_fuel:
+        if use_fp_latched_fuel and need_combustion_outputs:
             for cyl_idx in getattr(bundle, 'cylinder_indices', []) or []:
                 cyl = int(cyl_idx)
                 if free_piston_cylinder_uses_latched_fuel is not None and not bool(free_piston_cylinder_uses_latched_fuel(bundle, cyl)):
@@ -1108,6 +1142,8 @@ class SignalReconstructionService:
                 if int(vol_matrix[i, VolumeCol.TYPE]) != VolumeType.CYLINDER:
                     continue
                 name = volume_names[i]
+                wall_state_by_vol = getattr(bundle, 'wall_temperature_state_index_by_vol', None)
+                wall_temp_params = getattr(bundle, 'wall_temperature_params_by_vol', None)
                 pdv_power, wall_heat_w, heat_transfer_coeff, _wall_velocity, added_energy_w, evap_sink_w = cylinder_energy_source_terms_from_context(
                     vol_matrix[i],
                     wall_matrix,
@@ -1128,6 +1164,32 @@ class SignalReconstructionService:
                     dtheta_global_dt_by_vol[i],
                     cycle_deg_by_vol[i],
                 )
+                wall_heat_zones_sum_w = None
+                wall_temperature_weighted_K = None
+                wall_temperature_total_area = 0.0
+                zone_heat_values: list[tuple[str, float, float, float]] = []
+                if wall_state_by_vol is not None and wall_temp_params is not None and int(getattr(wall_state_by_vol, 'shape', (0,))[0]) > i:
+                    zone_names = ("cylinder", "head", "piston")
+                    zone_heat_sum_w = 0.0
+                    weighted_temp = 0.0
+                    for zone, zone_name in enumerate(zone_names):
+                        wall_state_idx = int(wall_state_by_vol[i, zone])
+                        if wall_state_idx < 0:
+                            continue
+                        zone_temp = float(y_arr[wall_state_idx, k])
+                        area = 0.0
+                        zone_heat_w = 0.0
+                        if float(wall_temp_params[i, zone, WallTemperatureCol.ENABLED]) > 0.5:
+                            area = float(wall_temp_params[i, zone, WallTemperatureCol.AREA])
+                            zone_heat_w = float(heat_transfer_coeff) * area * (zone_temp - temp)
+                            zone_heat_sum_w += zone_heat_w
+                            wall_temperature_total_area += area
+                            weighted_temp += area * zone_temp
+                        zone_heat_values.append((zone_name, zone_temp, zone_heat_w, area))
+                    if wall_temperature_total_area > 1.0e-18:
+                        wall_temperature_weighted_K = weighted_temp / wall_temperature_total_area
+                        wall_heat_zones_sum_w = zone_heat_sum_w
+                        wall_heat_w = zone_heat_sum_w
                 comb_idx = int(vol_matrix[i, VolumeCol.COMB_ROW])
                 if i in cylinder_latch_histories and comb_idx >= 0:
                     cyl_latched_energy_hist = cylinder_latch_histories[i][2]
@@ -1339,6 +1401,16 @@ class SignalReconstructionService:
                 cls._ensure_float_column(columns, f'{name}_wall_heat_W', n_samples)[k] = float(wall_heat_w)
                 cls._ensure_float_column(columns, f'{name}_heat_transfer_power_W', n_samples)[k] = float(wall_heat_w)
                 cls._ensure_float_column(columns, f'{name}_htc_W_per_m2K', n_samples)[k] = float(heat_transfer_coeff)
+                for zone_name, zone_temp, zone_heat_w, area in zone_heat_values:
+                    cls._ensure_float_column(columns, f'{name}_wall_{zone_name}_temperature_K', n_samples)[k] = zone_temp
+                    if area > 0.0:
+                        cls._ensure_float_column(columns, f'{name}_wall_{zone_name}_heat_W', n_samples)[k] = zone_heat_w
+                        cls._ensure_float_column(columns, f'{name}_wall_{zone_name}_heat_transfer_power_W', n_samples)[k] = zone_heat_w
+                        cls._ensure_float_column(columns, f'{name}_wall_{zone_name}_heat_share_0to1', n_samples)[k] = zone_heat_w / wall_heat_w if abs(wall_heat_w) > 1.0e-18 else 0.0
+                if wall_temperature_weighted_K is not None:
+                    cls._ensure_float_column(columns, f'{name}_wall_temperature_K', n_samples)[k] = wall_temperature_weighted_K
+                if wall_heat_zones_sum_w is not None:
+                    cls._ensure_float_column(columns, f'{name}_wall_heat_zones_sum_W', n_samples)[k] = wall_heat_zones_sum_w
                 cls._ensure_float_column(columns, f'{name}_added_energy_W', n_samples)[k] = float(added_energy_w)
                 cls._ensure_float_column(columns, f'{name}_combustion_fraction_0to1', n_samples)[k] = float(combustion_fraction)
                 cls._ensure_float_column(columns, f'{name}_combustion_fraction_rate_1_per_s', n_samples)[k] = float(combustion_fraction_rate_1_per_s)
@@ -1393,13 +1465,18 @@ class SignalReconstructionService:
                         cls._ensure_float_column(columns, 'free_piston_combustion_energy_latched_J', n_samples)[k] = energy_latched_J
                         cls._ensure_float_column(columns, 'free_piston_combustion_lambda', n_samples)[k] = lambda_value
 
-        cls._add_burn_window_energy_columns(columns, t_arr, list(volume_names))
+        if _requested_contains('burn_window', 'released_energy_window', 'combustion_active'):
+            cls._add_burn_window_energy_columns(columns, t_arr, list(volume_names))
         _add_single_instance_compat_aliases(columns, bundle)
 
         columns['t_s'] = np.asarray(t_arr, dtype=np.float64)
         columns['cycle_index'] = np.asarray(cycle_idx_arr, dtype=np.int64)
         columns['theta_deg'] = np.asarray(theta_global, dtype=np.float64)
         columns['theta_local_deg'] = np.asarray(theta_local, dtype=np.float64)
+        if use_requested_filter:
+            base_keys = {'t_s', 'cycle_index', 'theta_deg', 'theta_local_deg'}
+            keep_keys = requested_key_set | base_keys
+            columns = {key: value for key, value in columns.items() if key in keep_keys}
         return ReconstructedSeries(
             t_s=np.asarray(t_arr, dtype=np.float64),
             cycle_index=np.asarray(cycle_idx_arr, dtype=np.int64),

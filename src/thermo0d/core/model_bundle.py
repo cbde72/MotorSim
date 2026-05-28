@@ -206,6 +206,10 @@ class PostprocessingOptions:
     csv_enabled: bool = True
     csv_path: str = "results/out.csv"
     csv_separator: str = ";"
+    csv_export_layout: str | None = None
+    csv_export_mode: str = "auto"
+    csv_export_missing_layout: str = "warn_all"
+    csv_export_unknown_signals: str = "warn_empty"
     excel_enabled: bool = False
     excel_path: str = "results/out.xlsx"
     sampling_mode: str = "crank_angle"
@@ -259,6 +263,10 @@ class ModelBundle:
     wall_ref_matrix_safe: np.ndarray | None = None
     wall_bore_by_vol: np.ndarray | None = None
     wall_ups_by_vol: np.ndarray | None = None
+    wall_temperature_enabled: bool = False
+    wall_temperature_state_index_by_vol: np.ndarray | None = None
+    wall_temperature_average_state_index_by_vol: np.ndarray | None = None
+    wall_temperature_params_by_vol: np.ndarray | None = None
     jac_sparsity: object | None = None
     jac_color_groups: object | None = None
     environment_is_fixed: np.ndarray | None = None

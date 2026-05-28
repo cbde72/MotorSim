@@ -14,7 +14,7 @@ from scipy import sparse
 from thermo0d.config.constants import ConnCol, FeatureCol
 
 
-STATES_PER_VOLUME = 6
+STATES_PER_VOLUME = 5
 
 
 def build_rhs_jacobian_sparsity(
@@ -27,16 +27,16 @@ def build_rhs_jacobian_sparsity(
 ) -> sparse.csr_matrix:
     """Build a conservative structural sparsity pattern for the current RHS.
 
-    Per volume the solver carries six thermodynamic states:
-    gas mass, internal energy, burned gas tracer mass, air mass, residual gas tracer mass and liquid fuel mass.
+    Per volume the solver carries five thermodynamic states:
+    gas mass, internal energy, burned gas tracer mass, air mass and liquid fuel mass.
     """
     n_vol = int(n_volumes)
     n_state = STATES_PER_VOLUME * n_vol + int(extra_state_count)
     pattern = np.zeros((n_state, n_state), dtype=np.uint8)
 
-    def vol_rows(i: int) -> tuple[int, int, int, int, int, int]:
+    def vol_rows(i: int) -> tuple[int, int, int, int, int]:
         base = STATES_PER_VOLUME * int(i)
-        return (base, base + 1, base + 2, base + 3, base + 4, base + 5)
+        return (base, base + 1, base + 2, base + 3, base + 4)
 
     for i in range(n_vol):
         rows = vol_rows(i)

@@ -11,6 +11,7 @@ class StateLayout:
     x_index: int | None = None
     v_index: int | None = None
     mechanical_dofs: int = 0
+    extra_state_labels: tuple[str, ...] = ()
 
     STATES_PER_VOLUME: ClassVar[int] = 5
 
@@ -33,6 +34,17 @@ class StateLayout:
             raise ValueError("mechanical_dofs must be > 0")
         base = cls.STATES_PER_VOLUME * n
         return cls(n_volumes=n, total_size=base + 2 * dofs, x_index=base, v_index=base + dofs, mechanical_dofs=dofs)
+
+    def with_extra_states(self, labels: list[str] | tuple[str, ...]) -> "StateLayout":
+        extra = tuple(str(label) for label in labels)
+        return StateLayout(
+            n_volumes=self.n_volumes,
+            total_size=self.total_size + len(extra),
+            x_index=self.x_index,
+            v_index=self.v_index,
+            mechanical_dofs=self.mechanical_dofs,
+            extra_state_labels=self.extra_state_labels + extra,
+        )
 
     def _base_index(self, volume_index: int) -> int:
         idx = int(volume_index)
@@ -146,4 +158,5 @@ class StateLayout:
                 labels.append("free_piston_v_m_per_s")
                 for dof in range(1, dofs):
                     labels.append(f"free_piston_q{dof}_v_m_per_s")
+        labels.extend(self.extra_state_labels)
         return labels

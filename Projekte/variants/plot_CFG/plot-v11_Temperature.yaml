@@ -1,0 +1,73 @@
+name: Free-Piston Einzelplots
+figures:
+- title: Free-Piston Temperaturverläufe aller Volumes
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Temperaturen über Zeit
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_p
+      title: Temperature [K]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+      y_min: -1.0
+      y_max: 11.0
+    series:
+    - signal_key: cylinder_1_T_K
+      label: cylinder
+      axis_id: ax_p
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1
+      unit_preset: raw
+    - signal_key: compressor_1_T_K
+      label: bounce
+      axis_id: ax_p
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1
+      unit_preset: raw
+    - signal_key: receiver_1_T_K
+      label: receiver
+      axis_id: ax_p
+      color: '#027a48'
+      line_style: '-'
+      scale_factor: 1
+      unit_preset: raw
+    - signal_key: exhaust_plenum_1_T_K
+      label: exhaust_plenum
+      axis_id: ax_p
+      color: '#7a5af8'
+      line_style: '-'
+      scale_factor: 1
+      unit_preset: raw
+
+      label: ambient_out
+      axis_id: ax_p
+      color: '#667085'
+      line_style: --
+      scale_factor: 1
+      unit_preset: raw
+style:
+  preset_name: Light Engineering
+  font_family: DejaVu Sans
+  font_size: 6
+  axis_label_size: 6
+  tick_label_size: 6
+  title_size: 6
+  figure_title_size: 6
+  subplot_title_visible: true
+  figure_title_visible: false
+  grid_visible: true
+  grid_alpha: 0.3
+  legend_visible: true
+  legend_position: best
+  tight_layout: true
+  default_line_width: 0.8
+  default_marker_size: 3.5

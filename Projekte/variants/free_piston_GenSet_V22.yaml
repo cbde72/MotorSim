@@ -1,4 +1,4 @@
-﻿versioning:
+versioning:
   package_version: 7.1.122                                                                                                                                                    # MotorSim-Paketversion, mit der die Config gespeichert wurde.
   config_schema_version: 8                                                                                                                                                    # Ziel-Schema der Config.
   loaded_config_schema_version: 8                                                                                                                                             # Schema nach Laden/Migration.
@@ -72,10 +72,12 @@ preprocessing:
           conrod_m: 1.12                                                                                                                                                      # Pleuellaenge in m.
           compression_ratio: 50.0                                                                                                                                             # Geometrisches Verdichtungsverhaeltnis.
           phase_deg: 0.0                                                                                                                                                      # Phasenversatz in Grad.
+        wall_temperature:
+          ref: cycle_average_wall
         wall_heat:
           ref: woschni_promo_wall                                                                                                                                             # Referenz auf zentral definiertes Submodel.
         combustion:
-          ref: hcci_diesel_beck_2003                                                                                                                                          # Referenz auf zentral definiertes Submodel.
+          ref: vibe_lambda_slot                                                                                                                                          # Referenz auf zentral definiertes Submodel.
         evaporation:
           model: none                                                                                                                                                         # Auswahl des jeweiligen Teilmodells.
       compressor_bounce:
@@ -111,6 +113,29 @@ preprocessing:
         type: environment                                                                                                                                                     # Typ des Volumens, der Verbindung oder Kinematik.
         pressure_Pa: 101325.0                                                                                                                                                 # Fester Umgebungsdruck.
         temperature_K: 300.0                                                                                                                                                  # Feste Umgebungstemperatur.
+
+    wall_temperature:
+      cycle_average_wall:
+        model: cycle_average
+        relaxation: 0.3
+        cylinder:
+          initial_temperature_K: 340.0
+          coolant_temperature_K: 300.0
+          lambda_W_per_mK: 50.0
+          wall_thickness_m: 0.006
+          area_m2: 0.020541
+        head:
+          initial_temperature_K: 323.0
+          coolant_temperature_K: 300.0
+          lambda_W_per_mK: 160.0
+          wall_thickness_m: 0.010
+          area_m2: 0.002875
+        piston:
+          initial_temperature_K: 330.0
+          coolant_temperature_K: 300.0
+          lambda_W_per_mK: 160.0
+          wall_thickness_m: 0.012
+          area_m2: 0.002875
     wall_heat:
       woschni_promo_wall:
         model: woschni                                                                                                                                                        # Auswahl des jeweiligen Teilmodells.
@@ -178,14 +203,14 @@ preprocessing:
         model: hcci_diesel                                                                                                                                                    # Auswahl des jeweiligen Teilmodells.
         ignition_model: beck_2003_two_stage                                                                                                                                   # Zweistufiges Beck-Zuendmodell mit Cool Flame und Hot Flame.
         burn_model: vibe-beck
-        cool_flame_burn_model: vibe-beck                                                                                                                                         # Vibe-Beck-Brennverlaufsmodell nach Autoignition.
+        cool_flame_burn_model: vibe-beck_CF                                                                                                                                        # Vibe-Beck-Brennverlaufsmodell nach Autoignition.
         duration_ms: 1.2                                                                                                                                                      # Brenndauer in Millisekunden.
         lambda_target: 2.4                                                                                                                                                    # Ziel-Luftverhaeltnis Lambda.
         lhv_J_per_kg: 43000000.0                                                                                                                                              # Unterer Heizwert des Kraftstoffs.
         slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
         beck_cf_fuel_name: Diesel 2                                                                                                                                           # Kraftstoffname nach Beck Tabelle 6.2 fuer das Cool-Flame-Modell.
         start_temperature_min_K: 592.0                                                                                                                                        # Mindesttemperatur fuer HCCI-SOC.
-        start_pressure_min_Pa: 500000.0                                                                                                                                       # Mindestdruck fuer HCCI-SOC.
+        start_pressure_min_Pa: 50000.0                                                                                                                                       # Mindestdruck fuer HCCI-SOC.
         max_ignition_delay_s: 0.002                                                                                                                                           # Maximal erlaubter HCCI-Zuendverzug.
     connections:
       compressor_in_check_valve:
@@ -341,10 +366,14 @@ simulation:
 postprocessing:
   auto_update_initial_conditions: false                                                                                                                                        # Schreibt Startwerte aus letztem Lauf zurueck.
   csv_enabled: true                                                                                                                                                           # Aktiviert Haupt-CSV-Ausgabe.
-  csv_path: results/free_piston_GenSet_V16.csv                                                                                                                                # Pfad der Haupt-CSV relativ zum Projekt.
+  csv_path: results/free_piston_GenSet_V20.csv                                                                                                                                # Pfad der Haupt-CSV relativ zum Projekt.
   csv_separator: ;                                                                                                                                                            # Trennzeichen der CSV-Datei.
+  csv_export_layout: thermo0d_signal_export_layout.csv                                                                                                                        # Optionale Signal-Auswahldatei aus dem Alias-Editor.
+  csv_export_mode: all                   # auto | all | selected                                                                                                                                                 # auto nutzt vorhandenes Layout, all exportiert alles, selected erzwingt Layout.
+  csv_export_missing_layout: warn_all         # warn_all | fail                                                                                                                                # Verhalten, wenn selected aktiv ist und kein Layout gefunden wird.
+  csv_export_unknown_signals: warn_empty      # warn_empty | fail                                                                                                                                # Verhalten bei Layout-Signalen, die im Ergebnis nicht existieren.
   excel_enabled: false                                                                                                                                                        # Aktiviert Excel-Ausgabe.
-  excel_path: results/free_piston_GenSet_V16.xlsx                                                                                                                             # Pfad der Excel-Datei relativ zum Projekt.
+  excel_path: results/free_piston_GenSet_V20.xlsx                                                                                                                             # Pfad der Excel-Datei relativ zum Projekt.
   sampling:
     mode: time                                                                                                                                                                # Auswahl des lokalen Modus.
     step_s: 0.0001                                                                                                                                                            # Zeitliche Ausgabeschrittweite.
@@ -367,7 +396,11 @@ postprocessing:
       entries:
       - enabled: true                                                                                                                                                         # Schaltet diesen Block aktiv oder inaktiv.
         path: plot_CFG/plot-v11_hub.yaml                                                                                                                                      # Pfad zur Plot-Layout-Datei.
-        prefix: plot_v11_hub                                                                                                                                                  # Dateipraefix fuer erzeugte Plot-Ausgaben.
+        prefix: plot_v11_hub
+      - enabled: true                                                                                                                                                        # Schaltet diesen Block aktiv oder inaktiv.
+        path: plot_CFG/plot-v11_Temperature.yaml                                                                                                                                   # Pfad zur Plot-Layout-Datei.
+        prefix: plot_fp_energy
+                                                                                                                                                  # Dateipraefix fuer erzeugte Plot-Ausgaben.
       - enabled: false                                                                                                                                                        # Schaltet diesen Block aktiv oder inaktiv.
         path: plot_CFG/plot-v11_Energy.yaml                                                                                                                                   # Pfad zur Plot-Layout-Datei.
         prefix: plot_fp_energy                                                                                                                                                # Dateipraefix fuer erzeugte Plot-Ausgaben.

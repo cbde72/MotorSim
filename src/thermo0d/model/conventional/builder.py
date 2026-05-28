@@ -23,6 +23,8 @@ from thermo0d.config.constants import (
     VolumeType,
     WallCol,
     WallRefCol,
+    WallTemperatureCol,
+    WallTemperatureZone,
 )
 from thermo0d.config.models import (
     ConstantDischargeCoefficientsConfig,
@@ -31,6 +33,7 @@ from thermo0d.config.models import (
     DisabledEvaporationConfig,
     DisabledSubmodelConfig,
     EnvironmentVolumeConfig,
+    CycleAverageWallTemperatureConfig,
     OrificeConnectionConfig,
     PlenumVolumeConfig,
     SimpleEvaporationConfig,
@@ -70,6 +73,14 @@ def _resolve_combustion_total_energy_J(combustion_cfg, nominal_stroke_m: float) 
     return q_total
 
 
+def _wall_temperature_zones(cfg: CycleAverageWallTemperatureConfig):
+    return (
+        (WallTemperatureZone.CYLINDER, "cylinder", cfg.cylinder),
+        (WallTemperatureZone.HEAD, "head", cfg.head),
+        (WallTemperatureZone.PISTON, "piston", cfg.piston),
+    )
+
+
 def build_conventional_bundle(builder) -> ModelBundle:
     config = builder.config
     n_vol = len(config.volumes)
@@ -87,6 +98,12 @@ def build_conventional_bundle(builder) -> ModelBundle:
     kin_rows: list[list[float]] = []
     wall_rows: list[list[float]] = []
     wall_ref_rows: list[list[float]] = []
+    n_wall_zones = len(WallTemperatureZone)
+    wall_temperature_state_index_by_vol = np.full((n_vol, n_wall_zones), -1, dtype=np.int64)
+    wall_temperature_average_state_index_by_vol = np.full((n_vol, 2), -1, dtype=np.int64)
+    wall_temperature_params_by_vol = np.zeros((n_vol, n_wall_zones, len(WallTemperatureCol)), dtype=np.float64)
+    wall_temperature_initials: list[tuple[int, str, float]] = []
+    wall_temperature_average_initials: list[tuple[int, str, float]] = []
     comb_rows: list[list[float]] = []
     evap_rows: list[list[float]] = []
     environment_is_fixed, environment_pressures_pa, environment_temperatures_K = build_environment_buffers(n_vol)
@@ -170,6 +187,31 @@ def build_conventional_bundle(builder) -> ModelBundle:
                 clearance_vol, max_vol = builder._cylinder_reference_volumes(vol)
                 wall_row[WallCol.CLEARANCE_VOL] = clearance_vol
                 wall_row[WallCol.MAX_VOL] = max_vol
+            if isinstance(getattr(vol, "wall_temperature", None), CycleAverageWallTemperatureConfig):
+                wall_temp_cfg = vol.wall_temperature
+                total_area = 0.0
+                weighted_temp = 0.0
+                base_state_idx = state_layout.total_size + len(wall_temperature_initials) + len(wall_temperature_average_initials)
+                for local_zone_offset, (zone_enum, zone_name, zone_cfg) in enumerate(_wall_temperature_zones(wall_temp_cfg)):
+                    zone = int(zone_enum)
+                    state_idx = base_state_idx + local_zone_offset
+                    wall_temperature_state_index_by_vol[i, zone] = state_idx
+                    wall_temperature_params_by_vol[i, zone, WallTemperatureCol.AREA] = float(zone_cfg.area_m2)
+                    wall_temperature_params_by_vol[i, zone, WallTemperatureCol.CONDUCTANCE] = float(zone_cfg.lambda_W_per_mK) / float(zone_cfg.wall_thickness_m)
+                    wall_temperature_params_by_vol[i, zone, WallTemperatureCol.COOLANT_TEMP] = float(zone_cfg.coolant_temperature_K)
+                    wall_temperature_params_by_vol[i, zone, WallTemperatureCol.RELAXATION] = float(wall_temp_cfg.relaxation)
+                    wall_temperature_params_by_vol[i, zone, WallTemperatureCol.ENABLED] = 1.0
+                    wall_temperature_initials.append((i, str(zone_name), float(zone_cfg.initial_temperature_K)))
+                    total_area += float(zone_cfg.area_m2)
+                    weighted_temp += float(zone_cfg.area_m2) * float(zone_cfg.initial_temperature_K)
+                avg_base_idx = base_state_idx + n_wall_zones
+                wall_temperature_average_state_index_by_vol[i, 0] = avg_base_idx
+                wall_temperature_average_state_index_by_vol[i, 1] = avg_base_idx + 1
+                wall_temperature_average_initials.append((i, "alpha_avg_W_per_m2K", 0.0))
+                wall_temperature_average_initials.append((i, "T_alpha_avg_KW_per_m2K", 0.0))
+                if total_area > 0.0:
+                    wall_row[WallCol.WALL_AREA] = total_area
+                    wall_row[WallCol.WALL_TEMP] = weighted_temp / total_area
             wall_rows.append(wall_row.tolist())
             wall_ref_rows.append([0.0, 0.0, 0.0, 0.0, 0.0, -1.0])
             vol_matrix[i, VolumeCol.WALL_ROW] = float(wall_idx)
@@ -246,9 +288,23 @@ def build_conventional_bundle(builder) -> ModelBundle:
     feature_flags = build_feature_flags(config)
     simulation = build_simulation_options(config, cycle_period_s)
     postprocessing = build_postprocessing_options(config)
-    jac_sparsity = build_rhs_jacobian_sparsity(n_vol, conn_matrix, feature_flags)
+    wall_temperature_extra_state_count = len(wall_temperature_initials) + len(wall_temperature_average_initials)
+    jac_sparsity = build_rhs_jacobian_sparsity(n_vol, conn_matrix, feature_flags, extra_state_count=wall_temperature_extra_state_count, dense_extra_coupling=bool(wall_temperature_extra_state_count))
     jac_color_groups = greedy_color_columns(jac_sparsity)
     wall_ref_matrix_safe = wall_ref_matrix if wall_ref_matrix.size > 0 else np.zeros((max(wall_matrix.shape[0], 1), len(WallRefCol)), dtype=np.float64)
+    if wall_temperature_extra_state_count:
+        old_size = y_init.size
+        extra_labels = [f"{volume_names[i]}_wall_{zone_name}_temperature_K" for i, zone_name, _temp in wall_temperature_initials]
+        extra_labels += [f"{volume_names[i]}_wall_temperature_{avg_name}" for i, avg_name, _value in wall_temperature_average_initials]
+        state_layout = state_layout.with_extra_states(extra_labels)
+        y_ext = np.zeros(state_layout.total_size, dtype=np.float64)
+        y_ext[:old_size] = y_init
+        for offset, (_vol_i, _zone_name, temp) in enumerate(wall_temperature_initials):
+            y_ext[old_size + offset] = temp
+        avg_offset0 = old_size + len(wall_temperature_initials)
+        for offset, (_vol_i, _avg_name, value) in enumerate(wall_temperature_average_initials):
+            y_ext[avg_offset0 + offset] = value
+        y_init = y_ext
     wall_bore_by_vol = np.zeros(n_vol, dtype=np.float64)
     wall_ups_by_vol = np.zeros(n_vol, dtype=np.float64)
     for i in range(n_vol):
@@ -307,6 +363,10 @@ def build_conventional_bundle(builder) -> ModelBundle:
         wall_ref_matrix_safe=wall_ref_matrix_safe,
         wall_bore_by_vol=wall_bore_by_vol,
         wall_ups_by_vol=wall_ups_by_vol,
+        wall_temperature_enabled=bool(wall_temperature_extra_state_count),
+        wall_temperature_state_index_by_vol=wall_temperature_state_index_by_vol,
+        wall_temperature_average_state_index_by_vol=wall_temperature_average_state_index_by_vol,
+        wall_temperature_params_by_vol=wall_temperature_params_by_vol,
         comb_matrix=comb_matrix,
         evap_matrix=evap_matrix,
         lift_table=lift_table,

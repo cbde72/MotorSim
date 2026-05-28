@@ -1,4 +1,4 @@
-﻿versioning:
+versioning:
   package_version: 7.1.122                                                                                                                                                    # MotorSim-Paketversion, mit der die Config gespeichert wurde.
   config_schema_version: 8                                                                                                                                                    # Ziel-Schema der Config.
   loaded_config_schema_version: 8                                                                                                                                             # Schema nach Laden/Migration.
@@ -75,7 +75,7 @@ preprocessing:
         wall_heat:
           ref: woschni_promo_wall                                                                                                                                             # Referenz auf zentral definiertes Submodel.
         combustion:
-          ref: hcci_diesel_beck_2003                                                                                                                                          # Referenz auf zentral definiertes Submodel.
+          ref: vibe_lambda_slot                                                                                                                                          # Referenz auf zentral definiertes Submodel.
         evaporation:
           model: none                                                                                                                                                         # Auswahl des jeweiligen Teilmodells.
       compressor_bounce:
@@ -178,7 +178,7 @@ preprocessing:
         model: hcci_diesel                                                                                                                                                    # Auswahl des jeweiligen Teilmodells.
         ignition_model: beck_2003_two_stage                                                                                                                                   # Zweistufiges Beck-Zuendmodell mit Cool Flame und Hot Flame.
         burn_model: vibe-beck
-        cool_flame_burn_model: vibe-beck                                                                                                                                         # Vibe-Beck-Brennverlaufsmodell nach Autoignition.
+        cool_flame_burn_model: vibe-beck #vibe-beck_CF                                                                                                                                        # Vibe-Beck-Brennverlaufsmodell nach Autoignition.
         duration_ms: 1.2                                                                                                                                                      # Brenndauer in Millisekunden.
         lambda_target: 2.4                                                                                                                                                    # Ziel-Luftverhaeltnis Lambda.
         lhv_J_per_kg: 43000000.0                                                                                                                                              # Unterer Heizwert des Kraftstoffs.
@@ -367,7 +367,11 @@ postprocessing:
       entries:
       - enabled: true                                                                                                                                                         # Schaltet diesen Block aktiv oder inaktiv.
         path: plot_CFG/plot-v11_hub.yaml                                                                                                                                      # Pfad zur Plot-Layout-Datei.
-        prefix: plot_v11_hub                                                                                                                                                  # Dateipraefix fuer erzeugte Plot-Ausgaben.
+        prefix: plot_v11_hub
+      - enabled: true                                                                                                                                                        # Schaltet diesen Block aktiv oder inaktiv.
+        path: plot_CFG/plot-v11_Temperature.yaml                                                                                                                                   # Pfad zur Plot-Layout-Datei.
+        prefix: plot_fp_energy
+                                                                                                                                                  # Dateipraefix fuer erzeugte Plot-Ausgaben.
       - enabled: false                                                                                                                                                        # Schaltet diesen Block aktiv oder inaktiv.
         path: plot_CFG/plot-v11_Energy.yaml                                                                                                                                   # Pfad zur Plot-Layout-Datei.
         prefix: plot_fp_energy                                                                                                                                                # Dateipraefix fuer erzeugte Plot-Ausgaben.

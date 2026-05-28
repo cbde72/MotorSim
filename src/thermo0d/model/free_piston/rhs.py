@@ -4,7 +4,7 @@ import math
 
 import numpy as np
 
-from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnectionType, FeatureCol, VolumeCol, VolumeType
+from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnectionType, FeatureCol, VolumeCol, VolumeType, WallCol, WallTemperatureCol, WallTemperatureZone
 from thermo0d.model.free_piston.forces import compute_load_info
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_equivalent_linear_kinematics, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
@@ -22,6 +22,10 @@ F_WALL = int(FeatureCol.WALL_HEAT)
 F_COMB = int(FeatureCol.COMBUSTION)
 F_EVAP = int(FeatureCol.EVAPORATION)
 F_PV = int(FeatureCol.PV_WORK)
+W_TEMP = int(WallCol.WALL_TEMP)
+WT_AREA = int(WallTemperatureCol.AREA)
+WT_ENABLED = int(WallTemperatureCol.ENABLED)
+WT_ZONE_COUNT = len(WallTemperatureZone)
 
 EMPTY_FLOAT = np.zeros(0, dtype=np.float64)
 EMPTY_INT = np.zeros(0, dtype=np.int64)
@@ -297,6 +301,32 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     use_promo_thermo = bundle.gas_props.shape[0] > 4 and float(bundle.gas_props[4]) >= 0.5
 
     dy_dt = np.zeros_like(y)
+    wall_matrix = bundle.wall_matrix
+    wall_temperature_state_index_by_vol = getattr(bundle, 'wall_temperature_state_index_by_vol', None)
+    wall_temperature_params_by_vol = getattr(bundle, 'wall_temperature_params_by_vol', None)
+    wall_temperature_enabled = bool(getattr(bundle, 'wall_temperature_enabled', False)) and wall_temperature_state_index_by_vol is not None and wall_temperature_params_by_vol is not None
+    wall_temp_eff_by_vol = np.empty(0, dtype=np.float64)
+    wall_area_eff_by_vol = np.empty(0, dtype=np.float64)
+    if wall_temperature_enabled and wall_matrix.shape[0] > 0:
+        wall_temp_eff_by_vol = np.zeros(n_vol, dtype=np.float64)
+        wall_area_eff_by_vol = np.zeros(n_vol, dtype=np.float64)
+        for i in range(n_vol):
+            wall_row_idx = int(bundle.vol_matrix[i, VolumeCol.WALL_ROW])
+            if wall_row_idx >= 0 and wall_row_idx < wall_matrix.shape[0]:
+                wall_temp_eff_by_vol[i] = float(wall_matrix[wall_row_idx, W_TEMP])
+                wall_area_eff_by_vol[i] = float(wall_matrix[wall_row_idx, int(WallCol.WALL_AREA)])
+            if wall_row_idx >= 0 and wall_row_idx < wall_matrix.shape[0] and i < int(wall_temperature_state_index_by_vol.shape[0]):
+                total_area = 0.0
+                weighted_temp = 0.0
+                for zone in range(WT_ZONE_COUNT):
+                    wall_state_idx = int(wall_temperature_state_index_by_vol[i, zone])
+                    if wall_state_idx >= 0 and wall_temperature_params_by_vol is not None and float(wall_temperature_params_by_vol[i, zone, WT_ENABLED]) > 0.5:
+                        area = float(wall_temperature_params_by_vol[i, zone, WT_AREA])
+                        total_area += area
+                        weighted_temp += area * float(y[wall_state_idx])
+                if total_area > 1.0e-18:
+                    wall_area_eff_by_vol[i] = total_area
+                    wall_temp_eff_by_vol[i] = weighted_temp / total_area
     pressures = np.zeros(n_vol, dtype=np.float64)
     temperatures = np.zeros(n_vol, dtype=np.float64)
     volumes = np.zeros(n_vol, dtype=np.float64)
@@ -648,7 +678,7 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             and comb_idx >= 0
             and duration_mode == int(CombDurationMode.TIME)
         )
-        pdv_power, qdot_wall, _htc_wall, _wall_velocity, qdot_comb, qdot_evap = volume_energy_source_terms(
+        pdv_power, qdot_wall, htc_wall, _wall_velocity, qdot_comb, qdot_evap = volume_energy_source_terms(
             vol_type,
             int(vol_row[VolumeCol.WALL_ROW]),
             comb_idx,
@@ -657,7 +687,7 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             0 if (use_latched_fuel_combustion or use_time_vibe) else comb_enabled,
             1 if bundle.feature_flags.size > F_EVAP and int(bundle.feature_flags[F_EVAP]) == 1 else 0,
             1 if bundle.feature_flags.size > F_PV and int(bundle.feature_flags[F_PV]) == 1 else 0,
-            bundle.wall_matrix,
+            wall_matrix,
             bundle.comb_matrix,
             bundle.evap_matrix,
             float(wall_bore_by_vol[i]),
@@ -674,6 +704,8 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             dtheta_dt_global,
             cycle_deg_by_vol[i],
         )
+        if wall_temperature_enabled and bundle.feature_flags.size > F_WALL and int(bundle.feature_flags[F_WALL]) == 1 and int(vol_row[VolumeCol.WALL_ROW]) >= 0 and float(wall_area_eff_by_vol[i]) > 0.0:
+            qdot_wall = float(htc_wall) * float(wall_area_eff_by_vol[i]) * (float(wall_temp_eff_by_vol[i]) - float(temperatures[i]))
         if use_time_vibe:
             comb_row = bundle.comb_matrix[comb_idx]
             if int(getattr(runtime_soc_active_by_vol, 'shape', (0,))[0]) > i:

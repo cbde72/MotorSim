@@ -151,6 +151,9 @@ def _sanitize_disabled_submodels_inplace(state: dict[str, Any]) -> None:
         wall_heat = vol.get("wall_heat")
         if isinstance(wall_heat, dict) and wall_heat.get("model") == "none":
             vol["wall_heat"] = {"model": "none"}
+        wall_temperature = vol.get("wall_temperature")
+        if isinstance(wall_temperature, dict) and wall_temperature.get("model") == "none":
+            vol["wall_temperature"] = {"model": "none"}
         combustion = vol.get("combustion")
         if isinstance(combustion, dict) and combustion.get("model") == "none":
             vol["combustion"] = {"model": "none"}
@@ -808,6 +811,10 @@ class PropertyPanel(QWidget):
             self._meta_spec("postprocessing.csv_enabled"),
             self._meta_spec("postprocessing.csv_path"),
             self._meta_spec("postprocessing.csv_separator"),
+            self._meta_spec("postprocessing.csv_export_layout"),
+            self._meta_spec("postprocessing.csv_export_mode"),
+            self._meta_spec("postprocessing.csv_export_missing_layout"),
+            self._meta_spec("postprocessing.csv_export_unknown_signals"),
             self._meta_spec("postprocessing.excel_enabled"),
             self._meta_spec("postprocessing.excel_path"),
             self._meta_spec("postprocessing.sampling.mode", choices=list(SAMPLING_MODES)),
@@ -849,6 +856,26 @@ class PropertyPanel(QWidget):
                 self._meta_spec(f"{prefix}.cucm"),
                 self._meta_spec(f"{prefix}.swirl_number"),
                 self._meta_spec(f"{prefix}.imep_bar"),
+            ]
+        if prefix.endswith("wall_temperature"):
+            return [
+                self._meta_spec(f"{prefix}.model"),
+                self._meta_spec(f"{prefix}.relaxation"),
+                self._meta_spec(f"{prefix}.cylinder.initial_temperature_K"),
+                self._meta_spec(f"{prefix}.cylinder.coolant_temperature_K"),
+                self._meta_spec(f"{prefix}.cylinder.lambda_W_per_mK"),
+                self._meta_spec(f"{prefix}.cylinder.wall_thickness_m"),
+                self._meta_spec(f"{prefix}.cylinder.area_m2"),
+                self._meta_spec(f"{prefix}.head.initial_temperature_K"),
+                self._meta_spec(f"{prefix}.head.coolant_temperature_K"),
+                self._meta_spec(f"{prefix}.head.lambda_W_per_mK"),
+                self._meta_spec(f"{prefix}.head.wall_thickness_m"),
+                self._meta_spec(f"{prefix}.head.area_m2"),
+                self._meta_spec(f"{prefix}.piston.initial_temperature_K"),
+                self._meta_spec(f"{prefix}.piston.coolant_temperature_K"),
+                self._meta_spec(f"{prefix}.piston.lambda_W_per_mK"),
+                self._meta_spec(f"{prefix}.piston.wall_thickness_m"),
+                self._meta_spec(f"{prefix}.piston.area_m2"),
             ]
         if prefix.endswith("combustion"):
             specs = [
@@ -912,6 +939,7 @@ class PropertyPanel(QWidget):
             self._meta_spec("kinematics.phase_deg"),
         ]
         specs += self._submodel_specs("wall_heat")
+        specs += self._submodel_specs("wall_temperature")
         specs += self._submodel_specs("combustion", include_angle_reference=True)
         specs += self._submodel_specs("evaporation", include_angle_reference=True)
         return specs
@@ -927,6 +955,7 @@ class PropertyPanel(QWidget):
             self._meta_spec("fixed_volume_m3"),
         ]
         specs += self._submodel_specs("wall_heat")
+        specs += self._submodel_specs("wall_temperature")
         specs += self._submodel_specs("combustion", include_angle_reference=True)
         specs += self._submodel_specs("evaporation", include_angle_reference=True)
         return specs
@@ -1796,6 +1825,7 @@ class TopologyConfigEditor(QMainWindow):
                 "initial_temperature_K": 300.0,
                 "kinematics": {"type": "crank_slider", "bore_m": 0.08, "stroke_m": 0.08, "conrod_m": 0.13, "compression_ratio": 10.0, "phase_deg": 0.0},
                 "wall_heat": {"model": "none"},
+                "wall_temperature": {"model": "none"},
                 "combustion": {"model": "none"},
                 "evaporation": {"model": "none"},
             }
@@ -1808,6 +1838,7 @@ class TopologyConfigEditor(QMainWindow):
                 "initial_temperature_K": 300.0,
                 "fixed_volume_m3": 0.002,
                 "wall_heat": {"model": "none"},
+                "wall_temperature": {"model": "none"},
                 "combustion": {"model": "none"},
                 "evaporation": {"model": "none"},
             }
