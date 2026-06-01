@@ -365,4 +365,4 @@ def run_free_piston_postprocessing(bundle, config_path: str | Path, t: np.ndarra
         excel_path = _resolve_output_path(cfg_path, outdir, getattr(bundle.postprocessing, 'excel_path', None), 'free_piston_out.xlsx')
         ExcelExporter.write(excel_path, rows)
         excel_path_text = str(excel_path)
-    return PostprocessingArtifacts(csv_path=csv_path_text, excel_path=excel_path_text, export_rows=rows, check_report_metrics=[])
+    return PostprocessingArtifacts(csv_path=csv_path_text, excel_path=excel_path_text, rhs_derivatives_csv_path=None, export_rows=rows, check_report_metrics=[])

@@ -27,6 +27,7 @@ from thermo0d.output.sampling import OutputSampler
 class PostprocessingArtifacts:
     csv_path: str | None
     excel_path: str | None
+    rhs_derivatives_csv_path: str | None
     export_rows: list[dict[str, float | int]]
     last_cycle_uniform_csv_path: str | None = None
     last_cycle_uniform_rows: list[dict[str, float | int]] | None = None
@@ -73,6 +74,12 @@ class PostprocessingService:
             return self._resolve_output_path(configured, fallback_name='out.xlsx')
         csv_path = self._base_csv_path()
         return csv_path.with_suffix('.xlsx')
+
+    def _rhs_derivatives_csv_path(self, base_csv_path: Path) -> Path:
+        configured = str(getattr(self.bundle.postprocessing, 'rhs_derivatives_export_path', '') or '').strip()
+        if configured:
+            return self._resolve_output_path(configured, fallback_name=base_csv_path.stem + '_rhs_derivatives.csv')
+        return base_csv_path.with_name(base_csv_path.stem + '_rhs_derivatives.csv')
 
     def _is_safe_layout_path(self, path: Path) -> bool:
         resolved = path.resolve()
@@ -571,6 +578,100 @@ class PostprocessingService:
             timings[timing_key] = elapsed
         return str(path)
 
+    @staticmethod
+    def _state_derivative_unit(state_label: str) -> str:
+        label = str(state_label)
+        unit_suffixes = (
+            ('_m_per_s', 'm/s2'),
+            ('_kg_per_s', 'kg/s2'),
+            ('_W_per_m2K', 'W/m2K/s'),
+            ('_KW_per_m2K', 'K*W/m2K/s'),
+            ('_kg', 'kg/s'),
+            ('_J', 'W'),
+            ('_K', 'K/s'),
+            ('_Pa', 'Pa/s'),
+            ('_m', 'm/s'),
+        )
+        for suffix, unit in unit_suffixes:
+            if label.endswith(suffix):
+                return unit
+        return '1/s'
+
+    @staticmethod
+    def _snapshot_free_piston_runtime(bundle) -> tuple[object | None, dict[str, object]]:
+        fp = getattr(bundle, 'free_piston', None)
+        if fp is None:
+            return None, {}
+        fields = getattr(fp, '__dataclass_fields__', {})
+        names = [name for name in fields if str(name).startswith('runtime_')]
+        snapshot: dict[str, object] = {}
+        for name in names:
+            value = getattr(fp, name)
+            snapshot[name] = value.copy() if isinstance(value, np.ndarray) else value
+        return fp, snapshot
+
+    @staticmethod
+    def _restore_free_piston_runtime(fp, snapshot: dict[str, object]) -> None:
+        if fp is None:
+            return
+        for name, value in snapshot.items():
+            current = getattr(fp, name, None)
+            if isinstance(current, np.ndarray) and isinstance(value, np.ndarray) and current.shape == value.shape:
+                current[...] = value
+            else:
+                setattr(fp, name, value)
+
+    def _update_free_piston_runtime_before_rhs(self, t_s: float, y_state: np.ndarray) -> None:
+        if getattr(self.bundle, 'architecture', 'classic') != 'free_piston':
+            return
+        try:
+            from thermo0d.model.free_piston.combustion_latch import (
+                free_piston_uses_slot_closure_lambda,
+                free_piston_uses_time_vibe,
+                free_piston_uses_vapor_injector,
+                update_free_piston_combustion_latch_state,
+            )
+        except Exception:
+            return
+        if not (
+            free_piston_uses_slot_closure_lambda(self.bundle)
+            or free_piston_uses_vapor_injector(self.bundle)
+            or free_piston_uses_time_vibe(self.bundle)
+        ):
+            return
+        update_free_piston_combustion_latch_state(self.bundle, float(t_s), np.asarray(y_state, dtype=np.float64))
+
+    def _build_rhs_derivative_rows(self, t: np.ndarray, y: np.ndarray) -> tuple[list[dict[str, float]], list[list[object]]]:
+        layout = getattr(self.bundle, 'state_layout', None)
+        if layout is None or t.size == 0 or y.size == 0:
+            return [], []
+        labels = list(layout.state_labels(volume_names=list(getattr(self.bundle, 'volume_names', []) or [])))
+        n_state_total = min(len(labels), int(y.shape[0]))
+        rhs_state_indices = [i for i in range(n_state_total) if '_wall_temperature_' not in labels[i]]
+        if not rhs_state_indices:
+            return [], []
+
+        from thermo0d.compute.executor import build_rhs_for_bundle
+
+        rhs = build_rhs_for_bundle(self.bundle)
+        names = ['t_s'] + [f'd_{labels[i]}_dt' for i in rhs_state_indices]
+        units = ['s'] + [self._state_derivative_unit(labels[i]) for i in rhs_state_indices]
+        rows: list[dict[str, float]] = []
+        fp, runtime_snapshot = self._snapshot_free_piston_runtime(self.bundle)
+        try:
+            for k in range(int(t.shape[0])):
+                t_value = float(t[k])
+                y_state = np.asarray(y[:, k], dtype=np.float64)
+                self._update_free_piston_runtime_before_rhs(t_value, y_state)
+                dy = np.asarray(rhs(t_value, y_state.copy()), dtype=np.float64)
+                row = {'t_s': t_value}
+                for out_idx, state_idx in enumerate(rhs_state_indices):
+                    row[names[out_idx + 1]] = float(dy[state_idx]) if state_idx < int(dy.shape[0]) else 0.0
+                rows.append(row)
+        finally:
+            self._restore_free_piston_runtime(fp, runtime_snapshot)
+        return rows, [names, units]
+
     def _needs_export_rows(self, excel_override: bool | None) -> bool:
         return (
             bool(getattr(self.bundle.postprocessing, 'csv_enabled', True))
@@ -606,6 +707,7 @@ class PostprocessingService:
         excel_enabled = self._effective_excel_enabled(excel)
         final_uniform_export_enabled = bool(getattr(self.bundle.postprocessing, 'final_cycle_uniform_angle_export_enabled', False))
         free_piston_ut_ot_ut_export_enabled = bool(getattr(self.bundle.postprocessing, 'free_piston_last_ut_ot_ut_export_enabled', False))
+        rhs_derivatives_export_enabled = bool(getattr(self.bundle.postprocessing, 'rhs_derivatives_export_enabled', False))
         check_report_enabled = bool(getattr(self.bundle.postprocessing, 'check_report_enabled', True))
         check_report_html_enabled = bool(getattr(self.bundle.postprocessing, 'check_report_html_enabled', False))
 
@@ -664,6 +766,31 @@ class PostprocessingService:
         else:
             timings['csv'] = 0.0
             ConsoleArtifactReporter.print_skipped('csv', elapsed_s=timings['csv'])
+
+        rhs_derivatives_csv_path: str | None = None
+        if rhs_derivatives_export_enabled:
+            started = perf_counter()
+            rhs_rows, rhs_header_rows = self._build_rhs_derivative_rows(sampled_t, sampled_y)
+            timings['postprocessing:build-rhs-derivatives'] = perf_counter() - started
+            ConsoleTimingReporter.print('postprocessing:build-rhs-derivatives', timings['postprocessing:build-rhs-derivatives'], rows=len(rhs_rows))
+            if rhs_rows:
+                rhs_path = self._rhs_derivatives_csv_path(base_csv_path)
+                rhs_derivatives_csv_path = self._write_csv_export(
+                    rhs_path,
+                    rhs_rows,
+                    header_rows=rhs_header_rows,
+                    timing_key='csv:rhs-derivatives',
+                    timings=timings,
+                )
+                if rhs_derivatives_csv_path:
+                    ConsoleArtifactReporter.print_path_status('csv:rhs-derivatives', rhs_derivatives_csv_path, elapsed_s=timings['csv:rhs-derivatives'])
+            else:
+                timings['csv:rhs-derivatives'] = 0.0
+                ConsoleArtifactReporter.print_status('csv:rhs-derivatives', 'warn', elapsed_s=timings['csv:rhs-derivatives'], reason='no-rows')
+        else:
+            timings['postprocessing:build-rhs-derivatives'] = 0.0
+            timings['csv:rhs-derivatives'] = 0.0
+            ConsoleArtifactReporter.print_skipped('csv:rhs-derivatives', elapsed_s=timings['csv:rhs-derivatives'])
 
         excel_path: str | None = None
         if excel_enabled:
@@ -795,6 +922,7 @@ class PostprocessingService:
         return PostprocessingArtifacts(
             csv_path=csv_path,
             excel_path=excel_path,
+            rhs_derivatives_csv_path=rhs_derivatives_csv_path,
             export_rows=export_rows,
             last_cycle_uniform_csv_path=last_cycle_uniform_csv_path,
             last_cycle_uniform_rows=uniform_last_cycle_rows or None,

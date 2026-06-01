@@ -132,6 +132,17 @@ class FreePistonLastUtOtUtExportConfig(StrictBaseModel):
         return self
 
 
+class RhsDerivativesExportConfig(StrictBaseModel):
+    enabled: StrictBool = False
+    path: StrictStr | None = None
+
+    @model_validator(mode="after")
+    def validate_values(self) -> "RhsDerivativesExportConfig":
+        if self.path is not None and not self.path.strip():
+            raise ValueError("rhs_derivatives_export.path must not be empty when provided")
+        return self
+
+
 class CheckReportConfig(StrictBaseModel):
     enabled: StrictBool = True
     html_enabled: StrictBool = False
@@ -187,6 +198,7 @@ class PostprocessingConfig(StrictBaseModel):
     sampling: SamplingConfig
     final_cycle_uniform_angle_export: LastCycleUniformAngleExportConfig = Field(default_factory=LastCycleUniformAngleExportConfig)
     free_piston_last_ut_ot_ut_export: FreePistonLastUtOtUtExportConfig = Field(default_factory=FreePistonLastUtOtUtExportConfig)
+    rhs_derivatives_export: RhsDerivativesExportConfig = Field(default_factory=RhsDerivativesExportConfig)
     check_report: CheckReportConfig = Field(default_factory=CheckReportConfig)
     plots: PlotsConfig = Field(default_factory=PlotsConfig)
     console: ConsoleOutputConfig = Field(default_factory=ConsoleOutputConfig)

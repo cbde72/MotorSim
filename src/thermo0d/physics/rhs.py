@@ -113,6 +113,14 @@ F_PV = int(FeatureCol.PV_WORK)
 
 REF_ABSOLUTE = int(AngleReference.ABSOLUTE)
 DURATION_MODE_TIME = int(CombDurationMode.TIME)
+ANGLE_DOMAIN_CAM = int(AngleDomain.CAM)
+FLOW_COEFF_CONSTANT = int(FlowCoeffMode.CONSTANT)
+CONN_VALVE = int(ConnectionType.VALVE)
+CONN_SLOT = int(ConnectionType.SLOT)
+CONN_ORIFICE = int(ConnectionType.ORIFICE)
+CONN_CHECK_VALVE = int(ConnectionType.CHECK_VALVE)
+VOL_CYLINDER = int(VolumeType.CYLINDER)
+VOL_ENVIRONMENT = int(VolumeType.ENVIRONMENT)
 
 
 
@@ -135,7 +143,7 @@ def _evaluate_valve_state(
     theta_ref_deg, ref_zero = _reference_theta_and_zero(theta_local_deg, theta_global_deg, cycle_deg, int(conn_row[C_REF]))
     local_crank_deg = wrap_angle_deg(theta_ref_deg - ref_zero - conn_row[C_OPEN], cycle_deg)
     profile_deg = local_crank_deg
-    if int(conn_row[C_ANGLE_DOMAIN]) == AngleDomain.CAM:
+    if int(conn_row[C_ANGLE_DOMAIN]) == ANGLE_DOMAIN_CAM:
         cam_ratio = cycle_deg / 360.0
         profile_deg = local_crank_deg / cam_ratio
     p_start = int(conn_row[C_PROFILE_START])
@@ -166,7 +174,7 @@ def _evaluate_valve_area(
     theta_ref_deg, ref_zero = _reference_theta_and_zero(theta_local_deg, theta_global_deg, cycle_deg, int(conn_row[C_REF]))
     local_crank_deg = wrap_angle_deg(theta_ref_deg - ref_zero - conn_row[C_OPEN], cycle_deg)
     profile_deg = local_crank_deg
-    if int(conn_row[C_ANGLE_DOMAIN]) == AngleDomain.CAM:
+    if int(conn_row[C_ANGLE_DOMAIN]) == ANGLE_DOMAIN_CAM:
         cam_ratio = cycle_deg / 360.0
         profile_deg = local_crank_deg / cam_ratio
     p_start = int(conn_row[C_PROFILE_START])
@@ -197,7 +205,7 @@ def _evaluate_slot_state(conn_row: np.ndarray, piston_x_m: float, cd_table: np.n
     if uncovered > height:
         uncovered = height
     geom_area = width * uncovered * holes
-    if int(conn_row[C_CD_MODE]) == FlowCoeffMode.CONSTANT:
+    if int(conn_row[C_CD_MODE]) == FLOW_COEFF_CONSTANT:
         cd_f = conn_row[C_CD_F]
         cd_r = conn_row[C_CD_R]
     else:
@@ -246,13 +254,13 @@ def _connection_area_and_coefficients(
     p_from_pa: float = 0.0,
     p_to_pa: float = 0.0,
 ) -> tuple[float, float, float]:
-    if conn_type == ConnectionType.VALVE:
+    if conn_type == CONN_VALVE:
         return _evaluate_valve_area(conn_row, cyl_theta_deg, cyl_theta_global_deg, cyl_cycle_deg, lift_table, alpha_table)
-    if conn_type == ConnectionType.SLOT:
+    if conn_type == CONN_SLOT:
         return _evaluate_slot_area(conn_row, cyl_piston_x_m, cd_table)
-    if conn_type == ConnectionType.ORIFICE:
+    if conn_type == CONN_ORIFICE:
         return _evaluate_orifice_area(conn_row)
-    if conn_type == ConnectionType.CHECK_VALVE:
+    if conn_type == CONN_CHECK_VALVE:
         return _evaluate_check_valve_area(conn_row, p_from_pa, p_to_pa)
     return 0.0, 0.0, 0.0
 
@@ -451,7 +459,7 @@ def rhs_thermo_numba(
     for i in range(n_vol):
         vol_row = vol_matrix[i]
         vol_type = int(vol_row[V_TYPE])
-        is_fixed_environment = int(environment_is_fixed[i]) == 1 or vol_type == VolumeType.ENVIRONMENT
+        is_fixed_environment = int(environment_is_fixed[i]) == 1 or vol_type == VOL_ENVIRONMENT
         base = _gas_state_base_index(i)
         mass_idx = base
         energy_idx = base + 1
@@ -461,7 +469,7 @@ def rhs_thermo_numba(
         burned_mass = _burned_mass_from_state_vec(y, i)
         fuel_vapor_mass = _fuel_vapor_mass_from_state_vec(y, i)
 
-        if vol_type == VolumeType.CYLINDER:
+        if vol_type == VOL_CYLINDER:
             kin_idx = int(vol_row[V_KIN_ROW])
             kin_row = kin_matrix[kin_idx]
             volume, dvdt, theta_deg, piston_pos, dtheta_dt_deg_s, cycle_deg = cylinder_kinematic_state_from_time(kin_row, t)
@@ -533,10 +541,10 @@ def rhs_thermo_numba(
             right = int(conn[C_TO])
             conn_type = int(conn[C_TYPE])
 
-            if conn_type in (ConnectionType.VALVE, ConnectionType.SLOT):
-                if int(vol_matrix[left, V_TYPE]) == VolumeType.CYLINDER:
+            if conn_type == CONN_VALVE or conn_type == CONN_SLOT:
+                if int(vol_matrix[left, V_TYPE]) == VOL_CYLINDER:
                     cyl_idx = left
-                elif int(vol_matrix[right, V_TYPE]) == VolumeType.CYLINDER:
+                elif int(vol_matrix[right, V_TYPE]) == VOL_CYLINDER:
                     cyl_idx = right
                 else:
                     continue
@@ -551,9 +559,9 @@ def rhs_thermo_numba(
                     alpha_table,
                     cd_table,
                 )
-            elif conn_type == ConnectionType.ORIFICE:
+            elif conn_type == CONN_ORIFICE:
                 area, cd_f, cd_r = _evaluate_orifice_area(conn)
-            elif conn_type == ConnectionType.CHECK_VALVE:
+            elif conn_type == CONN_CHECK_VALVE:
                 area, cd_f, cd_r = _evaluate_check_valve_area(conn, pressures[left], pressures[right])
             else:
                 continue
@@ -624,9 +632,9 @@ def rhs_thermo_numba(
                     dy[right_b] -= burned_transfer
                     dy[right_a] -= air_transfer
 
-            if int(vol_matrix[left, V_TYPE]) == VolumeType.CYLINDER and mdot < 0.0:
+            if int(vol_matrix[left, V_TYPE]) == VOL_CYLINDER and mdot < 0.0:
                 mdot_in_by_vol[left] += -mdot
-            if int(vol_matrix[right, V_TYPE]) == VolumeType.CYLINDER and mdot > 0.0:
+            if int(vol_matrix[right, V_TYPE]) == VOL_CYLINDER and mdot > 0.0:
                 mdot_in_by_vol[right] += mdot
 
     for i in range(n_vol):
@@ -638,7 +646,7 @@ def rhs_thermo_numba(
         burned_idx = base + 2
         air_idx = base + 3
         liquid_idx = base + 4
-        if int(environment_is_fixed[i]) == 1 or vol_type == VolumeType.ENVIRONMENT:
+        if int(environment_is_fixed[i]) == 1 or vol_type == VOL_ENVIRONMENT:
             dy[mass_idx] = 0.0
             dy[energy_idx] = 0.0
             dy[burned_idx] = 0.0
@@ -680,7 +688,7 @@ def rhs_thermo_numba(
         dy[energy_idx] = dy[energy_idx] - pdv_power + qdot_wall + qdot_comb - qdot_evap
 
         evap_idx = int(vol_row[V_EVAP])
-        if vol_type == VolumeType.CYLINDER and enable_evap and evap_idx >= 0 and qdot_evap > 0.0:
+        if vol_type == VOL_CYLINDER and enable_evap and evap_idx >= 0 and qdot_evap > 0.0:
             latent = evap_matrix[evap_idx, E_LATENT]
             if latent > 1.0e-18 and y[liquid_idx] > 0.0:
                 evap_mdot = qdot_evap / latent
@@ -688,7 +696,7 @@ def rhs_thermo_numba(
                 dy[mass_idx] += evap_mdot
 
         comb_idx = int(vol_row[V_COMB])
-        if vol_type == VolumeType.CYLINDER and enable_comb and comb_idx >= 0 and qdot_comb > 0.0:
+        if vol_type == VOL_CYLINDER and enable_comb and comb_idx >= 0 and qdot_comb > 0.0:
             comb_row = comb_matrix[comb_idx]
             if _comb_duration_mode_from_row(comb_row) != DURATION_MODE_TIME:
                 xb, dxb_dt = vibe_fraction_and_rate_numba(

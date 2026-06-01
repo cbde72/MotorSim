@@ -97,7 +97,10 @@ def cylinder_distance_from_tdc(x_m: float, x_min_m: float, x_max_m: float) -> fl
     return float(x_eff_m - x_min_m)
 
 
-def cylinder_volume_from_position(clearance_volume_m3: float, piston_area_m2: float, x_m: float, x_min_m: float, x_max_m: float) -> float:
+def cylinder_volume_from_position(clearance_volume_m3: float, piston_area_m2: float, x_m: float, x_min_m: float, x_max_m: float | None = None) -> float:
+    if x_max_m is None:
+        x_max_m = x_min_m
+        x_min_m = 0.0
     x_eff_m = _clamp_position(x_m, x_min_m, x_max_m)
     volume_m3 = float(clearance_volume_m3 + piston_area_m2 * (x_eff_m - x_min_m))
     if volume_m3 <= 0.0:

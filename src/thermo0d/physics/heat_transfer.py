@@ -9,6 +9,7 @@ from thermo0d.config.constants import HeatTransferModel, VolumeCol, VolumeType, 
 
 V_TYPE = int(VolumeCol.TYPE)
 V_KIN_ROW = int(VolumeCol.KIN_ROW)
+VOL_CYLINDER = int(VolumeType.CYLINDER)
 W_MODEL = int(WallCol.MODEL)
 W_C1 = int(WallCol.C1)
 W_C2 = int(WallCol.C2)
@@ -38,7 +39,7 @@ WDP_OFF = int(WoschniDpMode.OFF)
 
 @nb.njit(cache=True)
 def wall_heat_context_for_volume(vol_row: np.ndarray, kin_matrix: np.ndarray) -> tuple[float, float]:
-    if int(vol_row[V_TYPE]) == VolumeType.CYLINDER:
+    if int(vol_row[V_TYPE]) == VOL_CYLINDER:
         kin_idx = int(vol_row[V_KIN_ROW])
         return kin_matrix[kin_idx, 1], 2.0 * kin_matrix[kin_idx, 2] * kin_matrix[kin_idx, 6] / 60.0
     return _DEFAULT_NONCYL_BORE_M, 0.0

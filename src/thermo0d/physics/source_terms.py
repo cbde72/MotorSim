@@ -18,6 +18,7 @@ F_WALL = int(FeatureCol.WALL_HEAT)
 F_COMB = int(FeatureCol.COMBUSTION)
 F_EVAP = int(FeatureCol.EVAPORATION)
 F_PV = int(FeatureCol.PV_WORK)
+VOL_CYLINDER = int(VolumeType.CYLINDER)
 
 
 @nb.njit(cache=True)
@@ -30,7 +31,7 @@ def volume_energy_source_terms(vol_type: int, wall_idx: int, comb_idx: int, evap
     qdot_evap = 0.0
     if wall_enabled == 1 and wall_idx >= 0:
         qdot_wall, htc_wall, wall_velocity, _dp = wall_heat_rate_and_coeff_from_row_numba(wall_matrix[wall_idx], wall_bore_m, pressure_pa, gas_temp_K, wall_mean_piston_speed_m_s, volume_m3, theta_local_deg, cycle_deg, cylinder_mass_kg, mdot_in_kg_per_s)
-    if vol_type == VolumeType.CYLINDER:
+    if vol_type == VOL_CYLINDER:
         if comb_enabled == 1 and comb_idx >= 0:
             qdot_comb = _vibe_heat_release_rate_impl(theta_local_deg, theta_global_deg, dtheta_local_dt_deg_s, dtheta_global_dt_deg_s, comb_matrix[comb_idx], cycle_deg)
         if evap_enabled == 1 and evap_idx >= 0:

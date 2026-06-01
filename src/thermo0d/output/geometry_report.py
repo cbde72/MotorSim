@@ -70,6 +70,33 @@ def _integrate_window(rows: list[dict[str, float | int]], key: str) -> float:
     return float(np.trapezoid(y_arr, t_arr))
 
 
+def _integrate_abs_window(rows: list[dict[str, float | int]], key: str) -> float | None:
+    t_arr, y_arr = _window_values(rows, key)
+    if t_arr.size < 2 or y_arr.size < 2:
+        return None
+    return float(np.trapezoid(np.abs(y_arr), t_arr))
+
+
+def _integrate_zone_abs_wall_window(rows: list[dict[str, float | int]], prefix: str | None) -> float | None:
+    if not prefix:
+        return None
+    t_ref: np.ndarray | None = None
+    summed: np.ndarray | None = None
+    for zone in ("cylinder", "head", "piston"):
+        t_arr, y_arr = _window_values(rows, f"{prefix}_wall_{zone}_heat_W")
+        if t_arr.size < 2 or y_arr.size < 2:
+            continue
+        if t_ref is None:
+            t_ref = t_arr
+            summed = y_arr.astype(np.float64, copy=True)
+            continue
+        if t_arr.size == t_ref.size and np.allclose(t_arr, t_ref):
+            summed = summed + y_arr if summed is not None else y_arr.astype(np.float64, copy=True)
+    if t_ref is None or summed is None or t_ref.size < 2:
+        return None
+    return float(np.trapezoid(np.abs(summed), t_ref))
+
+
 def _integrate_series(t_arr: np.ndarray, y_arr: np.ndarray) -> float:
     if t_arr.size < 2 or y_arr.size < 2 or t_arr.size != y_arr.size:
         return 0.0
@@ -388,7 +415,11 @@ def build_last_cycle_entries(bundle, rows: list[dict[str, float | int]] | None) 
 
     piston_work_J = _integrate_window(cycle_rows, f"{prefix}_piston_work_W") if prefix else 0.0
     wall_heat_net_J = _integrate_window(cycle_rows, f"{prefix}_wall_heat_W") if prefix else 0.0
-    wall_heat_loss_J = max(0.0, -wall_heat_net_J)
+    wall_heat_loss_J = _integrate_abs_window(cycle_rows, f"{prefix}_wall_heat_W") if prefix else None
+    if wall_heat_loss_J is None:
+        wall_heat_loss_J = _integrate_zone_abs_wall_window(cycle_rows, prefix)
+    if wall_heat_loss_J is None:
+        wall_heat_loss_J = abs(wall_heat_net_J)
     added_energy_J = _integrate_window(cycle_rows, f"{prefix}_added_energy_W") if prefix else 0.0
     htc_arr = _row_values(cycle_rows, f"{prefix}_htc_W_per_m2K") if prefix else np.zeros(0, dtype=np.float64)
     htc_mean = float(np.mean(htc_arr)) if htc_arr.size else 0.0

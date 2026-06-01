@@ -23,6 +23,9 @@ KIN_CR = int(KinCol.COMPRESSION_RATIO)
 KIN_PHASE = int(KinCol.PHASE_DEG)
 KIN_SPEED = int(KinCol.SPEED_RPM)
 KIN_CYCLE = int(KinCol.CYCLE_DEG)
+REF_ABSOLUTE = int(AngleReference.ABSOLUTE)
+REF_COMPRESSION_TDC = int(AngleReference.COMPRESSION_TDC)
+REF_GAS_EXCHANGE_TDC = int(AngleReference.GAS_EXCHANGE_TDC)
 
 
 @nb.njit(cache=True)
@@ -35,11 +38,11 @@ def wrap_angle_deg(angle_deg: float, cycle_deg: float) -> float:
 
 @nb.njit(cache=True)
 def reference_zero_deg(cycle_deg: float, ref_type: int) -> float:
-    if ref_type == AngleReference.ABSOLUTE:
+    if ref_type == REF_ABSOLUTE:
         return 0.0
-    if ref_type == AngleReference.COMPRESSION_TDC:
+    if ref_type == REF_COMPRESSION_TDC:
         return 0.0
-    if ref_type == AngleReference.GAS_EXCHANGE_TDC:
+    if ref_type == REF_GAS_EXCHANGE_TDC:
         if cycle_deg >= 719.0:
             return 360.0
         return 0.0
@@ -74,7 +77,7 @@ def reference_theta_and_zero(
     cycle_deg: float,
     ref_type: int,
 ) -> tuple[float, float]:
-    if ref_type == AngleReference.ABSOLUTE:
+    if ref_type == REF_ABSOLUTE:
         return theta_global_deg, 0.0
     return theta_local_deg, reference_zero_deg(cycle_deg, ref_type)
 

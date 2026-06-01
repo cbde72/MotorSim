@@ -769,6 +769,8 @@ class PropertyPanel(QWidget):
             self._meta_spec("postprocessing.free_piston_last_ut_ot_ut_export.step_deg"),
             self._meta_spec("postprocessing.free_piston_last_ut_ot_ut_export.axis_min_deg"),
             self._meta_spec("postprocessing.free_piston_last_ut_ot_ut_export.axis_max_deg"),
+            self._meta_spec("postprocessing.rhs_derivatives_export.enabled"),
+            self._meta_spec("postprocessing.rhs_derivatives_export.path"),
             self._meta_spec("postprocessing.check_report.enabled"),
             self._meta_spec("postprocessing.check_report.html_enabled"),
             self._meta_spec("postprocessing.plots.enabled"),

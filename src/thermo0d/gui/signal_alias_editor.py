@@ -201,6 +201,12 @@ class SignalAliasEditor(QMainWindow):
         self.family_filter_combo = QComboBox()
         self.family_filter_combo.setMinimumWidth(160)
         self.family_filter_combo.currentTextChanged.connect(self.apply_filter)
+        self.unit_filter_combo = QComboBox()
+        self.unit_filter_combo.setMinimumWidth(145)
+        self.unit_filter_combo.currentTextChanged.connect(self.apply_filter)
+        self.component_filter_combo = QComboBox()
+        self.component_filter_combo.setMinimumWidth(155)
+        self.component_filter_combo.currentTextChanged.connect(self.apply_filter)
         save_btn = QPushButton("Speichern")
         save_btn.clicked.connect(self.save_file)
         export_btn = QPushButton("Export-Datei")
@@ -211,6 +217,10 @@ class SignalAliasEditor(QMainWindow):
         top.addWidget(self.filter_edit, 1)
         top.addWidget(QLabel("Familie:"))
         top.addWidget(self.family_filter_combo)
+        top.addWidget(QLabel("Einheiten:"))
+        top.addWidget(self.unit_filter_combo)
+        top.addWidget(QLabel("Bauteil:"))
+        top.addWidget(self.component_filter_combo)
         top.addWidget(save_btn)
         top.addWidget(export_btn)
         layout.addLayout(top)
@@ -389,12 +399,18 @@ class SignalAliasEditor(QMainWindow):
         self.table.resizeColumnsToContents()
         self.table.setSortingEnabled(True)
         self._refresh_family_filter_options()
+        self._refresh_unit_filter_options()
+        self._refresh_component_filter_options()
         self.apply_filter()
 
     def apply_filter(self) -> None:
         needle = self.filter_edit.text().strip().lower()
         family_filter = self.family_filter_combo.currentData() if hasattr(self, 'family_filter_combo') else None
         family_filter = str(family_filter or "").strip()
+        unit_filter = self.unit_filter_combo.currentData() if hasattr(self, 'unit_filter_combo') else None
+        unit_filter = str(unit_filter or "").strip()
+        component_filter = self.component_filter_combo.currentData() if hasattr(self, 'component_filter_combo') else None
+        component_filter = str(component_filter or "").strip()
         searchable_columns = [1, 2, 4, 5, 6, 7, 8, 9, 10]
         for row in range(self.table.rowCount()):
             row_text = " | ".join(
@@ -402,9 +418,13 @@ class SignalAliasEditor(QMainWindow):
                 for col in searchable_columns
             ).lower()
             row_family = self.table.item(row, 7).text().strip() if self.table.item(row, 7) else ""
+            row_unit = self.table.item(row, 2).text().strip() if self.table.item(row, 2) else ""
+            row_component = self._row_component(row)
             text_hidden = bool(needle) and needle not in row_text
             family_hidden = bool(family_filter) and row_family != family_filter
-            self.table.setRowHidden(row, text_hidden or family_hidden)
+            unit_hidden = bool(unit_filter) and not self._unit_matches_filter(row_unit, unit_filter)
+            component_hidden = bool(component_filter) and row_component != component_filter
+            self.table.setRowHidden(row, text_hidden or family_hidden or unit_hidden or component_hidden)
         self._update_statusbar_fields()
 
     def _refresh_family_filter_options(self) -> None:
@@ -424,6 +444,89 @@ class SignalAliasEditor(QMainWindow):
         idx = self.family_filter_combo.findData(current)
         self.family_filter_combo.setCurrentIndex(idx if idx >= 0 else 0)
         self.family_filter_combo.blockSignals(False)
+
+    def _refresh_unit_filter_options(self) -> None:
+        if not hasattr(self, 'unit_filter_combo'):
+            return
+        current = str(self.unit_filter_combo.currentData() or "")
+        units = sorted({
+            self.table.item(row, 2).text().strip()
+            for row in range(self.table.rowCount())
+            if self.table.item(row, 2) and self.table.item(row, 2).text().strip()
+        }, key=str.lower)
+        self.unit_filter_combo.blockSignals(True)
+        self.unit_filter_combo.clear()
+        self.unit_filter_combo.addItem("Alle", "")
+        for label, token in self._unit_filter_presets():
+            self.unit_filter_combo.addItem(label, token)
+        if units:
+            self.unit_filter_combo.insertSeparator(self.unit_filter_combo.count())
+        for unit in units:
+            self.unit_filter_combo.addItem(unit, f"unit:{unit}")
+        idx = self.unit_filter_combo.findData(current)
+        self.unit_filter_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.unit_filter_combo.blockSignals(False)
+
+    def _refresh_component_filter_options(self) -> None:
+        if not hasattr(self, 'component_filter_combo'):
+            return
+        current = str(self.component_filter_combo.currentData() or "")
+        components = sorted({
+            component
+            for row in range(self.table.rowCount())
+            for component in [self._row_component(row)]
+            if component
+        }, key=self._natural_sort_key)
+        self.component_filter_combo.blockSignals(True)
+        self.component_filter_combo.clear()
+        self.component_filter_combo.addItem("Alle Bauteile", "")
+        for component in components:
+            self.component_filter_combo.addItem(component, component)
+        idx = self.component_filter_combo.findData(current)
+        self.component_filter_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.component_filter_combo.blockSignals(False)
+
+    @staticmethod
+    def _unit_filter_presets() -> list[tuple[str, str]]:
+        return [
+            ("Temperatur", "temperature"),
+            ("Druck", "pressure"),
+            ("Energie", "energy"),
+            ("Leistung", "power"),
+            ("Masse", "mass"),
+            ("Massenstrom", "mass_flow"),
+            ("Volumen", "volume"),
+            ("Flaeche", "area"),
+            ("Winkel", "angle"),
+            ("Kraft", "force"),
+        ]
+
+    @staticmethod
+    def _unit_matches_filter(unit: str, token: str) -> bool:
+        unit_norm = str(unit or "").strip()
+        if not token:
+            return True
+        if token.startswith("unit:"):
+            return unit_norm == token[len("unit:"):]
+        normalized = unit_norm.replace("Â", "").replace("²", "2").replace("³", "3").lower()
+        groups = {
+            "temperature": {"k", "degc", "c", "°c"},
+            "pressure": {"pa", "kpa", "bar", "mpa"},
+            "energy": {"j", "kj", "nm"},
+            "power": {"w", "kw"},
+            "mass": {"kg", "g", "mg"},
+            "mass_flow": {"kg/s", "g/s", "mg/s"},
+            "volume": {"m3", "cm3", "mm3", "l"},
+            "area": {"m2", "cm2", "mm2"},
+            "angle": {"deg", "rad"},
+            "force": {"n", "kn"},
+        }
+        return normalized in groups.get(token, set())
+
+    @staticmethod
+    def _natural_sort_key(text: str) -> list[object]:
+        parts = re.split(r"(\d+)", str(text))
+        return [int(part) if part.isdigit() else part.lower() for part in parts]
 
     def _row_export_widget(self, row: int) -> QCheckBox | None:
         host = self.table.cellWidget(row, 0)
@@ -447,6 +550,10 @@ class SignalAliasEditor(QMainWindow):
     def _row_key(self, row: int) -> str:
         item = self.table.item(row, 1)
         return item.text().strip() if item is not None else ""
+
+    def _row_component(self, row: int) -> str:
+        parts = self._component_parts_from_key(self._row_key(row))
+        return parts[1] if parts is not None else ""
 
     @staticmethod
     def _component_parts_from_key(key: str) -> tuple[str, str, str] | None:

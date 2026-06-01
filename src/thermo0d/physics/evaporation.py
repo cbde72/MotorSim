@@ -15,6 +15,7 @@ E_DURATION = int(EvapCol.DURATION_DEG)
 E_MASS = int(EvapCol.EVAP_MASS_PER_CYCLE)
 E_LATENT = int(EvapCol.LATENT_HEAT)
 E_REF = int(EvapCol.REF_TYPE)
+EVAP_SIMPLE = int(EvaporationModel.SIMPLE)
 
 
 @nb.njit(cache=True)
@@ -25,7 +26,7 @@ def evaporation_sink_rate(
     evap_row: np.ndarray,
     cycle_deg: float,
 ) -> float:
-    if int(evap_row[E_MODEL]) != EvaporationModel.SIMPLE:
+    if int(evap_row[E_MODEL]) != EVAP_SIMPLE:
         return 0.0
     theta_ref_deg, ref_zero_deg = reference_theta_and_zero(
         theta_local_deg,

@@ -37,3 +37,35 @@ def test_uniform_last_cycle_export_writes_full_angle_grid() -> None:
     assert np.allclose(np.diff(thetas), 30.0, atol=1.0e-9, rtol=0.0)
     assert abs(thetas[0] - 0.0) <= 1.0e-9
     assert abs(thetas[-1] - artifacts.bundle.cycle_deg) <= 1.0e-9
+
+
+def test_rhs_derivatives_export_writes_names_units_and_rhs_state_derivatives() -> None:
+    _, cfg = _prepare_case(
+        'runner_rhs_derivatives_export',
+        'Projekte/config_1cyl_2t.yaml',
+        'config_rhs_derivatives.yaml',
+        'run_rhs_derivatives.csv',
+        [
+            (
+                'csv_separator: ","\n  sampling:',
+                'csv_separator: ","\n  rhs_derivatives_export:\n    enabled: true\n  sampling:',
+            ),
+        ],
+    )
+    artifacts = run_simulation(cfg, excel=False)
+
+    assert artifacts.rhs_derivatives_csv_path is not None
+    rhs_csv = Path(artifacts.rhs_derivatives_csv_path)
+    assert rhs_csv.exists()
+
+    lines = rhs_csv.read_text(encoding='utf-8').splitlines()
+    names = lines[0].split(',')
+    units = lines[1].split(',')
+    assert names[0] == 't_s'
+    assert units[0] == 's'
+    assert 'd_cylinder_m_kg_dt' in names
+    assert units[names.index('d_cylinder_m_kg_dt')] == 'kg/s'
+    assert 'd_cylinder_U_J_dt' in names
+    assert units[names.index('d_cylinder_U_J_dt')] == 'W'
+    assert all('_wall_temperature_' not in name for name in names)
+    assert len(lines) > 2

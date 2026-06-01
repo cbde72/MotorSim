@@ -43,6 +43,7 @@ class RunArtifacts:
     wall_clock_s: float
     csv_path: str | None
     excel_path: str | None
+    rhs_derivatives_csv_path: str | None
     export_rows: list[dict[str, float | int]]
     last_cycle_uniform_csv_path: str | None
     check_report_csv_path: str | None
@@ -416,6 +417,7 @@ class SimulationAppRunner:
             wall_clock_s=execution.wall_clock_s,
             csv_path=post.csv_path,
             excel_path=post.excel_path,
+            rhs_derivatives_csv_path=post.rhs_derivatives_csv_path,
             export_rows=post.export_rows,
             last_cycle_uniform_csv_path=post.last_cycle_uniform_csv_path,
             check_report_csv_path=post.check_report_csv_path,

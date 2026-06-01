@@ -266,15 +266,21 @@ def write_last_cycle_pressure_plot(bundle, t: np.ndarray, y: np.ndarray, cycle_i
     ax_p.set_ylabel('Druck [bar]')
     ax_m.set_ylabel('Massenstrom [kg/s] (+ in, - out)')
     ax_a.set_ylabel('Effektiver Öffnungsquerschnitt [mm²]')
+
     ax_p.grid(True, alpha=0.35)
     ax_m.axhline(0.0, color='0.3', linewidth=0.9, alpha=0.8)
+
     handles_p, labels_p = ax_p.get_legend_handles_labels()
     handles_m, labels_m = ax_m.get_legend_handles_labels()
     handles_a, labels_a = ax_a.get_legend_handles_labels()
+
     ax_p.legend(handles_p + handles_m + handles_a, labels_p + labels_m + labels_a, loc='best', fontsize=7)
+
     run_config_text = f"Config: {Path(run_config_path).name}" if run_config_path is not None else ""
     plot_config_text = "Plot: built-in free-piston pV plot"
+
     footer_text = "\n".join(part for part in (run_config_text, plot_config_text) if part)
+
     if footer_text:
         fig.text(0.995, 0.006, footer_text, ha="right", va="bottom", fontsize=6, color="#666666", alpha=0.9)
     fig.tight_layout(rect=(0.0, 0.02, 1.0, 1.0))
@@ -367,6 +373,18 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
             return None
         return float(np.trapezoid(y_vals[mask], t_vals[mask]))
 
+    def _integrate_abs_over_time(values: np.ndarray | None, time_s: np.ndarray, start: int, stop: int) -> float | None:
+        if values is None:
+            return None
+        y_vals = values[start:stop + 1]
+        t_vals = time_s[start:stop + 1]
+        mask = np.isfinite(y_vals) & np.isfinite(t_vals)
+        if int(np.count_nonzero(mask)) < 2:
+            return None
+        y_masked = y_vals[mask]
+        t_masked = t_vals[mask]
+        return float(np.trapezoid(np.abs(y_masked), t_masked))
+
     def _cycle_window_delta(segment_rows: list[dict[str, float | int]], keys: list[str]) -> float | None:
         if not segment_rows:
             return None
@@ -389,6 +407,21 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
             total += value
             used = True
         return total if used else None
+
+    def _integrate_abs_sum_over_time(values_list: list[np.ndarray | None], time_s: np.ndarray, start: int, stop: int) -> float | None:
+        summed: np.ndarray | None = None
+        for values in values_list:
+            if values is None:
+                continue
+            segment = values[start:stop + 1]
+            summed = segment.astype(np.float64, copy=True) if summed is None else summed + segment
+        if summed is None:
+            return None
+        t_vals = time_s[start:stop + 1]
+        mask = np.isfinite(summed) & np.isfinite(t_vals)
+        if int(np.count_nonzero(mask)) < 2:
+            return None
+        return float(np.trapezoid(np.abs(summed[mask]), t_vals[mask]))
 
     def _sum_optional_cycle_deltas(segment_rows: list[dict[str, float | int]], key_groups: list[list[str]]) -> float | None:
         total = 0.0
@@ -552,6 +585,16 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
             "cylinder_combustion_energy_latched_J",
             "free_piston_combustion_energy_latched_J",
         ], positive=True)
+
+    wall_heat_loss_J = _integrate_abs_over_time(wall_heat_W, t_s, ut1, ut2)
+    if wall_heat_loss_J is None:
+        wall_heat_loss_J = _integrate_abs_sum_over_time(
+            [wall_cylinder_heat_W, wall_head_heat_W, wall_piston_heat_W],
+            t_s,
+            ut1,
+            ut2,
+        )
+
     wall_heat_net_J = _integrate_over_time(wall_heat_W, t_s, ut1, ut2)
     if wall_heat_net_J is None or abs(wall_heat_net_J) <= 1.0e-12:
         zone_wall_heat_net_J = _sum_optional_integrals(
@@ -577,12 +620,14 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
         ])
         if zone_wall_heat_net_J is not None:
             wall_heat_net_J = zone_wall_heat_net_J
-    wall_heat_loss_J = abs(wall_heat_net_J) if wall_heat_net_J is not None else None
+    if wall_heat_loss_J is None and wall_heat_net_J is not None:
+        wall_heat_loss_J = abs(wall_heat_net_J)
     lambda_latch_value = _last_finite_value(segment_rows, [
         f"{cyl_name}_lambda",
         "cylinder_lambda",
         "free_piston_combustion_lambda",
     ], positive=True)
+
     pmax_bar = float(np.max(p_bar)) if p_bar.size else None
     geom_cr = _geometric_compression_ratio()
     eff_cr = _slot_closure_effective_compression_ratio()
@@ -660,27 +705,36 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
             if burned_mass is not None and total_mass is not None and total_mass > 1.0e-18:
                 burned_percent = 100.0 * max(0.0, min(1.0, burned_mass / total_mass))
                 restgas_percent = burned_percent
+    if added_energy_J is not None and math.isfinite(added_energy_J) and added_energy_J > 0:
+        wall_heat_pct = f" ({round(wall_heat_loss_J / added_energy_J * 100):.0f}%)" if wall_heat_loss_J is not None and math.isfinite(wall_heat_loss_J) else ""
+        piston_work_pct = f" ({round(piston_work_J / added_energy_J * 100):.0f}%)" if piston_work_J is not None and math.isfinite(piston_work_J) else ""
+    else:
+        wall_heat_pct = ""
+        piston_work_pct = ""
+
+    # ... (Zusammenstellung der Textzeilen für den Plot)
+
 
     info_text = "\n".join([
-        f"Kolbenarbeit: {_format_value(piston_work_J, 'J')}",
-        f"Innere Leistung: {_format_value(indicated_power_W/1000, 'kW')}",
+        f"Zugef. Energie: {_format_value(added_energy_J, 'J')}",
+        f"Wandwaermeverluste: {_format_value(wall_heat_loss_J, 'J')}{wall_heat_pct}",
+        f"Kolbenarbeit: {_format_value(piston_work_J, 'J')}{piston_work_pct}",
+
         f"Druck Brennbeginn: {_format_value(combustion_start_pressure_bar, 'bar')}",
         f"Temperatur Brennbeginn: {_format_value(combustion_start_temperature_K, 'K')}",
-        f"Lambda Latch: {_format_value(lambda_latch_value, '-', 3)}",
-        f"Lambda thermo Brennbeginn: {_format_value(lambda_thermo_at_combustion_start, '-', 3)}",
+        f"Lambda (SOC): {_format_value(lambda_thermo_at_combustion_start, '-', 3)}",
         f"Frequenz: {_format_value(frequency_hz, 'Hz')}",
+        f"Innere Leistung: {_format_value(indicated_power_W/1000, 'kW')}",
         f"pmi: {_format_value(pmi_bar, 'bar')}",
-        f"Zugef. Energie: {_format_value(added_energy_J, 'J')}",
-        f"Wandwaermeverluste: {_format_value(wall_heat_loss_J, 'J')}",
         f"pmax: {_format_value(pmax_bar, 'bar')}",
-        f"Winkel Einlassschluss: {_format_value(theta_at_intake_close_deg, 'deg', 1)}",
         f"Frischluft Einlassschluss: {_format_value(air_mass_at_intake_close_mg, 'mg')}",
         f"Gesamtmasse Einlassschluss: {_format_value(mass_at_intake_close_mg, 'mg')}",
         f"Verbrannt Einlassschluss: {_format_value(burned_mass_at_intake_close_mg, 'mg')}",
+        f"Restgasanteil: {_format_value(restgas_percent, '%', 1)}",
+
         f"Verdichtung geom.: {_format_value(geom_cr, '-', 1)}",
         f"Verdichtung eff.: {_format_value(eff_cr, '-', 1)}",
         f"Verdichtung real: {_format_value(real_cr, '-', 1)}",
-        f"Restgasanteil: {_format_value(restgas_percent, '%', 1)}",
     ])
 
     fig, ax = plt.subplots(figsize=(8.0, 5.0), dpi=150)
@@ -1199,10 +1253,10 @@ def export_free_piston_last_ut_ot_ut_frames(
     V_cycle = V_m3[seg]
     x_cycle = x_m[seg]
     ot_idx_local = ot - ut1  # Local index within cycle
-    
+
     fp = getattr(bundle, 'free_piston', None)
     is_rotary = fp is not None and getattr(fp, 'kinematics_type', 'linear') == 'oscillating_rotary'
-    
+
     if is_rotary and np.any(np.isfinite(q_rad[seg])):
         x_axis_cycle = q_rad[seg] * (180.0 / math.pi)
         xlabel = 'Schwingwinkel [°]'
@@ -1255,29 +1309,29 @@ def export_free_piston_last_ut_ot_ut_frames(
         fig, ax = plt.subplots(figsize=(8.0, 5.0), dpi=150)
         x_axis_cycle_plot = x_axis_cycle if x_axis_cycle is not None else theta_cycle
         ax.plot(x_axis_cycle_plot, p_cycle / 1.0e5, linewidth=2.0, label='Druck [bar]', color='#1f77b4')
-        
+
         if x_axis_cycle is not None:
             angle_label = f'{current_x:.1f}°'
         else:
             current_x = angle
             angle_label = f'{angle:.1f}°'
-            
+
         ax.axvline(current_x, color='#d62728', linestyle='--', linewidth=2.0, alpha=0.7, label=f'Aktuelle Position: {angle_label}')
-        
+
         # Mark UT/OT points
         ax.scatter([x_axis_cycle_plot[0], x_axis_cycle_plot[ot_idx_local], x_axis_cycle_plot[-1]],
                    [p_cycle[0] / 1.0e5, p_cycle[ot_idx_local] / 1.0e5, p_cycle[-1] / 1.0e5],
                    s=80, marker='o', color=['#2ca02c', '#ff7f0e', '#2ca02c'], zorder=5, edgecolors='black', linewidth=1.5)
-        
-        ax.annotate('UT (Start)', xy=(x_axis_cycle_plot[0], p_cycle[0] / 1.0e5), xytext=(10, 10), 
+
+        ax.annotate('UT (Start)', xy=(x_axis_cycle_plot[0], p_cycle[0] / 1.0e5), xytext=(10, 10),
                    textcoords='offset points', fontsize=8, fontweight='bold',
                    bbox=dict(boxstyle='round,pad=0.4', facecolor='#2ca02c', alpha=0.7),
                    arrowprops=dict(arrowstyle='->', lw=1.5))
-        ax.annotate('OT', xy=(x_axis_cycle_plot[ot_idx_local], p_cycle[ot_idx_local] / 1.0e5), xytext=(10, -15), 
+        ax.annotate('OT', xy=(x_axis_cycle_plot[ot_idx_local], p_cycle[ot_idx_local] / 1.0e5), xytext=(10, -15),
                    textcoords='offset points', fontsize=8, fontweight='bold',
                    bbox=dict(boxstyle='round,pad=0.4', facecolor='#ff7f0e', alpha=0.7),
                    arrowprops=dict(arrowstyle='->', lw=1.5))
-        ax.annotate('UT (End)', xy=(x_axis_cycle_plot[-1], p_cycle[-1] / 1.0e5), xytext=(-60, 10), 
+        ax.annotate('UT (End)', xy=(x_axis_cycle_plot[-1], p_cycle[-1] / 1.0e5), xytext=(-60, 10),
                    textcoords='offset points', fontsize=8, fontweight='bold',
                    bbox=dict(boxstyle='round,pad=0.4', facecolor='#2ca02c', alpha=0.7),
                    arrowprops=dict(arrowstyle='->', lw=1.5))

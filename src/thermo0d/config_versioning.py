@@ -308,6 +308,11 @@ def migrate_config_data(config_data: Mapping[str, Any] | None) -> dict[str, Any]
         elif isinstance(postprocessing.get("free_piston_last_ut_ot_ut_export"), dict):
             postprocessing["free_piston_last_ut_ot_ut_export"].setdefault("axis_min_deg", 0.0)
             postprocessing["free_piston_last_ut_ot_ut_export"].setdefault("axis_max_deg", 360.0)
+        if "rhs_derivatives_export" not in postprocessing:
+            postprocessing["rhs_derivatives_export"] = {
+                "enabled": False,
+                "path": None,
+            }
         if "check_report" not in postprocessing:
             postprocessing["check_report"] = {
                 "enabled": True,
@@ -407,6 +412,7 @@ def normalize_config_data(config_data: Mapping[str, Any] | None) -> dict[str, An
     if isinstance(post.get("free_piston_last_ut_ot_ut_export"), dict):
         post["free_piston_last_ut_ot_ut_export"].setdefault("axis_min_deg", 0.0)
         post["free_piston_last_ut_ot_ut_export"].setdefault("axis_max_deg", 360.0)
+    post.setdefault("rhs_derivatives_export", {"enabled": False, "path": None})
     post.setdefault("check_report", {"enabled": True, "html_enabled": False})
     post.setdefault("plots", {
         "enabled": True,
@@ -543,7 +549,7 @@ def _ensure_yaml_postprocessing_defaults(text: str, upgraded_config: Mapping[str
         break
 
     blocks_to_add: list[tuple[str, Mapping[str, Any]]] = []
-    for key in ("auto_update_initial_conditions", "final_cycle_uniform_angle_export", "free_piston_last_ut_ot_ut_export", "check_report", "plots", "console"):
+    for key in ("auto_update_initial_conditions", "final_cycle_uniform_angle_export", "free_piston_last_ut_ot_ut_export", "rhs_derivatives_export", "check_report", "plots", "console"):
         value = postprocessing.get(key)
         if isinstance(value, Mapping):
             blocks_to_add.append((key, value))

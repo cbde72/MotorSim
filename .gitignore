@@ -5,6 +5,8 @@ __pycache__/
 
 # Test and tool caches
 .pytest_cache/
+.codex_pycache/
+.codex_pycache_anaconda/
 .mypy_cache/
 .ruff_cache/
 .hypothesis/

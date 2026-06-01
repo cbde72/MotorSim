@@ -220,6 +220,8 @@ class PostprocessingOptions:
     free_piston_last_ut_ot_ut_export_step_deg: float = 1.0
     free_piston_last_ut_ot_ut_export_axis_min_deg: float = 0.0
     free_piston_last_ut_ot_ut_export_axis_max_deg: float = 360.0
+    rhs_derivatives_export_enabled: bool = False
+    rhs_derivatives_export_path: str | None = None
     check_report_enabled: bool = True
     check_report_html_enabled: bool = False
     plots_enabled: bool = True

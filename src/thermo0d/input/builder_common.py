@@ -99,6 +99,8 @@ def build_postprocessing_options(config) -> PostprocessingOptions:
         free_piston_last_ut_ot_ut_export_step_deg=float(config.postprocessing.free_piston_last_ut_ot_ut_export.step_deg),
         free_piston_last_ut_ot_ut_export_axis_min_deg=float(config.postprocessing.free_piston_last_ut_ot_ut_export.axis_min_deg),
         free_piston_last_ut_ot_ut_export_axis_max_deg=float(config.postprocessing.free_piston_last_ut_ot_ut_export.axis_max_deg),
+        rhs_derivatives_export_enabled=bool(config.postprocessing.rhs_derivatives_export.enabled),
+        rhs_derivatives_export_path=config.postprocessing.rhs_derivatives_export.path,
         check_report_enabled=bool(config.postprocessing.check_report.enabled),
         check_report_html_enabled=bool(config.postprocessing.check_report.html_enabled),
         plots_enabled=bool(config.postprocessing.plots.enabled),

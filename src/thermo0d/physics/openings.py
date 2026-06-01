@@ -33,6 +33,12 @@ C_ALPHA_LEN = int(ConnCol.ALPHA_LEN)
 C_CD_TABLE_START = int(ConnCol.CD_TABLE_START)
 C_CD_TABLE_LEN = int(ConnCol.CD_TABLE_LEN)
 C_REF_FLOW_AREA = int(ConnCol.REF_FLOW_AREA)
+ANGLE_DOMAIN_CAM = int(AngleDomain.CAM)
+FLOW_COEFF_CONSTANT = int(FlowCoeffMode.CONSTANT)
+CONN_VALVE = int(ConnectionType.VALVE)
+CONN_SLOT = int(ConnectionType.SLOT)
+CONN_ORIFICE = int(ConnectionType.ORIFICE)
+CONN_CHECK_VALVE = int(ConnectionType.CHECK_VALVE)
 
 
 @nb.njit(cache=True)
@@ -52,7 +58,7 @@ def evaluate_valve_state(
     )
     local_crank_deg = wrap_angle_deg(theta_ref_deg - ref_zero_deg - conn_row[C_OPEN], cycle_deg)
     profile_deg = local_crank_deg
-    if int(conn_row[C_ANGLE_DOMAIN]) == AngleDomain.CAM:
+    if int(conn_row[C_ANGLE_DOMAIN]) == ANGLE_DOMAIN_CAM:
         cam_ratio = cycle_deg / 360.0
         profile_deg = local_crank_deg / cam_ratio if cam_ratio > 1.0e-18 else local_crank_deg
     p_start = int(conn_row[C_PROFILE_START])
@@ -105,7 +111,7 @@ def evaluate_slot_state(conn_row: np.ndarray, piston_x_m: float, cd_table: np.nd
     if uncovered > height:
         uncovered = height
     geom_area = width * uncovered * holes
-    if int(conn_row[C_CD_MODE]) == FlowCoeffMode.CONSTANT:
+    if int(conn_row[C_CD_MODE]) == FLOW_COEFF_CONSTANT:
         cd_f = conn_row[C_CD_F]
         cd_r = conn_row[C_CD_R]
     else:
@@ -154,13 +160,13 @@ def connection_area_and_coefficients(
     p_from_pa: float = 0.0,
     p_to_pa: float = 0.0,
 ) -> tuple[float, float, float]:
-    if conn_type == ConnectionType.VALVE:
+    if conn_type == CONN_VALVE:
         return evaluate_valve_area(conn_row, cyl_theta_local_deg, cyl_theta_global_deg, cyl_cycle_deg, lift_table, alpha_table)
-    if conn_type == ConnectionType.SLOT:
+    if conn_type == CONN_SLOT:
         return evaluate_slot_area(conn_row, cyl_piston_x_m, cd_table)
-    if conn_type == ConnectionType.ORIFICE:
+    if conn_type == CONN_ORIFICE:
         return evaluate_orifice_area(conn_row)
-    if conn_type == ConnectionType.CHECK_VALVE:
+    if conn_type == CONN_CHECK_VALVE:
         return evaluate_check_valve_area(conn_row, p_from_pa, p_to_pa)
     return 0.0, 0.0, 0.0
 
