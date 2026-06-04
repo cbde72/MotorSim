@@ -1,0 +1,316 @@
+name: Subplot
+style_sheet: ../plot_style_sheet.yaml
+style:
+  background_color: '#ffffff'
+  axes_facecolor: '#ffffff'
+  text_color: '#202020'
+  grid_color: '#d8d8d8'
+  legend_facecolor: '#ffffff'
+  legend_edgecolor: '#9aa0a6'
+  default_line_width: 1.8
+  default_marker_size: 4.5
+  font_size: 10
+  title_size: 12
+  grid_alpha: 0.65
+figures:
+- id: 44d8988344ce
+  title: Massenströme / Hubvolumen Copy
+  rows: 1
+  cols: 1
+  subplots:
+  - id: 3b5ee40aa3ce
+    title: Subplot
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Theta
+    x_unit_preset: deg
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: data
+    x_min: 0.0
+    x_max: 720.0
+    y_axes:
+    - id: 1921883cc2cf
+      title: Y
+      side: left
+      spine_offset: 0.0
+      color: '#1f77b4'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: 54caa01510e4
+      signal_key: cylinder_p_Pa
+      label: cylinder_p_Pa
+      axis_id: 1921883cc2cf
+      visible: true
+      color: '#1f77b4'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    events:
+    - id: a3b99dc05457
+      x: 0.0
+      label: OT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: reference
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 0a81fbf5799c
+      x: 141.0
+      label: EVO
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: valve
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 1cbda37c2bf1
+      x: 180.0
+      label: UT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: reference
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: df742996e272
+      x: 330.0
+      label: SOI
+      color: '#12b76a'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 19046cb7db82
+      x: 338.0
+      label: IVO
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: valve
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 6e60f1deee32
+      x: 350.0
+      label: SOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: combustion
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 6d6fccdce8dd
+      x: 360.0
+      label: OT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: reference
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: e9c136ff3d3d
+      x: 360.0
+      label: EOI
+      color: '#12b76a'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 90079efa8a59
+      x: 387.0
+      label: EVC
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: valve
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 43cb63667479
+      x: 405.0
+      label: EOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: combustion
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 50800e4310d5
+      x: 540.0
+      label: UT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: reference
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 7fa05d3c8791
+      x: 622.0
+      label: IVC
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: config_auto
+      source_note: Automatisch aus aktiver Config erzeugt
+      locked: false
+      event_type: valve
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    legend_visible: true
+    legend_position: best
+    show_grid: true

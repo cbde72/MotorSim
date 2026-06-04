@@ -1,0 +1,30 @@
+name: Ventilposition & Effektive Fläche
+style_sheet: ../plot_style_sheet.yaml
+figures:
+- title: Massenströme & Ventilposition
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Ventilposition & Effektive Fläche
+    x_signal: cylinder_0_theta_deg
+    x_title: Kurbelwinkel [°]
+    y_axes:
+    - id: lift_ax
+      title: Ventilhub [mm]
+      side: left
+    - id: area_ax
+      title: Eff. Fläche [mm²]
+      side: right
+    series:
+    - signal_key: connection_intake_valve_lift_mm
+      label: Einlasshub
+      axis_id: lift_ax
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000.0
+    - signal_key: connection_exhaust_valve_lift_mm
+      label: Auslaßhub
+      axis_id: lift_ax
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000.0

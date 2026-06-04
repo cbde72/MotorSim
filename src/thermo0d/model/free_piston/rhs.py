@@ -5,7 +5,7 @@ import math
 import numba as nb
 import numpy as np
 
-from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnectionType, FeatureCol, VolumeCol, VolumeType, WallCol, WallTemperatureCol, WallTemperatureZone
+from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnCol, ConnectionType, EndpointKind, FeatureCol, VolumeCol, VolumeType, WallCol, WallTemperatureCol, WallTemperatureZone
 from thermo0d.model.free_piston.forces import compute_load_info
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_equivalent_linear_kinematics, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
@@ -40,6 +40,12 @@ COMB_M = int(CombCol.M)
 COMB_REF_TYPE = int(CombCol.REF_TYPE)
 COMB_DURATION_MODE_ANGLE = int(CombDurationMode.ANGLE)
 CONN_SLOT = int(ConnectionType.SLOT)
+C_TYPE = int(ConnCol.TYPE)
+C_FROM = int(ConnCol.FROM_VOL)
+C_TO = int(ConnCol.TO_VOL)
+C_FROM_KIND = int(ConnCol.FROM_KIND)
+C_TO_KIND = int(ConnCol.TO_KIND)
+ENDPOINT_VOLUME = int(EndpointKind.VOLUME)
 WT_AREA = int(WallTemperatureCol.AREA)
 WT_ENABLED = int(WallTemperatureCol.ENABLED)
 WT_ZONE_COUNT = len(WallTemperatureZone)
@@ -537,6 +543,8 @@ def _compute_free_piston_rhs_numba(
     environment_is_fixed: np.ndarray,
     environment_pressures_pa: np.ndarray,
     environment_temperatures_K: np.ndarray,
+    boundary_pressures_pa: np.ndarray,
+    boundary_temperatures_K: np.ndarray,
     wall_bore_by_vol: np.ndarray,
     wall_ups_by_vol: np.ndarray,
     wall_temperature_enabled: int,
@@ -580,6 +588,7 @@ def _compute_free_piston_rhs_numba(
     load_power_target_W: float,
     load_efficiency_0to1: float,
     load_min_velocity_m_per_s: float,
+    load_motor_assist_until_soc: int,
     load_assist_velocity_threshold_m_per_s: float,
     load_assist_force_N: float,
     load_target_margin_m: float,
@@ -638,6 +647,12 @@ def _compute_free_piston_rhs_numba(
     dy_dt = np.zeros_like(y)
     diag = np.zeros(4, dtype=np.float64)
     scav_diag_by_vol = np.zeros((n_vol, 4), dtype=np.float64)
+    motor_assist_soc_seen = runtime_soc_time_s > 0.0
+    if not motor_assist_soc_seen:
+        for i_soc in range(runtime_soc_time_by_vol_s.shape[0]):
+            if runtime_soc_time_by_vol_s[i_soc] > 0.0:
+                motor_assist_soc_seen = True
+                break
     x_m, v_m_per_s = _fp_equivalent_linear_kinematics_numba(
         y[x_idx], y[v_idx], 1.0, kinematics_mode, x_min_m, x_max_m, angle_min_rad, angle_max_rad, rotary_radius_m
     )
@@ -767,13 +782,21 @@ def _compute_free_piston_rhs_numba(
     if enable_mass:
         for j in range(conn_matrix.shape[0]):
             conn = conn_matrix[j]
-            left = int(conn[1])
-            right = int(conn[2])
-            conn_type = int(conn[0])
+            left = int(conn[C_FROM])
+            right = int(conn[C_TO])
+            conn_type = int(conn[C_TYPE])
+            left_kind = int(conn[C_FROM_KIND]) if conn.shape[0] > C_FROM_KIND else ENDPOINT_VOLUME
+            right_kind = int(conn[C_TO_KIND]) if conn.shape[0] > C_TO_KIND else ENDPOINT_VOLUME
+            left_is_volume = left_kind == ENDPOINT_VOLUME
+            right_is_volume = right_kind == ENDPOINT_VOLUME
+            p_left = pressures[left] if left_is_volume else max(boundary_pressures_pa[left], 1.0)
+            t_left = temperatures[left] if left_is_volume else max(boundary_temperatures_K[left], 1.0)
+            p_right = pressures[right] if right_is_volume else max(boundary_pressures_pa[right], 1.0)
+            t_right = temperatures[right] if right_is_volume else max(boundary_temperatures_K[right], 1.0)
             cyl_idx = -1
-            if int(vol_matrix[left, V_TYPE]) == VOL_CYLINDER:
+            if left_is_volume and int(vol_matrix[left, V_TYPE]) == VOL_CYLINDER:
                 cyl_idx = left
-            elif int(vol_matrix[right, V_TYPE]) == VOL_CYLINDER:
+            elif right_is_volume and int(vol_matrix[right, V_TYPE]) == VOL_CYLINDER:
                 cyl_idx = right
             area, cd_f, cd_r = connection_area_and_coefficients(
                 conn,
@@ -785,64 +808,70 @@ def _compute_free_piston_rhs_numba(
                 lift_table,
                 alpha_table,
                 cd_table,
-                pressures[left],
-                pressures[right],
+                p_left,
+                p_right,
             )
             if area <= 1.0e-18 or (cd_f <= 0.0 and cd_r <= 0.0):
                 continue
-            if pressures[left] >= pressures[right]:
-                gamma_up = kappa_by_vol[left]
-                gas_constant_up = gas_constant_by_vol[left]
-                cp_up = cp_by_vol[left]
-                temp_up = temperatures[left]
+            if p_left >= p_right:
+                gamma_up = kappa_by_vol[left] if left_is_volume else kappa_default
+                gas_constant_up = gas_constant_by_vol[left] if left_is_volume else gas_constant_default
+                cp_up = cp_by_vol[left] if left_is_volume else cp_default
+                temp_up = t_left
             else:
-                gamma_up = kappa_by_vol[right]
-                gas_constant_up = gas_constant_by_vol[right]
-                cp_up = cp_by_vol[right]
-                temp_up = temperatures[right]
-            mdot = de_st_venant_wantzel_signed(pressures[left], temperatures[left], pressures[right], temperatures[right], area, cd_f, cd_r, gamma_up, gas_constant_up)
+                gamma_up = kappa_by_vol[right] if right_is_volume else kappa_default
+                gas_constant_up = gas_constant_by_vol[right] if right_is_volume else gas_constant_default
+                cp_up = cp_by_vol[right] if right_is_volume else cp_default
+                temp_up = t_right
+            mdot = de_st_venant_wantzel_signed(p_left, t_left, p_right, t_right, area, cd_f, cd_r, gamma_up, gas_constant_up)
             h_up = cp_up * temp_up
-            if int(environment_is_fixed[left]) != 1:
+            if left_is_volume and int(environment_is_fixed[left]) != 1:
                 dy_dt[5 * left] -= mdot
                 dy_dt[5 * left + 1] -= mdot * h_up
-            if int(environment_is_fixed[right]) != 1:
+            if right_is_volume and int(environment_is_fixed[right]) != 1:
                 dy_dt[5 * right] += mdot
                 dy_dt[5 * right + 1] += mdot * h_up
             if mdot >= 0.0:
-                burned_fraction, air_fraction = _fp_upstream_species_fractions_numba(y, left, environment_is_fixed)
+                if left_is_volume:
+                    burned_fraction, air_fraction = _fp_upstream_species_fractions_numba(y, left, environment_is_fixed)
+                else:
+                    burned_fraction, air_fraction = 0.0, 1.0
                 burned_transfer = mdot * burned_fraction
                 air_transfer = mdot * air_fraction
-                if int(environment_is_fixed[left]) != 1:
+                if left_is_volume and int(environment_is_fixed[left]) != 1:
                     dy_dt[5 * left + 2] -= burned_transfer
                     dy_dt[5 * left + 3] -= air_transfer
-                if int(environment_is_fixed[right]) != 1:
+                if right_is_volume and int(environment_is_fixed[right]) != 1:
                     dy_dt[5 * right + 2] += burned_transfer
                     dy_dt[5 * right + 3] += air_transfer
                 if conn_type == CONN_SLOT:
-                    if _fp_is_in_indices_numba(right, cylinder_indices) and left != right:
+                    if right_is_volume and left_is_volume and _fp_is_in_indices_numba(right, cylinder_indices) and left != right:
                         scav_transfer_in_by_cyl[right] += mdot
                         scav_transfer_air_in_by_cyl[right] += air_transfer
-                    elif _fp_is_in_indices_numba(left, cylinder_indices) and right != left:
+                    elif right_is_volume and left_is_volume and _fp_is_in_indices_numba(left, cylinder_indices) and right != left:
                         scav_exhaust_out_by_cyl_to_vol[left, right] += mdot
             else:
-                burned_fraction, air_fraction = _fp_upstream_species_fractions_numba(y, right, environment_is_fixed)
+                if right_is_volume:
+                    burned_fraction, air_fraction = _fp_upstream_species_fractions_numba(y, right, environment_is_fixed)
+                else:
+                    burned_fraction, air_fraction = 0.0, 1.0
                 burned_transfer = (-mdot) * burned_fraction
                 air_transfer = (-mdot) * air_fraction
-                if int(environment_is_fixed[left]) != 1:
+                if left_is_volume and int(environment_is_fixed[left]) != 1:
                     dy_dt[5 * left + 2] += burned_transfer
                     dy_dt[5 * left + 3] += air_transfer
-                if int(environment_is_fixed[right]) != 1:
+                if right_is_volume and int(environment_is_fixed[right]) != 1:
                     dy_dt[5 * right + 2] -= burned_transfer
                     dy_dt[5 * right + 3] -= air_transfer
                 if conn_type == CONN_SLOT:
-                    if _fp_is_in_indices_numba(left, cylinder_indices) and right != left:
+                    if right_is_volume and left_is_volume and _fp_is_in_indices_numba(left, cylinder_indices) and right != left:
                         scav_transfer_in_by_cyl[left] += -mdot
                         scav_transfer_air_in_by_cyl[left] += air_transfer
-                    elif _fp_is_in_indices_numba(right, cylinder_indices) and left != right:
+                    elif right_is_volume and left_is_volume and _fp_is_in_indices_numba(right, cylinder_indices) and left != right:
                         scav_exhaust_out_by_cyl_to_vol[right, left] += -mdot
-            if int(vol_matrix[left, V_TYPE]) == VOL_CYLINDER and mdot < 0.0:
+            if left_is_volume and int(vol_matrix[left, V_TYPE]) == VOL_CYLINDER and mdot < 0.0:
                 mdot_in_by_vol[left] += -mdot
-            if int(vol_matrix[right, V_TYPE]) == VOL_CYLINDER and mdot > 0.0:
+            if right_is_volume and int(vol_matrix[right, V_TYPE]) == VOL_CYLINDER and mdot > 0.0:
                 mdot_in_by_vol[right] += mdot
         for k in range(cylinder_indices.shape[0]):
             cyl = int(cylinder_indices[k])
@@ -1076,6 +1105,11 @@ def _compute_free_piston_rhs_numba(
             force_friction = 0.0
         else:
             force_friction = -(friction_fc_N * math.copysign(1.0, q_v_m_per_s) + friction_cv_Ns_per_m * q_v_m_per_s)
+        assist_threshold = load_assist_velocity_threshold_m_per_s
+        assist_force = load_assist_force_N
+        if load_motor_assist_until_soc == 1 and motor_assist_soc_seen:
+            assist_threshold = 0.0
+            assist_force = 0.0
         force_load = -_fp_load_force_signed_numba(
             load_model_code,
             load_damping_Ns_per_m,
@@ -1088,8 +1122,8 @@ def _compute_free_piston_rhs_numba(
             load_power_target_W,
             load_efficiency_0to1,
             load_min_velocity_m_per_s,
-            load_assist_velocity_threshold_m_per_s,
-            load_assist_force_N,
+            assist_threshold,
+            assist_force,
             load_target_margin_m,
             load_hard_margin_m,
             load_stop_kp,
@@ -1262,6 +1296,8 @@ def _compute_free_piston_rhs_python(t_s: float, y: np.ndarray, bundle) -> np.nda
     environment_is_fixed = bundle.environment_is_fixed if bundle.environment_is_fixed is not None else np.zeros(n_vol, dtype=np.int64)
     environment_pressures_pa = bundle.environment_pressures_pa if bundle.environment_pressures_pa is not None else np.zeros(n_vol, dtype=np.float64)
     environment_temperatures_K = bundle.environment_temperatures_K if bundle.environment_temperatures_K is not None else np.zeros(n_vol, dtype=np.float64)
+    boundary_pressures_pa = bundle.boundary_pressures_pa if getattr(bundle, 'boundary_pressures_pa', None) is not None else np.zeros(0, dtype=np.float64)
+    boundary_temperatures_K = bundle.boundary_temperatures_K if getattr(bundle, 'boundary_temperatures_K', None) is not None else np.zeros(0, dtype=np.float64)
     wall_bore_by_vol = bundle.wall_bore_by_vol if bundle.wall_bore_by_vol is not None else np.zeros(n_vol, dtype=np.float64)
     wall_ups_by_vol = bundle.wall_ups_by_vol if bundle.wall_ups_by_vol is not None else np.zeros(n_vol, dtype=np.float64)
 
@@ -1375,14 +1411,22 @@ def _compute_free_piston_rhs_python(t_s: float, y: np.ndarray, bundle) -> np.nda
     if enable_mass:
         for j in range(bundle.conn_matrix.shape[0]):
             conn = bundle.conn_matrix[j]
-            left = int(conn[1])
-            right = int(conn[2])
-            conn_type = int(conn[0])
+            left = int(conn[C_FROM])
+            right = int(conn[C_TO])
+            conn_type = int(conn[C_TYPE])
+            left_kind = int(conn[C_FROM_KIND]) if conn.shape[0] > C_FROM_KIND else ENDPOINT_VOLUME
+            right_kind = int(conn[C_TO_KIND]) if conn.shape[0] > C_TO_KIND else ENDPOINT_VOLUME
+            left_is_volume = left_kind == ENDPOINT_VOLUME
+            right_is_volume = right_kind == ENDPOINT_VOLUME
+            p_left = float(pressures[left]) if left_is_volume else max(float(boundary_pressures_pa[left]), 1.0)
+            t_left = float(temperatures[left]) if left_is_volume else max(float(boundary_temperatures_K[left]), 1.0)
+            p_right = float(pressures[right]) if right_is_volume else max(float(boundary_pressures_pa[right]), 1.0)
+            t_right = float(temperatures[right]) if right_is_volume else max(float(boundary_temperatures_K[right]), 1.0)
 
             cyl_idx = -1
-            if int(bundle.vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER:
+            if left_is_volume and int(bundle.vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER:
                 cyl_idx = left
-            elif int(bundle.vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER:
+            elif right_is_volume and int(bundle.vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER:
                 cyl_idx = right
 
             area, cd_f, cd_r = connection_area_and_coefficients(
@@ -1395,27 +1439,27 @@ def _compute_free_piston_rhs_python(t_s: float, y: np.ndarray, bundle) -> np.nda
                 bundle.lift_table,
                 bundle.alpha_table,
                 bundle.cd_table,
-                pressures[left],
-                pressures[right],
+                p_left,
+                p_right,
             )
             if area <= 1.0e-18 or (cd_f <= 0.0 and cd_r <= 0.0):
                 continue
 
-            if pressures[left] >= pressures[right]:
-                gamma_up = kappa_by_vol[left]
-                gas_constant_up = gas_constant_by_vol[left]
-                cp_up = cp_by_vol[left]
-                temp_up = temperatures[left]
+            if p_left >= p_right:
+                gamma_up = float(kappa_by_vol[left]) if left_is_volume else kappa_default
+                gas_constant_up = float(gas_constant_by_vol[left]) if left_is_volume else gas_constant_default
+                cp_up = float(cp_by_vol[left]) if left_is_volume else cp_default
+                temp_up = t_left
             else:
-                gamma_up = kappa_by_vol[right]
-                gas_constant_up = gas_constant_by_vol[right]
-                cp_up = cp_by_vol[right]
-                temp_up = temperatures[right]
+                gamma_up = float(kappa_by_vol[right]) if right_is_volume else kappa_default
+                gas_constant_up = float(gas_constant_by_vol[right]) if right_is_volume else gas_constant_default
+                cp_up = float(cp_by_vol[right]) if right_is_volume else cp_default
+                temp_up = t_right
             mdot = de_st_venant_wantzel_signed(
-                pressures[left],
-                temperatures[left],
-                pressures[right],
-                temperatures[right],
+                p_left,
+                t_left,
+                p_right,
+                t_right,
                 area,
                 cd_f,
                 cd_r,
@@ -1424,49 +1468,55 @@ def _compute_free_piston_rhs_python(t_s: float, y: np.ndarray, bundle) -> np.nda
             )
             h_up = cp_up * temp_up
 
-            if int(environment_is_fixed[left]) != 1:
+            if left_is_volume and int(environment_is_fixed[left]) != 1:
                 dy_dt[mass_indices[left]] -= mdot
                 dy_dt[energy_indices[left]] -= mdot * h_up
-            if int(environment_is_fixed[right]) != 1:
+            if right_is_volume and int(environment_is_fixed[right]) != 1:
                 dy_dt[mass_indices[right]] += mdot
                 dy_dt[energy_indices[right]] += mdot * h_up
 
             if mdot >= 0.0:
-                upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(bundle.state_layout, y, left, environment_is_fixed)
+                if left_is_volume:
+                    upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(bundle.state_layout, y, left, environment_is_fixed)
+                else:
+                    upstream_burned_fraction, upstream_air_fraction = 0.0, 1.0
                 burned_transfer = mdot * upstream_burned_fraction
                 air_transfer = mdot * upstream_air_fraction
-                if int(environment_is_fixed[left]) != 1:
+                if left_is_volume and int(environment_is_fixed[left]) != 1:
                     dy_dt[burned_indices[left]] -= burned_transfer
                     dy_dt[air_indices[left]] -= air_transfer
-                if int(environment_is_fixed[right]) != 1:
+                if right_is_volume and int(environment_is_fixed[right]) != 1:
                     dy_dt[burned_indices[right]] += burned_transfer
                     dy_dt[air_indices[right]] += air_transfer
                 if conn_type == int(ConnectionType.SLOT):
-                    if right in cylinder_index_set and left != right:
+                    if left_is_volume and right_is_volume and right in cylinder_index_set and left != right:
                         scav_transfer_in_by_cyl_kg_per_s[right] += float(mdot)
                         scav_transfer_air_in_by_cyl_kg_per_s[right] += float(air_transfer)
-                    elif left in cylinder_index_set and right != left:
+                    elif left_is_volume and right_is_volume and left in cylinder_index_set and right != left:
                         scav_exhaust_out_by_cyl_to_vol_kg_per_s[left, right] += float(mdot)
             else:
-                upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(bundle.state_layout, y, right, environment_is_fixed)
+                if right_is_volume:
+                    upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(bundle.state_layout, y, right, environment_is_fixed)
+                else:
+                    upstream_burned_fraction, upstream_air_fraction = 0.0, 1.0
                 burned_transfer = (-mdot) * upstream_burned_fraction
                 air_transfer = (-mdot) * upstream_air_fraction
-                if int(environment_is_fixed[left]) != 1:
+                if left_is_volume and int(environment_is_fixed[left]) != 1:
                     dy_dt[burned_indices[left]] += burned_transfer
                     dy_dt[air_indices[left]] += air_transfer
-                if int(environment_is_fixed[right]) != 1:
+                if right_is_volume and int(environment_is_fixed[right]) != 1:
                     dy_dt[burned_indices[right]] -= burned_transfer
                     dy_dt[air_indices[right]] -= air_transfer
                 if conn_type == int(ConnectionType.SLOT):
-                    if left in cylinder_index_set and right != left:
+                    if left_is_volume and right_is_volume and left in cylinder_index_set and right != left:
                         scav_transfer_in_by_cyl_kg_per_s[left] += float(-mdot)
                         scav_transfer_air_in_by_cyl_kg_per_s[left] += float(air_transfer)
-                    elif right in cylinder_index_set and left != right:
+                    elif left_is_volume and right_is_volume and right in cylinder_index_set and left != right:
                         scav_exhaust_out_by_cyl_to_vol_kg_per_s[right, left] += float(-mdot)
 
-            if int(bundle.vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot < 0.0:
+            if left_is_volume and int(bundle.vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot < 0.0:
                 mdot_in_by_vol[left] += -mdot
-            if int(bundle.vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot > 0.0:
+            if right_is_volume and int(bundle.vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot > 0.0:
                 mdot_in_by_vol[right] += mdot
 
         for cyl_i in bundle.cylinder_indices:
@@ -1830,6 +1880,16 @@ def _compute_free_piston_rhs_python(t_s: float, y: np.ndarray, bundle) -> np.nda
             elif vol_type_i == int(VolumeType.BOUNCE_CHAMBER):
                 force_bounce_N += -sign_i * float(pressures[i]) * bounce_area_m2
         force_friction_N = -_coulomb_viscous_force(friction_fc_N, friction_cv_Ns_per_m, q_v_m_per_s)
+        assist_threshold = fp.load_assist_velocity_threshold_m_per_s
+        assist_force = fp.load_assist_force_N
+        motor_assist_soc_seen = float(getattr(fp, 'runtime_soc_time_s', 0.0) or 0.0) > 0.0
+        if not motor_assist_soc_seen:
+            runtime_soc_times = getattr(fp, 'runtime_soc_time_by_vol_s', None)
+            if runtime_soc_times is not None:
+                motor_assist_soc_seen = bool(np.any(np.asarray(runtime_soc_times, dtype=np.float64) > 0.0))
+        if bool(getattr(fp, 'load_motor_assist_until_soc', True)) and motor_assist_soc_seen:
+            assist_threshold = 0.0
+            assist_force = 0.0
         load_info = compute_load_info(
             fp.load_model,
             fp.load_damping_Ns_per_m,
@@ -1842,8 +1902,8 @@ def _compute_free_piston_rhs_python(t_s: float, y: np.ndarray, bundle) -> np.nda
             power_target_W=fp.load_power_target_W,
             efficiency_0to1=fp.load_efficiency_0to1,
             min_velocity_m_per_s=fp.load_min_velocity_m_per_s,
-            assist_velocity_threshold_m_per_s=fp.load_assist_velocity_threshold_m_per_s,
-            assist_force_N=fp.load_assist_force_N,
+            assist_velocity_threshold_m_per_s=assist_threshold,
+            assist_force_N=assist_force,
             target_margin_m=fp.load_target_margin_m,
             hard_margin_m=fp.load_hard_margin_m,
             stop_kp=fp.load_stop_kp,
@@ -1929,6 +1989,8 @@ def _free_piston_static_numba_args(bundle):
         'environment_is_fixed': bundle.environment_is_fixed if bundle.environment_is_fixed is not None else np.zeros(n_vol, dtype=np.int64),
         'environment_pressures_pa': bundle.environment_pressures_pa if bundle.environment_pressures_pa is not None else np.zeros(n_vol, dtype=np.float64),
         'environment_temperatures_K': bundle.environment_temperatures_K if bundle.environment_temperatures_K is not None else np.zeros(n_vol, dtype=np.float64),
+        'boundary_pressures_pa': bundle.boundary_pressures_pa if getattr(bundle, 'boundary_pressures_pa', None) is not None else np.zeros(0, dtype=np.float64),
+        'boundary_temperatures_K': bundle.boundary_temperatures_K if getattr(bundle, 'boundary_temperatures_K', None) is not None else np.zeros(0, dtype=np.float64),
         'wall_bore_by_vol': bundle.wall_bore_by_vol if bundle.wall_bore_by_vol is not None else np.zeros(n_vol, dtype=np.float64),
         'wall_ups_by_vol': bundle.wall_ups_by_vol if bundle.wall_ups_by_vol is not None else np.zeros(n_vol, dtype=np.float64),
         'wall_temperature_state_index_by_vol': wall_temperature_state_index_by_vol,
@@ -1971,6 +2033,7 @@ def _free_piston_static_numba_args(bundle):
         'load_power_target_W': float(getattr(fp, 'load_power_target_W', 0.0) or 0.0),
         'load_efficiency_0to1': float(getattr(fp, 'load_efficiency_0to1', 1.0) or 1.0),
         'load_min_velocity_m_per_s': float(getattr(fp, 'load_min_velocity_m_per_s', 1.0e-12) or 1.0e-12),
+        'load_motor_assist_until_soc': 1 if bool(getattr(fp, 'load_motor_assist_until_soc', True)) else 0,
         'load_assist_velocity_threshold_m_per_s': float(getattr(fp, 'load_assist_velocity_threshold_m_per_s', 0.0) or 0.0),
         'load_assist_force_N': float(getattr(fp, 'load_assist_force_N', 0.0) or 0.0),
         'load_target_margin_m': float(getattr(fp, 'load_target_margin_m', 0.0) or 0.0),
@@ -2077,6 +2140,8 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             static['environment_is_fixed'],
             static['environment_pressures_pa'],
             static['environment_temperatures_K'],
+            static['boundary_pressures_pa'],
+            static['boundary_temperatures_K'],
             static['wall_bore_by_vol'],
             static['wall_ups_by_vol'],
             1 if bool(getattr(bundle, 'wall_temperature_enabled', False)) else 0,
@@ -2120,6 +2185,7 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
             static['load_power_target_W'],
             static['load_efficiency_0to1'],
             static['load_min_velocity_m_per_s'],
+            static['load_motor_assist_until_soc'],
             static['load_assist_velocity_threshold_m_per_s'],
             static['load_assist_force_N'],
             static['load_target_margin_m'],

@@ -1,0 +1,125 @@
+name: Waermefreisetzung und Lambda
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  background_color: '#ffffff'
+  axes_facecolor: '#ffffff'
+  text_color: '#202020'
+  grid_color: '#d9d9d9'
+  legend_facecolor: '#ffffff'
+  legend_edgecolor: '#a0a0a0'
+  default_line_width: 0.9
+  default_marker_size: 3.5
+  font_size: 6
+  axis_label_size: 6
+  tick_label_size: 6
+  title_size: 6
+  figure_title_size: 7
+  grid_alpha: 0.3
+figures:
+- id: c5343d6934ed
+  title: Einspritzung und Verbrennung
+  rows: 1
+  cols: 1
+  subplots:
+  - id: 10babe302236
+    title: Waermefreisetzung und Lambda
+    show_title: true
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: auto
+    x_min: 0.0
+    x_max: 720.0
+    x_start_at_zero: true
+    y_axes:
+    - id: ax_power
+      title: Leistung [kW]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    - id: ax_lambda
+      title: Lambda / aktiv [-]
+      side: right
+      spine_offset: 0.0
+      color: '#667085'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: 7b1049cd2b9f
+      signal_key: cylinder_1_added_energy_W
+      label: cyl1 qdot vibe
+      axis_id: ax_power
+      visible: true
+      color: '#b42318'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 0.001
+      offset: 0.0
+      series_type: line
+    - id: 16a0337283dc
+      signal_key: cylinder_2_added_energy_W
+      label: cyl2 qdot vibe
+      axis_id: ax_power
+      visible: true
+      color: '#f79009'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 0.001
+      offset: 0.0
+      series_type: line
+    - id: 46c7ec14c878
+      signal_key: cylinder_1_combustion_active_0to1
+      label: cyl1 combustion active
+      axis_id: ax_lambda
+      visible: true
+      color: '#344054'
+      line_style: ':'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: dedca3098718
+      signal_key: cylinder_2_combustion_active_0to1
+      label: cyl2 combustion active
+      axis_id: ax_lambda
+      visible: true
+      color: '#98a2b3'
+      line_style: ':'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    events: []
+    y_lines: []
+    legend_visible: true
+    legend_position: best
+    show_grid: true

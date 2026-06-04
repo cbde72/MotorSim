@@ -1,0 +1,127 @@
+name: Kolbenarbeit kumuliert / Ventilhub
+style_sheet: ../plot_style_sheet.yaml
+figures:
+- title: Kolbenarbeit kumuliert / Ventilhub
+  rows: 1
+  cols: 1
+  subplots:
+  - title: ''
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    events:
+    - x: 0.0
+      label: OT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+    - x: 160.0
+      label: EVO
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+    - x: 180.0
+      label: UT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+    - x: 300.0
+      label: EVC
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+    - x: 350.0
+      label: SOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+    - x: 360.0
+      label: OT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+    - x: 370.0
+      label: IVO
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+    - x: 405.0
+      label: EOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+    - x: 510.0
+      label: IVC
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+    - x: 540.0
+      label: UT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+    y_axes:
+    - id: ax_main
+      title: Kolbenarbeit [J]
+      side: left
+      color: '#111111'
+    - id: ax_lift
+      title: Ventilhub [mm]
+      side: right
+      color: '#1f77b4'
+    series:
+    - signal_key: cylinder_piston_work_cycle_J
+      label: Kolbenarbeit (kumuliert)
+      axis_id: ax_main
+      color: '#111111'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: intake_valve_valve_lift_m
+      label: Einlasshub
+      axis_id: ax_lift
+      color: '#0000ff'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_valve_valve_lift_m
+      label: Auslasshub
+      axis_id: ax_lift
+      color: '#ff0000'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0

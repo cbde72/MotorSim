@@ -27,6 +27,7 @@ from thermo0d.config.constants import (
     CombDurationMode,
     ConnCol,
     ConnectionType,
+    EndpointKind,
     EvapCol,
     FeatureCol,
     FlowCoeffMode,
@@ -79,6 +80,9 @@ C_ALPHA_LEN = int(ConnCol.ALPHA_LEN)
 C_CD_TABLE_START = int(ConnCol.CD_TABLE_START)
 C_CD_TABLE_LEN = int(ConnCol.CD_TABLE_LEN)
 C_REF_FLOW_AREA = int(ConnCol.REF_FLOW_AREA)
+C_FROM_KIND = int(ConnCol.FROM_KIND)
+C_TO_KIND = int(ConnCol.TO_KIND)
+ENDPOINT_VOLUME = int(EndpointKind.VOLUME)
 
 W_MODEL = int(WallCol.MODEL)
 W_C1 = int(WallCol.C1)
@@ -392,6 +396,8 @@ def rhs_thermo_numba(
     environment_is_fixed: np.ndarray,
     environment_pressures_pa: np.ndarray,
     environment_temperatures_K: np.ndarray,
+    boundary_pressures_pa: np.ndarray,
+    boundary_temperatures_K: np.ndarray,
     combustion_fuel_mass_by_vol: np.ndarray,
     combustion_afr_stoich_by_vol: np.ndarray,
     dt_s: float,
@@ -540,11 +546,19 @@ def rhs_thermo_numba(
             left = int(conn[C_FROM])
             right = int(conn[C_TO])
             conn_type = int(conn[C_TYPE])
+            left_kind = int(conn[C_FROM_KIND]) if conn.shape[0] > C_FROM_KIND else ENDPOINT_VOLUME
+            right_kind = int(conn[C_TO_KIND]) if conn.shape[0] > C_TO_KIND else ENDPOINT_VOLUME
+            left_is_volume = left_kind == ENDPOINT_VOLUME
+            right_is_volume = right_kind == ENDPOINT_VOLUME
+            p_left = pressures[left] if left_is_volume else max(boundary_pressures_pa[left], 1.0)
+            t_left = temperatures[left] if left_is_volume else max(boundary_temperatures_K[left], 1.0)
+            p_right = pressures[right] if right_is_volume else max(boundary_pressures_pa[right], 1.0)
+            t_right = temperatures[right] if right_is_volume else max(boundary_temperatures_K[right], 1.0)
 
             if conn_type == CONN_VALVE or conn_type == CONN_SLOT:
-                if int(vol_matrix[left, V_TYPE]) == VOL_CYLINDER:
+                if left_is_volume and int(vol_matrix[left, V_TYPE]) == VOL_CYLINDER:
                     cyl_idx = left
-                elif int(vol_matrix[right, V_TYPE]) == VOL_CYLINDER:
+                elif right_is_volume and int(vol_matrix[right, V_TYPE]) == VOL_CYLINDER:
                     cyl_idx = right
                 else:
                     continue
@@ -562,28 +576,28 @@ def rhs_thermo_numba(
             elif conn_type == CONN_ORIFICE:
                 area, cd_f, cd_r = _evaluate_orifice_area(conn)
             elif conn_type == CONN_CHECK_VALVE:
-                area, cd_f, cd_r = _evaluate_check_valve_area(conn, pressures[left], pressures[right])
+                area, cd_f, cd_r = _evaluate_check_valve_area(conn, p_left, p_right)
             else:
                 continue
 
             if area <= 1.0e-18 or (cd_f <= 0.0 and cd_r <= 0.0):
                 continue
 
-            if pressures[left] >= pressures[right]:
-                gamma_up = kappa_by_vol[left]
-                gas_constant_up = gas_constant_by_vol[left]
-                cp_up = cp_by_vol[left]
-                temp_up = temperatures[left]
+            if p_left >= p_right:
+                gamma_up = kappa_by_vol[left] if left_is_volume else kappa_default
+                gas_constant_up = gas_constant_by_vol[left] if left_is_volume else gas_constant_default
+                cp_up = cp_by_vol[left] if left_is_volume else cp_default
+                temp_up = t_left
             else:
-                gamma_up = kappa_by_vol[right]
-                gas_constant_up = gas_constant_by_vol[right]
-                cp_up = cp_by_vol[right]
-                temp_up = temperatures[right]
+                gamma_up = kappa_by_vol[right] if right_is_volume else kappa_default
+                gas_constant_up = gas_constant_by_vol[right] if right_is_volume else gas_constant_default
+                cp_up = cp_by_vol[right] if right_is_volume else cp_default
+                temp_up = t_right
             mdot = de_st_venant_wantzel_signed(
-                pressures[left],
-                temperatures[left],
-                pressures[right],
-                temperatures[right],
+                p_left,
+                t_left,
+                p_right,
+                t_right,
                 area,
                 cd_f,
                 cd_r,
@@ -604,37 +618,43 @@ def rhs_thermo_numba(
             right_l = right_m + 4
             _ = (left_l, right_l)
 
-            if int(environment_is_fixed[left]) != 1:
+            if left_is_volume and int(environment_is_fixed[left]) != 1:
                 dy[left_m] -= mdot
                 dy[left_u] -= mdot * h_up
-            if int(environment_is_fixed[right]) != 1:
+            if right_is_volume and int(environment_is_fixed[right]) != 1:
                 dy[right_m] += mdot
                 dy[right_u] += mdot * h_up
 
             if mdot >= 0.0:
-                upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(y, left, environment_is_fixed)
+                if left_is_volume:
+                    upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(y, left, environment_is_fixed)
+                else:
+                    upstream_burned_fraction, upstream_air_fraction = 0.0, 1.0
                 burned_transfer = mdot * upstream_burned_fraction
                 air_transfer = mdot * upstream_air_fraction
-                if int(environment_is_fixed[left]) != 1:
+                if left_is_volume and int(environment_is_fixed[left]) != 1:
                     dy[left_b] -= burned_transfer
                     dy[left_a] -= air_transfer
-                if int(environment_is_fixed[right]) != 1:
+                if right_is_volume and int(environment_is_fixed[right]) != 1:
                     dy[right_b] += burned_transfer
                     dy[right_a] += air_transfer
             else:
-                upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(y, right, environment_is_fixed)
+                if right_is_volume:
+                    upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(y, right, environment_is_fixed)
+                else:
+                    upstream_burned_fraction, upstream_air_fraction = 0.0, 1.0
                 burned_transfer = (-mdot) * upstream_burned_fraction
                 air_transfer = (-mdot) * upstream_air_fraction
-                if int(environment_is_fixed[left]) != 1:
+                if left_is_volume and int(environment_is_fixed[left]) != 1:
                     dy[left_b] += burned_transfer
                     dy[left_a] += air_transfer
-                if int(environment_is_fixed[right]) != 1:
+                if right_is_volume and int(environment_is_fixed[right]) != 1:
                     dy[right_b] -= burned_transfer
                     dy[right_a] -= air_transfer
 
-            if int(vol_matrix[left, V_TYPE]) == VOL_CYLINDER and mdot < 0.0:
+            if left_is_volume and int(vol_matrix[left, V_TYPE]) == VOL_CYLINDER and mdot < 0.0:
                 mdot_in_by_vol[left] += -mdot
-            if int(vol_matrix[right, V_TYPE]) == VOL_CYLINDER and mdot > 0.0:
+            if right_is_volume and int(vol_matrix[right, V_TYPE]) == VOL_CYLINDER and mdot > 0.0:
                 mdot_in_by_vol[right] += mdot
 
     for i in range(n_vol):
@@ -796,12 +816,18 @@ def analytic_flow_energy_jacobian(bundle, t: float, y: np.ndarray) -> np.ndarray
     environment_is_fixed = getattr(b, "environment_is_fixed", None)
     environment_pressures_pa = getattr(b, "environment_pressures_pa", None)
     environment_temperatures_K = getattr(b, "environment_temperatures_K", None)
+    boundary_pressures_pa = getattr(b, "boundary_pressures_pa", None)
+    boundary_temperatures_K = getattr(b, "boundary_temperatures_K", None)
     if environment_is_fixed is None:
         environment_is_fixed = np.zeros(b.vol_matrix.shape[0], dtype=np.int64)
     if environment_pressures_pa is None:
         environment_pressures_pa = np.zeros(b.vol_matrix.shape[0], dtype=np.float64)
     if environment_temperatures_K is None:
         environment_temperatures_K = np.zeros(b.vol_matrix.shape[0], dtype=np.float64)
+    if boundary_pressures_pa is None:
+        boundary_pressures_pa = np.zeros(0, dtype=np.float64)
+    if boundary_temperatures_K is None:
+        boundary_temperatures_K = np.zeros(0, dtype=np.float64)
     n_vol = b.vol_matrix.shape[0]
     jac = np.zeros((y.size, y.size), dtype=np.float64)
     if b.feature_flags.size <= F_MASS or int(b.feature_flags[F_MASS]) != 1:
@@ -858,8 +884,16 @@ def analytic_flow_energy_jacobian(bundle, t: float, y: np.ndarray) -> np.ndarray
         left = int(conn[C_FROM])
         right = int(conn[C_TO])
         conn_type = int(conn[C_TYPE])
-        cyl_idx = left if int(b.vol_matrix[left, V_TYPE]) == VolumeType.CYLINDER else right
-        if conn_type in (ConnectionType.VALVE, ConnectionType.SLOT) and int(b.vol_matrix[cyl_idx, V_TYPE]) != VolumeType.CYLINDER:
+        left_kind = int(conn[C_FROM_KIND]) if conn.shape[0] > C_FROM_KIND else ENDPOINT_VOLUME
+        right_kind = int(conn[C_TO_KIND]) if conn.shape[0] > C_TO_KIND else ENDPOINT_VOLUME
+        left_is_volume = left_kind == ENDPOINT_VOLUME
+        right_is_volume = right_kind == ENDPOINT_VOLUME
+        cyl_idx = -1
+        if left_is_volume and int(b.vol_matrix[left, V_TYPE]) == VolumeType.CYLINDER:
+            cyl_idx = left
+        elif right_is_volume and int(b.vol_matrix[right, V_TYPE]) == VolumeType.CYLINDER:
+            cyl_idx = right
+        if conn_type in (ConnectionType.VALVE, ConnectionType.SLOT) and cyl_idx < 0:
             continue
         aeff_f, aeff_r = _connection_effective_areas_py(
             conn,
@@ -872,10 +906,10 @@ def analytic_flow_energy_jacobian(bundle, t: float, y: np.ndarray) -> np.ndarray
             b.alpha_table,
             b.cd_table,
         )
-        p_left = press[left]
-        p_right = press[right]
-        t_left = temps[left]
-        t_right = temps[right]
+        p_left = press[left] if left_is_volume else max(float(boundary_pressures_pa[left]), 1.0)
+        p_right = press[right] if right_is_volume else max(float(boundary_pressures_pa[right]), 1.0)
+        t_left = temps[left] if left_is_volume else max(float(boundary_temperatures_K[left]), 1.0)
+        t_right = temps[right] if right_is_volume else max(float(boundary_temperatures_K[right]), 1.0)
 
         if aeff_f <= 0.0 and aeff_r <= 0.0:
             continue
@@ -893,9 +927,9 @@ def analytic_flow_energy_jacobian(bundle, t: float, y: np.ndarray) -> np.ndarray
         if aeff <= 0.0:
             continue
 
-        p_up = press[up]
-        p_down = press[down]
-        t_up = temps[up]
+        p_up = p_left if up == left else p_right
+        p_down = p_right if up == left else p_left
+        t_up = t_left if up == left else t_right
         if p_up <= 0.0 or t_up <= 0.0:
             continue
         pr = max(0.0, min(1.0, p_down / p_up))
@@ -914,16 +948,19 @@ def analytic_flow_energy_jacobian(bundle, t: float, y: np.ndarray) -> np.ndarray
         coeff_up_t = sign * aeff * (-0.5) * p_up * phi / (sqrt_rt * t_up)
 
         dmdot = {2 * left: 0.0, 2 * left + 1: 0.0, 2 * right: 0.0, 2 * right + 1: 0.0}
-        dmdot[2 * up] += coeff_up_t * dTdm[up]
-        dmdot[2 * up + 1] += coeff_up_p * dpdU[up] + coeff_up_t * dTdU[up]
-        dmdot[2 * down + 1] += coeff_down_p * dpdU[down]
+        if (up == left and left_is_volume) or (up == right and right_is_volume):
+            dmdot[2 * up] += coeff_up_t * dTdm[up]
+            dmdot[2 * up + 1] += coeff_up_p * dpdU[up] + coeff_up_t * dTdU[up]
+        if (down == left and left_is_volume) or (down == right and right_is_volume):
+            dmdot[2 * down + 1] += coeff_down_p * dpdU[down]
 
         dh_up = {2 * left: 0.0, 2 * left + 1: 0.0, 2 * right: 0.0, 2 * right + 1: 0.0}
-        dh_up[2 * up] = cp * dTdm[up]
-        dh_up[2 * up + 1] = cp * dTdU[up]
+        if (up == left and left_is_volume) or (up == right and right_is_volume):
+            dh_up[2 * up] = cp * dTdm[up]
+            dh_up[2 * up + 1] = cp * dTdU[up]
 
-        left_fixed = int(environment_is_fixed[left]) == 1
-        right_fixed = int(environment_is_fixed[right]) == 1
+        left_fixed = (not left_is_volume) or int(environment_is_fixed[left]) == 1
+        right_fixed = (not right_is_volume) or int(environment_is_fixed[right]) == 1
         for col, dmd in dmdot.items():
             if dmd == 0.0 and dh_up[col] == 0.0:
                 continue
@@ -950,6 +987,8 @@ class RHSWrapper:
         self._environment_is_fixed = bundle.environment_is_fixed if bundle.environment_is_fixed is not None else np.zeros(bundle.vol_matrix.shape[0], dtype=np.int64)
         self._environment_pressures_pa = bundle.environment_pressures_pa if bundle.environment_pressures_pa is not None else np.zeros(bundle.vol_matrix.shape[0], dtype=np.float64)
         self._environment_temperatures_K = bundle.environment_temperatures_K if bundle.environment_temperatures_K is not None else np.zeros(bundle.vol_matrix.shape[0], dtype=np.float64)
+        self._boundary_pressures_pa = bundle.boundary_pressures_pa if getattr(bundle, 'boundary_pressures_pa', None) is not None else np.zeros(0, dtype=np.float64)
+        self._boundary_temperatures_K = bundle.boundary_temperatures_K if getattr(bundle, 'boundary_temperatures_K', None) is not None else np.zeros(0, dtype=np.float64)
         self._combustion_fuel_mass_by_vol = bundle.combustion_fuel_mass_by_vol if getattr(bundle, 'combustion_fuel_mass_by_vol', None) is not None else np.zeros(bundle.vol_matrix.shape[0], dtype=np.float64)
         self._combustion_afr_stoich_by_vol = bundle.combustion_afr_stoich_by_vol if getattr(bundle, 'combustion_afr_stoich_by_vol', None) is not None else np.full(bundle.vol_matrix.shape[0], 14.5, dtype=np.float64)
         self._wall_temperature_state_index_by_vol = (
@@ -988,6 +1027,8 @@ class RHSWrapper:
             self._environment_is_fixed,
             self._environment_pressures_pa,
             self._environment_temperatures_K,
+            self._boundary_pressures_pa,
+            self._boundary_temperatures_K,
             self._combustion_fuel_mass_by_vol,
             self._combustion_afr_stoich_by_vol,
             float(getattr(b.simulation, 'dt_s', 0.0) or 0.0),
@@ -1017,6 +1058,8 @@ class RHSWrapper:
             self._environment_is_fixed,
             self._environment_pressures_pa,
             self._environment_temperatures_K,
+            self._boundary_pressures_pa,
+            self._boundary_temperatures_K,
             self._combustion_fuel_mass_by_vol,
             self._combustion_afr_stoich_by_vol,
             float(getattr(b.simulation, 'dt_s', 0.0) or 0.0),

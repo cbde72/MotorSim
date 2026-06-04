@@ -7,8 +7,8 @@ import re
 
 import numpy as np
 
-from thermo0d.config.constants import ConnCol, ConnectionType, FeatureCol, FlowCoeffMode, KinCol, VolumeCol, VolumeType
-from thermo0d.model.free_piston.cycle_metrics import detect_turning_points
+from thermo0d.config.constants import ConnCol, ConnectionType, FeatureCol, FlowCoeffMode, KinCol, VolumeCol, VolumeType, WallTemperatureZone
+from thermo0d.model.free_piston.cycle_metrics import count_ut_ot_ut_cycles, find_last_ut_ot_ut_turning_points
 
 
 @dataclass(slots=True)
@@ -315,6 +315,53 @@ def _last_cycle_rows_from_cycle_index(rows: list[dict[str, float | int]]) -> lis
     return [row for row in rows if int(row.get("cycle_index", 0)) == last_cycle]
 
 
+def _complete_cycle_markdown(bundle, rows: list[dict[str, float | int]] | None) -> str:
+    duration_s = _finite_float(getattr(getattr(bundle, "simulation", None), "simulationtime_s", None))
+    cycle_count = int(getattr(getattr(bundle, "simulation", None), "total_cycles", 0) or 0)
+
+    if rows:
+        t_vals: list[float] = []
+        cycle_values: set[int] = set()
+        x_vals: list[float] = []
+        v_vals: list[float] = []
+        for row in rows:
+            t_val = _finite_float(row.get("t_s"))
+            if t_val is not None:
+                t_vals.append(t_val)
+            cycle_raw = _finite_float(row.get("cycle_index"))
+            if cycle_raw is not None:
+                cycle_values.add(int(cycle_raw))
+            x_val = _finite_float(row.get("free_piston_x_m"))
+            v_val = _finite_float(row.get("free_piston_v_m_per_s"))
+            if x_val is not None and v_val is not None and t_val is not None:
+                x_vals.append(x_val)
+                v_vals.append(v_val)
+        if duration_s is None and len(t_vals) >= 2:
+            duration_s = max(float(t_vals[-1] - t_vals[0]), 0.0)
+        if getattr(bundle, "architecture", "classic") == "free_piston" and len(t_vals) == len(x_vals) == len(v_vals) and len(t_vals) >= 3:
+            v_arr = np.asarray(v_vals, dtype=np.float64)
+            max_v = float(np.max(np.abs(v_arr))) if v_arr.size else 0.0
+            turning_count = count_ut_ot_ut_cycles(
+                np.asarray(t_vals, dtype=np.float64),
+                np.asarray(x_vals, dtype=np.float64),
+                v_arr,
+                eps=max(1.0e-10, 1.0e-6 * max_v),
+            )
+            if turning_count > cycle_count:
+                cycle_count = turning_count
+        elif cycle_values and len(cycle_values) > cycle_count:
+            cycle_count = len(cycle_values)
+
+    duration_text = "n/a" if duration_s is None else f"{duration_s:.12g}s"
+    return "\n".join(
+        [
+            "# Complete Cycle",
+            f"    Simulationdauer: {duration_text}",
+            f"    Anzahl Zyklen: {cycle_count}",
+        ]
+    )
+
+
 def _last_free_piston_cycle_rows(rows: list[dict[str, float | int]]) -> list[dict[str, float | int]]:
     if not rows:
         return []
@@ -337,46 +384,19 @@ def _last_free_piston_cycle_rows(rows: list[dict[str, float | int]]) -> list[dic
     if len(valid_rows) < 3:
         return []
 
-    extrema: list[tuple[str, int]] = []
-    for i in range(1, len(x_vals) - 1):
-        prev_x = x_vals[i - 1]
-        cur_x = x_vals[i]
-        next_x = x_vals[i + 1]
-        if (cur_x >= prev_x and cur_x > next_x) or (cur_x > prev_x and cur_x >= next_x):
-            extrema.append(("max", i))
-        elif (cur_x <= prev_x and cur_x < next_x) or (cur_x < prev_x and cur_x <= next_x):
-            extrema.append(("min", i))
-    if len(extrema) >= 3:
-        for idx in range(len(extrema) - 3, -1, -1):
-            kind0, pos0 = extrema[idx]
-            kind1, pos1 = extrema[idx + 1]
-            kind2, pos2 = extrema[idx + 2]
-            if kind0 != "max" or kind1 != "min" or kind2 != "max":
-                continue
-            start_row = row_indices[pos0]
-            end_row = row_indices[pos2]
-            if end_row > start_row:
-                return rows[start_row:end_row + 1]
-
-    turning_points = detect_turning_points(
+    triplet = find_last_ut_ot_ut_turning_points(
         np.asarray(t_vals, dtype=np.float64),
         np.asarray(x_vals, dtype=np.float64),
         np.asarray(v_vals, dtype=np.float64),
     )
-    if len(turning_points) < 3:
+    if triplet is None:
         return []
-    for idx in range(len(turning_points) - 3, -1, -1):
-        tp0 = turning_points[idx]
-        tp1 = turning_points[idx + 1]
-        tp2 = turning_points[idx + 2]
-        if not (tp0.x_m > tp1.x_m and tp2.x_m > tp1.x_m):
-            continue
-        start_row = row_indices[tp0.sample_index]
-        end_row = row_indices[tp2.sample_index]
-        if end_row <= start_row:
-            continue
-        return rows[start_row:end_row + 1]
-    return []
+    tp0, _tp1, tp2 = triplet
+    start_row = row_indices[tp0.sample_index]
+    end_row = row_indices[tp2.sample_index]
+    if end_row <= start_row:
+        return []
+    return rows[start_row:end_row + 1]
 
 
 def build_last_cycle_entries(bundle, rows: list[dict[str, float | int]] | None) -> list[LastCycleEntry]:
@@ -482,6 +502,34 @@ def build_last_cycle_entries(bundle, rows: list[dict[str, float | int]] | None) 
         cyl_work_J = _integrate_window(cycle_rows, f"{cyl_prefix}_piston_work_W")
         cyl_power_W = cyl_work_J / duration_s if duration_s > 1.0e-15 else 0.0
         entries.append(LastCycleEntry(f"{cyl_prefix}_indicated_power_W", cyl_power_W, "W"))
+        cyl_volume_arr = _row_values(cycle_rows, f"{cyl_prefix}_V_m3")
+        cyl_swept_m3 = float(np.max(cyl_volume_arr) - np.min(cyl_volume_arr)) if cyl_volume_arr.size else 0.0
+        cyl_imep_bar = float(cyl_work_J / cyl_swept_m3 / 1.0e5) if cyl_swept_m3 > 1.0e-18 else 0.0
+        entries.append(LastCycleEntry(f"{cyl_prefix}_imep_bar", cyl_imep_bar, "bar"))
+        entries.append(LastCycleEntry(f"{cyl_prefix}_piston_work_Nm", cyl_work_J, "Nm"))
+        cyl_added_J = _integrate_window(cycle_rows, f"{cyl_prefix}_added_energy_W")
+        entries.append(LastCycleEntry(f"{cyl_prefix}_added_energy_J", cyl_added_J, "J"))
+        cyl_wall_loss_J = _integrate_abs_window(cycle_rows, f"{cyl_prefix}_wall_heat_W")
+        if cyl_wall_loss_J is None:
+            cyl_wall_loss_J = _integrate_zone_abs_wall_window(cycle_rows, cyl_prefix)
+        if cyl_wall_loss_J is not None:
+            entries.append(LastCycleEntry(f"{cyl_prefix}_wall_heat_loss_J", cyl_wall_loss_J, "J"))
+        for zone_name, label in (
+            ("piston", "piston"),
+            ("head", "head"),
+            ("cylinder", "cylinder"),
+        ):
+            zone_loss_J = _integrate_abs_window(cycle_rows, f"{cyl_prefix}_wall_{zone_name}_heat_W")
+            if zone_loss_J is not None:
+                entries.append(LastCycleEntry(f"{cyl_prefix}_wall_{label}_heat_loss_J", zone_loss_J, "J"))
+        cyl_lambda = _last_positive_value(cycle_rows, [f"{cyl_prefix}_lambda"])
+        if cyl_lambda is not None:
+            entries.append(LastCycleEntry(f"{cyl_prefix}_lambda", float(cyl_lambda), "-"))
+        cyl_combustion_start_row = _first_combustion_start_row(bundle, cycle_rows, cyl_prefix)
+        if cyl_combustion_start_row is not None:
+            cyl_burned = _value_at_keys(cyl_combustion_start_row, [f"{cyl_prefix}_share_burned_0to1"])
+            if cyl_burned is not None:
+                entries.append(LastCycleEntry(f"{cyl_prefix}_restgas_anteil_brennbeginn_percent", float(cyl_burned) * 100.0, "%"))
         indicated_power_total_W += cyl_power_W
         indicated_power_count += 1
     if indicated_power_count > 1:
@@ -602,25 +650,6 @@ def build_last_cycle_markdown(bundle, rows: list[dict[str, float | int]] | None,
         return ""
     entry_map = {entry.metric_name: entry for entry in entries}
 
-    def _entry_float(name: str) -> float | None:
-        entry = entry_map.get(name)
-        if entry is None:
-            return None
-        try:
-            return float(entry.value)
-        except (TypeError, ValueError):
-            return None
-
-    def _fmt_energy(value: float | None) -> str:
-        if value is None or not math.isfinite(value):
-            return "n/a"
-        return f"{value:.6g} J"
-
-    def _fmt_pct(value: float | None, ref: float | None) -> str:
-        if value is None or ref is None or abs(ref) <= 1.0e-18 or not math.isfinite(value) or not math.isfinite(ref):
-            return "n/a"
-        return f"{100.0 * value / ref:.2f} %"
-
     lines = [
         f"# {title}",
         "",
@@ -684,27 +713,236 @@ def build_last_cycle_markdown(bundle, rows: list[dict[str, float | int]] | None,
     for entry in entries:
         value = _format_last_cycle_value(entry)
         lines.append(f"| {entry.metric_name} | {value} | {entry.unit} |")
-
-    added_energy_J = _entry_float("added_energy_J")
-    piston_work_J = _entry_float("piston_work_Nm")
-    wall_heat_loss_J = _entry_float("wall_heat_loss_J")
-    friction_work_J = _entry_float("friction_work_J")
-    generator_work_J = _entry_float("generator_work_J")
-    known_out_J = sum(v for v in [piston_work_J, wall_heat_loss_J, friction_work_J, generator_work_J] if v is not None)
-    rest_J = None if added_energy_J is None else added_energy_J - known_out_J
-
-    lines.extend([
-        "",
-        "## Energiebilanz vom letzten Zyklus",
-        f"- Zugeführte Energie: {_fmt_energy(added_energy_J)} ({_fmt_pct(added_energy_J, added_energy_J)})",
-        f"- Kolbenarbeit: {_fmt_energy(piston_work_J)} ({_fmt_pct(piston_work_J, added_energy_J)})",
-        f"- Wandwärmeverluste: {_fmt_energy(wall_heat_loss_J)} ({_fmt_pct(wall_heat_loss_J, added_energy_J)})",
-        f"- Reibarbeit: {_fmt_energy(friction_work_J)} ({_fmt_pct(friction_work_J, added_energy_J)})",
-        f"- Generatorarbeit: {_fmt_energy(generator_work_J)} ({_fmt_pct(generator_work_J, added_energy_J)})",
-        f"- Rest: {_fmt_energy(rest_J)} ({_fmt_pct(rest_J, added_energy_J)})",
-        "",
-    ])
     return "\n".join(lines)
+
+
+def _fmt_energy(value: float | None) -> str:
+    if value is None or not math.isfinite(value):
+        return "n/a"
+    return f"{value:.6g} J"
+
+
+def _fmt_pct(value: float | None, ref: float | None) -> str:
+    if value is None or ref is None or abs(ref) <= 1.0e-18 or not math.isfinite(value) or not math.isfinite(ref):
+        return "n/a"
+    return f"{100.0 * value / ref:.2f} %"
+
+
+def _energy_balance_for_prefix(
+    rows: list[dict[str, float | int]],
+    prefix: str,
+    *,
+    include_global_loads: bool,
+) -> dict[str, float | None]:
+    added_energy_J = _integrate_window(rows, f"{prefix}_added_energy_W")
+    piston_work_J = _integrate_window(rows, f"{prefix}_piston_work_W")
+    wall_heat_loss_J = _integrate_abs_window(rows, f"{prefix}_wall_heat_W")
+    zone_wall_heat_loss_J = _integrate_zone_abs_wall_window(rows, prefix)
+    if zone_wall_heat_loss_J is not None:
+        wall_heat_loss_J = zone_wall_heat_loss_J
+
+    friction_work_J: float | None = None
+    generator_work_J: float | None = None
+    if include_global_loads:
+        friction_pairs: list[tuple[float, float]] = []
+        for row in rows:
+            t_val = _finite_float(row.get("t_s"))
+            force_val = _finite_float(row.get("free_piston_F_friction_N"))
+            v_val = _finite_float(row.get("free_piston_v_m_per_s"))
+            if t_val is None or force_val is None or v_val is None:
+                continue
+            friction_pairs.append((t_val, abs(force_val * v_val)))
+        if len(friction_pairs) >= 2:
+            friction_work_J = float(
+                np.trapezoid(
+                    np.asarray([value for _time, value in friction_pairs], dtype=np.float64),
+                    np.asarray([time for time, _value in friction_pairs], dtype=np.float64),
+                )
+            )
+        generator_work_J = _integrate_abs_window(rows, "free_piston_generator_power_W")
+
+    known_out_J = sum(
+        value
+        for value in (piston_work_J, wall_heat_loss_J, friction_work_J, generator_work_J)
+        if value is not None
+    )
+    rest_J = added_energy_J - known_out_J
+    return {
+        "added_energy_J": added_energy_J,
+        "piston_work_J": piston_work_J,
+        "wall_heat_loss_J": wall_heat_loss_J,
+        "friction_work_J": friction_work_J,
+        "generator_work_J": generator_work_J,
+        "rest_J": rest_J,
+    }
+
+
+def _cycle_rows_for_energy_balance(bundle, rows: list[dict[str, float | int]] | None) -> list[dict[str, float | int]]:
+    if not rows:
+        return []
+    if getattr(bundle, "architecture", "classic") == "free_piston":
+        cycle_rows = _last_free_piston_cycle_rows(list(rows))
+        if cycle_rows:
+            return cycle_rows
+    return _last_cycle_rows_from_cycle_index(list(rows))
+
+
+def _cylinder_label(prefix: str) -> str:
+    match = re.fullmatch(r"cylinder_(\d+)", prefix)
+    if match:
+        return f"Cylinder {match.group(1)}"
+    match = re.fullmatch(r"compressor_(\d+)", prefix)
+    if match:
+        return f"compressor_{match.group(1)}"
+    return prefix
+
+
+def _append_energy_balance_lines(lines: list[str], label: str, balance: dict[str, float | None]) -> None:
+    added_energy_J = balance["added_energy_J"]
+    lines.extend(
+        [
+            f"{label}: ",
+            f"- Zugeführte Energie: {_fmt_energy(added_energy_J)} ({_fmt_pct(added_energy_J, added_energy_J)})",
+            f"- Kolbenarbeit: {_fmt_energy(balance['piston_work_J'])} ({_fmt_pct(balance['piston_work_J'], added_energy_J)})",
+            f"- Wandwärmeverluste: {_fmt_energy(balance['wall_heat_loss_J'])} ({_fmt_pct(balance['wall_heat_loss_J'], added_energy_J)})",
+            f"- Reibarbeit: {_fmt_energy(balance['friction_work_J'])} ({_fmt_pct(balance['friction_work_J'], added_energy_J)})",
+            f"- Generatorarbeit: {_fmt_energy(balance['generator_work_J'])} ({_fmt_pct(balance['generator_work_J'], added_energy_J)})",
+            f"- Rest: {_fmt_energy(balance['rest_J'])} ({_fmt_pct(balance['rest_J'], added_energy_J)})",
+            "",
+        ]
+    )
+
+
+def _build_energy_balance_markdown(bundle, rows: list[dict[str, float | int]] | None) -> str:
+    cycle_rows = _cycle_rows_for_energy_balance(bundle, rows)
+    if not cycle_rows:
+        return ""
+    sample = cycle_rows[-1]
+    cylinder_prefixes = sorted(
+        {
+            str(key)[:-len("_added_energy_W")]
+            for key in sample
+            if str(key).startswith("cylinder_") and str(key).endswith("_added_energy_W")
+        },
+        key=lambda item: [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", item)],
+    )
+    if not cylinder_prefixes:
+        primary_prefix = _find_primary_prefix(cycle_rows)
+        if primary_prefix is None:
+            return ""
+        cylinder_prefixes = [primary_prefix]
+
+    balances: list[dict[str, float | None]] = []
+    lines = ["## Energiebilanz vom letzten Zyklus"]
+    for prefix in cylinder_prefixes:
+        balance = _energy_balance_for_prefix(cycle_rows, prefix, include_global_loads=False)
+        balances.append(balance)
+        _append_energy_balance_lines(lines, _cylinder_label(prefix), balance)
+
+    if len(balances) > 1:
+        global_loads = _energy_balance_for_prefix(cycle_rows, cylinder_prefixes[0], include_global_loads=True)
+        total_balance = {
+            key: sum(value for value in (balance.get(key) for balance in balances) if value is not None)
+            for key in ("added_energy_J", "piston_work_J", "wall_heat_loss_J", "friction_work_J", "generator_work_J", "rest_J")
+        }
+        total_balance["friction_work_J"] = global_loads.get("friction_work_J")
+        total_balance["generator_work_J"] = global_loads.get("generator_work_J")
+        known_out_J = sum(
+            value
+            for value in (
+                total_balance.get("piston_work_J"),
+                total_balance.get("wall_heat_loss_J"),
+                total_balance.get("friction_work_J"),
+                total_balance.get("generator_work_J"),
+            )
+            if value is not None
+        )
+        total_balance["rest_J"] = total_balance["added_energy_J"] - known_out_J
+        _append_energy_balance_lines(lines, "Gesamt", total_balance)
+    return "\n".join(lines).rstrip()
+
+
+def _wall_temperature_groups_from_bundle(bundle) -> dict[str, dict[str, float]]:
+    state_by_vol = getattr(bundle, "wall_temperature_state_index_by_vol", None)
+    y_init = getattr(bundle, "y_init", None)
+    volume_names = list(getattr(bundle, "volume_names", []) or [])
+    if state_by_vol is None or y_init is None or not volume_names:
+        return {}
+    state_arr = np.asarray(state_by_vol, dtype=np.int64)
+    y_arr = np.asarray(y_init, dtype=np.float64)
+    zone_indices = {
+        "piston": int(WallTemperatureZone.PISTON),
+        "cylinder": int(WallTemperatureZone.CYLINDER),
+        "head": int(WallTemperatureZone.HEAD),
+    }
+    grouped: dict[str, dict[str, float]] = {}
+    for vol_i, prefix in enumerate(volume_names):
+        if vol_i >= state_arr.shape[0]:
+            continue
+        for zone_name, zone_idx in zone_indices.items():
+            if zone_idx >= state_arr.shape[1]:
+                continue
+            state_idx = int(state_arr[vol_i, zone_idx])
+            if state_idx < 0 or state_idx >= y_arr.size:
+                continue
+            temp_K = _finite_float(y_arr[state_idx])
+            if temp_K is None:
+                continue
+            grouped.setdefault(str(prefix), {})[zone_name] = temp_K - 273.15
+    return grouped
+
+
+def _wall_temperature_groups_from_rows(rows: list[dict[str, float | int]] | None) -> dict[str, dict[str, float]]:
+    if not rows:
+        return {}
+    sample = rows[-1]
+    grouped: dict[str, dict[str, float]] = {}
+    zone_names = {
+        "piston": "Piston",
+        "cylinder": "Lineer",
+        "head": "Head",
+    }
+    for key, value in sample.items():
+        if "_wall_" not in str(key) or not str(key).endswith("_temperature_K"):
+            continue
+        prefix, rest = str(key).split("_wall_", 1)
+        zone = rest[:-len("_temperature_K")]
+        if zone not in zone_names:
+            continue
+        temp_K = _finite_float(value)
+        if temp_K is None:
+            continue
+        grouped.setdefault(prefix, {})[zone] = temp_K - 273.15
+    return grouped
+
+
+def _build_wall_temperature_markdown(bundle, rows: list[dict[str, float | int]] | None) -> str:
+    zone_names = {
+        "piston": "Piston",
+        "cylinder": "Lineer",
+        "head": "Head",
+    }
+    grouped = _wall_temperature_groups_from_bundle(bundle)
+    if not grouped:
+        grouped = _wall_temperature_groups_from_rows(rows)
+    if not grouped:
+        return ""
+    lines = ["##  Wandtemperatturen ", ""]
+    for prefix in sorted(grouped):
+        zones = grouped[prefix]
+        lines.append(f"    {_cylinder_label(prefix)} : ")
+        for zone, label in zone_names.items():
+            if zone in zones:
+                spacer = " " if label == "Piston" else ""
+                lines.append(f"        {label}:{spacer}{zones[zone]:.1f} °C")
+        lines.append("")
+    cylinder_groups = [zones for prefix, zones in grouped.items() if re.fullmatch(r"cylinder_\d+", prefix)]
+    if len(cylinder_groups) > 1 and all(cylinder_groups[0] == zones for zones in cylinder_groups[1:]):
+        lines.extend([
+            "Hinweis: Die Wandtemperaturen der Arbeitszylinder sind identisch, weil die Zylinder dasselbe Wandtemperatur-Submodell referenzieren.",
+            "Fuer unterschiedliche Wandtemperaturen je Zylinder muessen getrennte Wandtemperatur-Submodelle konfiguriert werden.",
+        ])
+    return "\n".join(lines).rstrip()
 
 
 @dataclass(slots=True)
@@ -824,19 +1062,31 @@ def _free_piston_geometry_entries(bundle) -> list[GeometryEntry]:
 
 def build_geometry_entries(bundle) -> list[GeometryEntry]:
     entries: list[GeometryEntry] = []
+    vol_matrix = getattr(bundle, 'vol_matrix', np.zeros((0, len(VolumeCol)), dtype=np.float64))
+    kin_matrix = getattr(bundle, 'kin_matrix', np.zeros((0, len(KinCol)), dtype=np.float64))
+    conn_matrix = getattr(bundle, 'conn_matrix', np.zeros((0, len(ConnCol)), dtype=np.float64))
+    lift_table = getattr(bundle, 'lift_table', np.zeros((0, 2), dtype=np.float64))
+    alpha_table = getattr(bundle, 'alpha_table', np.zeros((0, 3), dtype=np.float64))
+    cd_table = getattr(bundle, 'cd_table', np.zeros((0, 3), dtype=np.float64))
+    volume_names = list(getattr(bundle, 'volume_names', []) or [])
+    connection_names = list(getattr(bundle, 'connection_names', []) or [])
 
     if getattr(bundle, 'architecture', 'classic') == 'free_piston':
         entries.extend(_free_piston_geometry_entries(bundle))
 
     for vol_idx in getattr(bundle, 'cylinder_indices', []) or []:
-        kin_idx = int(bundle.vol_matrix[int(vol_idx), VolumeCol.KIN_ROW])
+        if int(vol_idx) >= int(vol_matrix.shape[0]):
+            continue
+        kin_idx = int(vol_matrix[int(vol_idx), VolumeCol.KIN_ROW])
         if kin_idx < 0:
             continue
-        name = str(bundle.volume_names[int(vol_idx)])
-        bore_m = max(float(bundle.kin_matrix[kin_idx, KinCol.BORE]), 0.0)
-        stroke_m = max(float(bundle.kin_matrix[kin_idx, KinCol.STROKE]), 0.0)
-        conrod_m = max(float(bundle.kin_matrix[kin_idx, KinCol.CONROD]), 0.0)
-        compression_ratio = max(float(bundle.kin_matrix[kin_idx, KinCol.COMPRESSION_RATIO]), 1.0)
+        if kin_idx >= int(kin_matrix.shape[0]):
+            continue
+        name = str(volume_names[int(vol_idx)]) if int(vol_idx) < len(volume_names) else f'volume_{int(vol_idx)}'
+        bore_m = max(float(kin_matrix[kin_idx, KinCol.BORE]), 0.0)
+        stroke_m = max(float(kin_matrix[kin_idx, KinCol.STROKE]), 0.0)
+        conrod_m = max(float(kin_matrix[kin_idx, KinCol.CONROD]), 0.0)
+        compression_ratio = max(float(kin_matrix[kin_idx, KinCol.COMPRESSION_RATIO]), 1.0)
         bore_area_m2 = 0.25 * math.pi * bore_m * bore_m
         swept_m3 = bore_area_m2 * stroke_m
         clearance_m3 = swept_m3 / (compression_ratio - 1.0) if compression_ratio > 1.0 else 0.0
@@ -850,12 +1100,12 @@ def build_geometry_entries(bundle) -> list[GeometryEntry]:
         ])
 
 
-    for vol_idx in range(bundle.vol_matrix.shape[0]):
-        vol_type = int(bundle.vol_matrix[vol_idx, VolumeCol.TYPE])
+    for vol_idx in range(vol_matrix.shape[0]):
+        vol_type = int(vol_matrix[vol_idx, VolumeCol.TYPE])
         if vol_type not in (int(VolumeType.PLENUM), int(VolumeType.ENVIRONMENT)):
             continue
-        name = str(bundle.volume_names[vol_idx])
-        fixed_m3 = max(float(bundle.vol_matrix[vol_idx, VolumeCol.FIXED_VOLUME]), 0.0)
+        name = str(volume_names[vol_idx]) if vol_idx < len(volume_names) else f'volume_{vol_idx}'
+        fixed_m3 = max(float(vol_matrix[vol_idx, VolumeCol.FIXED_VOLUME]), 0.0)
         metric = 'fixed_cm3' if vol_type == int(VolumeType.PLENUM) else 'reference_cm3'
         details = 'Plenum-Geometrie: festes Volumen.' if vol_type == int(VolumeType.PLENUM) else 'Umgebungs-Referenzvolumen.'
         category = 'plenum' if vol_type == int(VolumeType.PLENUM) else 'environment'
@@ -863,17 +1113,17 @@ def build_geometry_entries(bundle) -> list[GeometryEntry]:
             GeometryEntry(category, name, metric, fixed_m3 * 1.0e6, 'cm³', details)
         )
 
-    for conn_idx in range(bundle.conn_matrix.shape[0]):
-        conn = bundle.conn_matrix[conn_idx]
+    for conn_idx in range(conn_matrix.shape[0]):
+        conn = conn_matrix[conn_idx]
         conn_type = int(conn[ConnCol.TYPE])
-        name = str(bundle.connection_names[conn_idx])
+        name = str(connection_names[conn_idx]) if conn_idx < len(connection_names) else f'connection_{conn_idx}'
         if conn_type == int(ConnectionType.VALVE):
             p_start = int(conn[ConnCol.PROFILE_START])
             p_len = int(conn[ConnCol.PROFILE_LEN])
             a_start = int(conn[ConnCol.ALPHA_START])
             a_len = int(conn[ConnCol.ALPHA_LEN])
-            lift_slice = bundle.lift_table[p_start:p_start + p_len] if p_len > 0 else np.zeros((0, 2), dtype=np.float64)
-            alpha_slice = bundle.alpha_table[a_start:a_start + a_len] if a_len > 0 else np.zeros((0, 3), dtype=np.float64)
+            lift_slice = lift_table[p_start:p_start + p_len] if p_len > 0 else np.zeros((0, 2), dtype=np.float64)
+            alpha_slice = alpha_table[a_start:a_start + a_len] if a_len > 0 else np.zeros((0, 3), dtype=np.float64)
             lift_scale = max(float(conn[ConnCol.LIFT_SCALE]), 0.0)
             lash_m = max(float(conn[ConnCol.LASH]), 0.0)
             ref_area_m2 = max(float(conn[ConnCol.REF_FLOW_AREA]), 0.0)
@@ -906,7 +1156,7 @@ def build_geometry_entries(bundle) -> list[GeometryEntry]:
             else:
                 start = int(conn[ConnCol.CD_TABLE_START])
                 length = int(conn[ConnCol.CD_TABLE_LEN])
-                cd_slice = bundle.cd_table[start:start + length] if length > 0 else np.zeros((0, 3), dtype=np.float64)
+                cd_slice = cd_table[start:start + length] if length > 0 else np.zeros((0, 3), dtype=np.float64)
                 xs = np.asarray(cd_slice[:, 0], dtype=np.float64) if cd_slice.size else np.zeros((0,), dtype=np.float64)
                 cd_f = np.asarray(cd_slice[:, 1], dtype=np.float64) if cd_slice.size else np.zeros((0,), dtype=np.float64)
                 cd_r = np.asarray(cd_slice[:, 2], dtype=np.float64) if cd_slice.size else np.zeros((0,), dtype=np.float64)
@@ -1079,7 +1329,22 @@ def _build_free_piston_results_signal_markdown(bundle) -> str:
 
 def build_geometry_markdown(bundle, rows: list[dict[str, float | int]] | None = None, title: str = "Geometrie-Übersicht") -> str:
     entries = build_geometry_entries(bundle)
-    lines = [f"# {title}", "", "| Kategorie | Name | Größe | Wert | Einheit |", "|---|---|---|---:|---|"]
+    lines = [_complete_cycle_markdown(bundle, rows)]
+
+    last_cycle_section = build_last_cycle_markdown(bundle, rows)
+    if last_cycle_section:
+        lines.append("")
+        lines.append(last_cycle_section)
+    wall_temperature_section = _build_wall_temperature_markdown(bundle, rows)
+    if wall_temperature_section:
+        lines.append("")
+        lines.append(wall_temperature_section)
+    energy_balance_section = _build_energy_balance_markdown(bundle, rows)
+    if energy_balance_section:
+        lines.append("")
+        lines.append(energy_balance_section)
+
+    lines.extend(["", f"# {title}", "", "| Kategorie | Name | Größe | Wert | Einheit |", "|---|---|---|---:|---|"])
     for entry in entries:
         value = _format_geometry_value(float(entry.value))
         lines.append(f"| {entry.category} | {entry.entity_name} | {entry.metric_name} | {value} | {entry.unit} |")
@@ -1098,10 +1363,6 @@ def build_geometry_markdown(bundle, rows: list[dict[str, float | int]] | None = 
     if scavenging_section:
         lines.append("")
         lines.append(scavenging_section)
-    last_cycle_section = build_last_cycle_markdown(bundle, rows)
-    if last_cycle_section:
-        lines.append("")
-        lines.append(last_cycle_section)
     results_signal_section = _build_free_piston_results_signal_markdown(bundle)
     if results_signal_section:
         lines.append("")

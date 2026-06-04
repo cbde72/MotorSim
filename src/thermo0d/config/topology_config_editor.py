@@ -752,6 +752,8 @@ class PropertyPanel(QWidget):
             self._meta_spec("simulation.solver.rtol"),
             self._meta_spec("simulation.solver.atol"),
             self._meta_spec("postprocessing.csv_enabled"),
+            self._meta_spec("postprocessing.mode", choices=("pipeline",)),
+            self._meta_spec("postprocessing.config"),
             self._meta_spec("postprocessing.csv_path"),
             self._meta_spec("postprocessing.csv_separator"),
             self._meta_spec("postprocessing.csv_export_layout"),
@@ -1553,6 +1555,8 @@ class TopologyConfigEditor(QMainWindow):
             },
             "postprocessing": {
                 "csv_enabled": True,
+                "mode": "pipeline",
+                "config": None,
                 "csv_path": "results/editor_export.csv",
                 "csv_separator": ";",
                 "excel_enabled": False,

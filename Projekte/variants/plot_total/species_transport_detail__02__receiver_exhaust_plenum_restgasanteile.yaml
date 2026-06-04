@@ -1,0 +1,51 @@
+name: Receiver / Exhaust Plenum Restgasanteile
+style_sheet: ../../plot_style_sheet.yaml
+style:
+figures:
+- title: Species Transport - Plena Inventar
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Receiver / Exhaust Plenum Restgasanteile
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_frac
+      title: Anteil [-]
+      side: left
+      color: '#111111'
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 1.05
+    series:
+    - signal_key: receiver_1_share_fresh_gas_0to1
+      label: receiver fresh gas
+      axis_id: ax_frac
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: receiver_1_share_residual_0to1
+      label: receiver residual
+      axis_id: ax_frac
+      color: '#7a5af8'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: exhaust_plenum_1_share_residual_0to1
+      label: exhaust residual
+      axis_id: ax_frac
+      color: '#b42318'
+      line_style: --
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: exhaust_plenum_1_share_burned_0to1
+      label: exhaust burned
+      axis_id: ax_frac
+      color: '#f79009'
+      line_style: --
+      scale_factor: 1.0
+      unit_preset: raw

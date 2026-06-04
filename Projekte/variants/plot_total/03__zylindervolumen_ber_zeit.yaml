@@ -1,0 +1,34 @@
+name: Zylindervolumen über Zeit
+style_sheet: ../../plot_style_sheet.yaml
+style:
+figures:
+- title: Volume
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Zylindervolumen über Zeit
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_v
+      title: Volumen [cm³]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: cylinder_1_V_m3
+      label: Zylinder
+      axis_id: ax_v
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: compressor_1_V_m3
+      label: Bounce
+      axis_id: ax_v
+      color: '#111111'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw

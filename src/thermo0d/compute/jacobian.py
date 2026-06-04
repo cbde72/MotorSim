@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 from scipy import sparse
 
-from thermo0d.config.constants import ConnCol, FeatureCol
+from thermo0d.config.constants import ConnCol, EndpointKind, FeatureCol
 
 
 STATES_PER_VOLUME = 5
@@ -46,9 +46,17 @@ def build_rhs_jacobian_sparsity(
 
     if feature_flags.size > int(FeatureCol.MASS_FLOW) and int(feature_flags[int(FeatureCol.MASS_FLOW)]) == 1:
         for j in range(conn_matrix.shape[0]):
+            left_kind = int(conn_matrix[j, int(ConnCol.FROM_KIND)]) if conn_matrix.shape[1] > int(ConnCol.FROM_KIND) else int(EndpointKind.VOLUME)
+            right_kind = int(conn_matrix[j, int(ConnCol.TO_KIND)]) if conn_matrix.shape[1] > int(ConnCol.TO_KIND) else int(EndpointKind.VOLUME)
+            if left_kind != int(EndpointKind.VOLUME) and right_kind != int(EndpointKind.VOLUME):
+                continue
             left = int(conn_matrix[j, int(ConnCol.FROM_VOL)])
             right = int(conn_matrix[j, int(ConnCol.TO_VOL)])
-            rows = vol_rows(left) + vol_rows(right)
+            rows = ()
+            if left_kind == int(EndpointKind.VOLUME):
+                rows += vol_rows(left)
+            if right_kind == int(EndpointKind.VOLUME):
+                rows += vol_rows(right)
             for r in rows:
                 for c in rows:
                     pattern[r, c] = 1

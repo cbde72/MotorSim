@@ -13,28 +13,24 @@ from thermo0d.app.paths import DEFAULT_PROJECT, DEFAULT_TEST_SPACE, DEFAULT_VARI
 
 
 SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
-    'project_A156A1': [
-        '--config', str(PROJECT_ROOT / 'Projekte'/ 'variants' / 'A156A1-2V-REX-V09d_WH02-Vibe_PP_RK45.yaml'),
+    'project_default': [
+        '--config', str(PROJECT_ROOT / 'Projekte' / 'config.yaml'),
         '--project', str(Path(DEFAULT_PROJECT)),
     ],
-
     'variant_batch': [
         '--project', str(Path(DEFAULT_PROJECT)),
         '--variants-dir', str(Path(DEFAULT_VARIANTS_DIR)),
         '--batch-variants',
         '--continue-on-error',
     ],
-    'free_piston_a3': [
-# %%
-        '--config', str(PROJECT_ROOT / 'Projekte'/'variants' / 'free_piston_GenSet_V22.yaml'),
-
+    'free_piston_v25': [
+        '--config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V27.yaml'),
         '--project', str(Path(DEFAULT_PROJECT)),
-        #'--no-excel',
     ],
 }
 
 # Nur diesen Namen umstellen, wenn du ohne echte CLI-Argumente ein anderes Setup starten willst.
-SELECTED_PRESET = 'free_piston_a3'
+SELECTED_PRESET = 'free_piston_v25'
 
 
 

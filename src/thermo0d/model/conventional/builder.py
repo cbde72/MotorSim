@@ -32,7 +32,6 @@ from thermo0d.config.models import (
     DisabledCombustionConfig,
     DisabledEvaporationConfig,
     DisabledSubmodelConfig,
-    EnvironmentVolumeConfig,
     CycleAverageWallTemperatureConfig,
     OrificeConnectionConfig,
     PlenumVolumeConfig,
@@ -51,12 +50,14 @@ from thermo0d.physics.quellen_props import reduced_mixture_properties_from_tempe
 from thermo0d.input.builder_common import (
     assign_state_from_mass_and_temperature,
     build_environment_buffers,
+    collect_environment_boundaries,
     build_feature_flags,
     build_gas_props,
     build_gas_thermo_model,
     build_postprocessing_options,
     build_simulation_options,
     build_connection_tables,
+    split_dynamic_volumes_and_boundaries,
 )
 
 
@@ -83,7 +84,14 @@ def _wall_temperature_zones(cfg: CycleAverageWallTemperatureConfig):
 
 def build_conventional_bundle(builder) -> ModelBundle:
     config = builder.config
-    n_vol = len(config.volumes)
+    dynamic_volumes, legacy_boundaries = split_dynamic_volumes_and_boundaries(config)
+    boundary_names, boundary_pressures_pa, boundary_temperatures_K, boundary_name_to_index = collect_environment_boundaries(config)
+    for env in legacy_boundaries:
+        boundary_name_to_index[str(env.name)] = len(boundary_names)
+        boundary_names.append(str(env.name))
+        boundary_pressures_pa = np.append(boundary_pressures_pa, float(env.pressure_Pa))
+        boundary_temperatures_K = np.append(boundary_temperatures_K, float(env.temperature_K))
+    n_vol = len(dynamic_volumes)
     cycle_type = builder._cycle_enum(config.engine.cycle_type)
     cycle_deg = 360.0 if cycle_type == CycleType.TWO_STROKE else 720.0
     cycle_period_s = cycle_deg / (6.0 * config.engine.speed_rpm)
@@ -104,31 +112,27 @@ def build_conventional_bundle(builder) -> ModelBundle:
     wall_temperature_params_by_vol = np.zeros((n_vol, n_wall_zones, len(WallTemperatureCol)), dtype=np.float64)
     wall_temperature_initials: list[tuple[int, str, float]] = []
     wall_temperature_average_initials: list[tuple[int, str, float]] = []
+    wall_temperature_average_pending: list[int] = []
     comb_rows: list[list[float]] = []
     evap_rows: list[list[float]] = []
     environment_is_fixed, environment_pressures_pa, environment_temperatures_K = build_environment_buffers(n_vol)
     combustion_fuel_mass_by_vol = np.zeros(n_vol, dtype=np.float64)
     combustion_afr_stoich_by_vol = np.full(n_vol, 14.5, dtype=np.float64)
 
-    for i, vol in enumerate(config.volumes):
+    for i, vol in enumerate(dynamic_volumes):
         volume_names.append(vol.name)
         name_to_index[vol.name] = i
         initial_mass_kg = builder._initial_mass_kg(vol)
-        if isinstance(vol, EnvironmentVolumeConfig):
-            y_init[state_layout.mass_index(i)] = 0.0
-            y_init[state_layout.energy_index(i)] = 0.0
-            y_init[state_layout.burned_mass_index(i)] = 0.0
-        else:
-            assign_state_from_mass_and_temperature(
-                y_init,
-                mass_index=state_layout.mass_index(i),
-                energy_index=state_layout.energy_index(i),
-                mass_kg=initial_mass_kg,
-                temperature_K=vol.initial_temperature_K,
-                cv_J_per_kgK=config.gas_properties.cv_J_per_kgK,
-            )
-            initial_burned_mass_kg = initial_mass_kg * builder._initial_burned_fraction_0to1(vol)
-            y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
+        assign_state_from_mass_and_temperature(
+            y_init,
+            mass_index=state_layout.mass_index(i),
+            energy_index=state_layout.energy_index(i),
+            mass_kg=initial_mass_kg,
+            temperature_K=vol.initial_temperature_K,
+            cv_J_per_kgK=config.gas_properties.cv_J_per_kgK,
+        )
+        initial_burned_mass_kg = initial_mass_kg * builder._initial_burned_fraction_0to1(vol)
+        y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
 
         if isinstance(vol, CylinderVolumeConfig):
             cylinder_indices.append(i)
@@ -150,21 +154,8 @@ def build_conventional_bundle(builder) -> ModelBundle:
             vol_matrix[i, VolumeCol.TYPE] = float(VolumeType.PLENUM)
             vol_matrix[i, VolumeCol.KIN_ROW] = -1.0
             vol_matrix[i, VolumeCol.FIXED_VOLUME] = vol.fixed_volume_m3
-        elif isinstance(vol, EnvironmentVolumeConfig):
-            vol_matrix[i, VolumeCol.TYPE] = float(VolumeType.ENVIRONMENT)
-            vol_matrix[i, VolumeCol.KIN_ROW] = -1.0
-            vol_matrix[i, VolumeCol.FIXED_VOLUME] = 0.0
-            environment_is_fixed[i] = 1
-            environment_pressures_pa[i] = float(vol.pressure_Pa)
-            environment_temperatures_K[i] = float(vol.temperature_K)
         else:
             raise TypeError(f'Unsupported volume config: {type(vol)!r}')
-
-        if isinstance(vol, EnvironmentVolumeConfig):
-            vol_matrix[i, VolumeCol.WALL_ROW] = -1.0
-            vol_matrix[i, VolumeCol.COMB_ROW] = -1.0
-            vol_matrix[i, VolumeCol.EVAP_ROW] = -1.0
-            continue
 
         if isinstance(vol.wall_heat, WoschniHeatTransferConfig):
             wall_idx = len(wall_rows)
@@ -191,7 +182,7 @@ def build_conventional_bundle(builder) -> ModelBundle:
                 wall_temp_cfg = vol.wall_temperature
                 total_area = 0.0
                 weighted_temp = 0.0
-                base_state_idx = state_layout.total_size + len(wall_temperature_initials) + len(wall_temperature_average_initials)
+                base_state_idx = state_layout.total_size + len(wall_temperature_initials)
                 for local_zone_offset, (zone_enum, zone_name, zone_cfg) in enumerate(_wall_temperature_zones(wall_temp_cfg)):
                     zone = int(zone_enum)
                     state_idx = base_state_idx + local_zone_offset
@@ -204,9 +195,7 @@ def build_conventional_bundle(builder) -> ModelBundle:
                     wall_temperature_initials.append((i, str(zone_name), float(zone_cfg.initial_temperature_K)))
                     total_area += float(zone_cfg.area_m2)
                     weighted_temp += float(zone_cfg.area_m2) * float(zone_cfg.initial_temperature_K)
-                avg_base_idx = base_state_idx + n_wall_zones
-                wall_temperature_average_state_index_by_vol[i, 0] = avg_base_idx
-                wall_temperature_average_state_index_by_vol[i, 1] = avg_base_idx + 1
+                wall_temperature_average_pending.append(i)
                 wall_temperature_average_initials.append((i, "alpha_avg_W_per_m2K", 0.0))
                 wall_temperature_average_initials.append((i, "T_alpha_avg_KW_per_m2K", 0.0))
                 if total_area > 0.0:
@@ -279,6 +268,7 @@ def build_conventional_bundle(builder) -> ModelBundle:
         vol_matrix=vol_matrix,
         kin_matrix=kin_matrix,
         name_to_index=name_to_index,
+        boundary_name_to_index=boundary_name_to_index,
         allow_valves=True,
         allow_slot_by_angle=True,
     )
@@ -294,6 +284,10 @@ def build_conventional_bundle(builder) -> ModelBundle:
     wall_ref_matrix_safe = wall_ref_matrix if wall_ref_matrix.size > 0 else np.zeros((max(wall_matrix.shape[0], 1), len(WallRefCol)), dtype=np.float64)
     if wall_temperature_extra_state_count:
         old_size = y_init.size
+        avg_state_base_idx = old_size + len(wall_temperature_initials)
+        for offset, vol_i in enumerate(wall_temperature_average_pending):
+            wall_temperature_average_state_index_by_vol[int(vol_i), 0] = avg_state_base_idx + 2 * offset
+            wall_temperature_average_state_index_by_vol[int(vol_i), 1] = avg_state_base_idx + 2 * offset + 1
         extra_labels = [f"{volume_names[i]}_wall_{zone_name}_temperature_K" for i, zone_name, _temp in wall_temperature_initials]
         extra_labels += [f"{volume_names[i]}_wall_temperature_{avg_name}" for i, avg_name, _value in wall_temperature_average_initials]
         state_layout = state_layout.with_extra_states(extra_labels)
@@ -336,9 +330,7 @@ def build_conventional_bundle(builder) -> ModelBundle:
 
     cv_fallback = float(config.gas_properties.cv_J_per_kgK)
     if gas_thermo_model == 'promo':
-        for i, vol in enumerate(config.volumes):
-            if isinstance(vol, EnvironmentVolumeConfig):
-                continue
+        for i, vol in enumerate(dynamic_volumes):
             m_idx = int(state_layout.mass_index(i))
             u_idx = int(state_layout.energy_index(i))
             air_idx = int(state_layout.air_mass_index(i))
@@ -387,6 +379,9 @@ def build_conventional_bundle(builder) -> ModelBundle:
         environment_is_fixed=environment_is_fixed,
         environment_pressures_pa=environment_pressures_pa,
         environment_temperatures_K=environment_temperatures_K,
+        boundary_names=boundary_names,
+        boundary_pressures_pa=boundary_pressures_pa,
+        boundary_temperatures_K=boundary_temperatures_K,
         combustion_fuel_mass_by_vol=combustion_fuel_mass_by_vol,
         combustion_afr_stoich_by_vol=combustion_afr_stoich_by_vol,
     )

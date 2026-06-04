@@ -1,0 +1,383 @@
+name: Subplot
+style_sheet: ../plot_style_sheet.yaml
+style:
+  background_color: '#ffffff'
+  axes_facecolor: '#ffffff'
+  text_color: '#202020'
+  grid_color: '#d8d8d8'
+  legend_facecolor: '#ffffff'
+  legend_edgecolor: '#9aa0a6'
+  default_line_width: 1.8
+  default_marker_size: 4.5
+  font_size: 10
+  title_size: 12
+  grid_alpha: 0.65
+figures:
+- id: 821646e3d067
+  title: Figure 11
+  rows: 1
+  cols: 1
+  subplots:
+  - id: 2cd52de2dc1b
+    title: Subplot
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    y_axes:
+    - id: 703b5e5a9174
+      title: Massenstrom [kg/s]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 0.1
+      tick_step: 0.01
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    - id: e947460a9b51
+      title: Hubvolumen [cm³]
+      side: right
+      spine_offset: 0.0
+      color: '#666666'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: false
+      minor_grid: false
+    - id: 6ea3b71e47a0
+      title: Ventilhub [mm]
+      side: right
+      spine_offset: 0.1
+      color: '#d62728'
+      visible: true
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 10.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: false
+      minor_grid: false
+    - id: 75c4438ca566
+      title: Zylinder Masse [kg]
+      side: right
+      spine_offset: 0.18
+      color: '#000000'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: false
+      minor_grid: false
+    series:
+    - id: 670f663050ac
+      signal_key: cylinder_V_m3
+      label: Hubvolumen
+      axis_id: e947460a9b51
+      visible: false
+      color: '#808080'
+      line_style: --
+      marker: ''
+      line_width: 0.0
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: 9db309283fc9
+      signal_key: intake_valve_mdot_kg_per_s
+      label: Massenstrom (IV)
+      axis_id: 703b5e5a9174
+      visible: true
+      color: '#5500ff'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: a7477b28e82a
+      signal_key: exhaust_valve_mdot_kg_per_s
+      label: Massenstrom (EV)
+      axis_id: 703b5e5a9174
+      visible: true
+      color: '#ff0000'
+      line_style: '-'
+      marker: ''
+      line_width: 0.0
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: 0082b3cd995c
+      signal_key: intake_valve_valve_lift_m
+      label: Ventilhub (IV)
+      axis_id: 6ea3b71e47a0
+      visible: true
+      color: '#5500ff'
+      line_style: --
+      marker: ''
+      line_width: 1.0
+      marker_size: 4.5
+      unit_preset: mm
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: 4c197e50bb2c
+      signal_key: exhaust_valve_valve_lift_m
+      label: Ventilhub (EV)
+      axis_id: 6ea3b71e47a0
+      visible: true
+      color: '#aa0000'
+      line_style: --
+      marker: ''
+      line_width: 1.0
+      marker_size: 4.5
+      unit_preset: mm
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: 95fe0b0fa83e
+      signal_key: cylinder_m_kg
+      label: cylinder_m_kg
+      axis_id: 75c4438ca566
+      visible: true
+      color: '#000000'
+      line_style: '-'
+      marker: ''
+      line_width: 2.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    events:
+    - id: b859d69bbbbe
+      x: 0.0
+      label: OT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 618d96aca0a5
+      x: 160.0
+      label: EVO
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 2ea8c2346ecc
+      x: 180.0
+      label: UT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 096cdf10b454
+      x: 300.0
+      label: EVC
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 4e762adbc1f4
+      x: 350.0
+      label: SOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: f6b1b439577e
+      x: 360.0
+      label: OT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 98a26b5620dd
+      x: 370.0
+      label: IVO
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 279b3897dbd0
+      x: 405.0
+      label: EOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 23199a3f1bc6
+      x: 510.0
+      label: IVC
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: fae2e35e7d5d
+      x: 540.0
+      label: UT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    legend_visible: true
+    legend_position: upper right
+    show_grid: false

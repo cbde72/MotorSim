@@ -1,0 +1,125 @@
+name: Kraftstoffdosierung und Verbrauch
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  background_color: '#ffffff'
+  axes_facecolor: '#ffffff'
+  text_color: '#202020'
+  grid_color: '#d9d9d9'
+  legend_facecolor: '#ffffff'
+  legend_edgecolor: '#a0a0a0'
+  default_line_width: 0.9
+  default_marker_size: 3.5
+  font_size: 6
+  axis_label_size: 6
+  tick_label_size: 6
+  title_size: 6
+  figure_title_size: 7
+  grid_alpha: 0.3
+figures:
+- id: c5343d6934ed
+  title: Einspritzung und Verbrennung
+  rows: 1
+  cols: 1
+  subplots:
+  - id: 47e25f9cb015
+    title: Kraftstoffdosierung und Verbrauch
+    show_title: true
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: auto
+    x_min: 0.0
+    x_max: 720.0
+    x_start_at_zero: true
+    y_axes:
+    - id: ax_mass
+      title: Kraftstoffmasse [mg]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    - id: ax_rate
+      title: Rate [g/s]
+      side: right
+      spine_offset: 0.0
+      color: '#667085'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: 772065e31e5e
+      signal_key: cylinder_1_combustion_fuel_mass_latched_kg
+      label: cyl1 fuel latched
+      axis_id: ax_mass
+      visible: true
+      color: '#175cd3'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: 98e26c7307eb
+      signal_key: cylinder_2_combustion_fuel_mass_latched_kg
+      label: cyl2 fuel latched
+      axis_id: ax_mass
+      visible: true
+      color: '#00aa00'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: 121051cf2e44
+      signal_key: cylinder_1_m_fuel_vapor_kg
+      label: cyl1 fuel vapor
+      axis_id: ax_mass
+      visible: true
+      color: '#5500ff'
+      line_style: ':'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: 8d29da1149e4
+      signal_key: cylinder_2_m_fuel_vapor_kg
+      label: cyl2 fuel vapor
+      axis_id: ax_mass
+      visible: true
+      color: '#00aa00'
+      line_style: --
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    events: []
+    y_lines: []
+    legend_visible: true
+    legend_position: best
+    show_grid: true

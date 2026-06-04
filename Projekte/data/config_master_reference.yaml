@@ -1,0 +1,209 @@
+# ============================================================================
+# Thermo0D – Master-Referenz-Config
+# ----------------------------------------------------------------------------
+# Diese Datei ist die kanonische Master-Referenz für das aktuelle Konfigurationsschema und dokumentiert die verfügbaren YAML-Optionen,
+# deren erlaubte Auswahlwerte und die zugehörigen Parameter.
+#
+# Top-Level-Bereiche:
+#   - test_description  : optionaler Freitext für Batch-/Benchmark-/Testfälle
+#   - preprocessing     : Modellaufbau, Physik, Topologie, Startzustände
+#   - simulation        : Integrations- und Solverparameter
+#   - postprocessing    : Exportpfade, CSV-Format, Ausgabeabtastung
+#
+# Wichtige Auswahlmenüs / erlaubte Werte:
+#   engine.cycle_type                        : 2t | 4t
+#   simulation.solver.kind                   : euler | rk4 | scipy_rk45 | scipy_bdf | scipy_radau
+#   simulation.solver.rtol/atol              : nur für SciPy-Solver relevant
+#   postprocessing.sampling.mode             : time | crank_angle
+#   volume.type                              : cylinder | plenum
+#   volume.kinematics.type                   : crank_slider
+#   wall_heat.model                          : none | woschni
+#   combustion.model                         : none | vibe
+#   evaporation.model                        : none | simple
+#   combustion/evaporation angle_reference   : absolute | compression_tdc | gas_exchange_tdc
+#   connection.type                          : valve | slot
+#   valve.opening_reference                  : absolute | compression_tdc | gas_exchange_tdc
+#   valve.profile_angle_domain               : crank | cam
+#   slot.source_of_data                      : rectangle
+#   slot.opening_mode                        : by_distance | by_angle
+#   slot.discharge_coefficients.mode         : constant | table
+#
+# Hinweise:
+#   - Es gibt bewusst keine stillen Code-Defaults. Fehlende Pflichtfelder
+#     führen bei der Pydantic-Validierung zum Abbruch.
+#   - Bei slot.opening_mode = by_distance muss opening_angle_deg: null sein.
+#   - Bei slot.opening_mode = by_angle muss distance_from_tdc_m: null sein.
+# ============================================================================
+
+test_description: "Freitext für Batchläufe, Benchmarks oder Testfälle"
+
+preprocessing:
+  gas_properties:
+    # cp [J/(kg*K)] > 0 und cp > cv
+    cp_J_per_kgK: 1005.0
+    # cv [J/(kg*K)] > 0
+    cv_J_per_kgK: 718.0
+    # R [J/(kg*K)] > 0
+    R_J_per_kgK: 287.0
+
+  features:
+    # true aktiviert Massenströme über Ventile/Slots im RHS.
+    mass_flow: true
+    # true aktiviert das volumenweise Wandwärmemodell.
+    wall_heat: true
+    # true aktiviert das Verbrennungsmodell in Zylindern.
+    combustion: true
+    # true aktiviert die Verdampfungsenthalpie in Zylindern.
+    evaporation: false
+    # true aktiviert p*dV-Arbeit in Zylindern.
+    pv_work: true
+
+  engine:
+    # 2t = 360° Zyklus, 4t = 720° Zyklus
+    cycle_type: 4t
+    # Drehzahl [1/min] > 0
+    speed_rpm: 2500.0
+
+  volumes:
+    - name: cylinder
+      type: cylinder
+      initial_pressure_Pa: 1080650.993791
+      initial_temperature_K: 360.0
+      kinematics:
+        # aktuell einziges Kinematikmodell
+        type: crank_slider
+        bore_m: 0.086
+        stroke_m: 0.086
+        conrod_m: 0.143
+        compression_ratio: 10.5
+        phase_deg: 0.0
+      wall_heat:
+        # none deaktiviert Wandwärme für dieses Volumen
+        model: woschni
+        c1: 3.26
+        c2: 0.8
+        c3: -0.55
+        wall_temperature_K: 430.0
+        wall_area_m2: 0.032
+      combustion:
+        # none oder vibe
+        model: vibe
+        start_deg: 350.0
+        duration_deg: 55.0
+        a: 6.908
+        m: 2.0
+        fuel_mass_per_cycle_kg: 0.000020
+        lhv_J_per_kg: 43000000.0
+        angle_reference: compression_tdc
+      evaporation:
+        # none oder simple
+        model: none
+        # nur für model: simple relevant
+        # start_deg: 330.0
+        # duration_deg: 30.0
+        # evaporated_mass_per_cycle_kg: 0.000020
+        # latent_heat_J_per_kg: 350000.0
+        # angle_reference: compression_tdc
+
+    - name: intake_plenum
+      type: plenum
+      initial_pressure_Pa: 105042.000000
+      initial_temperature_K: 305.0
+      fixed_volume_m3: 0.0025
+      wall_heat:
+        model: none
+      combustion:
+        model: none
+      evaporation:
+        model: none
+
+    - name: exhaust_plenum
+      type: plenum
+      initial_pressure_Pa: 149240.000000
+      initial_temperature_K: 650.0
+      fixed_volume_m3: 0.0030
+      wall_heat:
+        model: none
+      combustion:
+        model: none
+      evaporation:
+        model: none
+
+  connections:
+    - name: intake_valve
+      type: valve
+      from_volume: intake_plenum
+      to_volume: cylinder
+      opening_angle_deg: 330.0
+      opening_reference: compression_tdc
+      # Hubdatei-Winkelbasis: crank oder cam
+      profile_angle_domain: crank
+      # skaliert den eingelesenen Hub der Liftdatei
+      lift_scale: 1.0
+      # Ventilspiel [m]
+      lash_m: 0.0001
+      # Tabellenformat: Winkel | Hub
+      lift_file: data/intake_valve_lift.csv
+      # Tabellenformat: Hub | alphaK_forward | alphaK_reverse
+      alpha_k_file: data/intake_alpha_k.csv
+
+    - name: transfer_slot
+      type: slot
+      from_volume: intake_plenum
+      to_volume: cylinder
+      source_of_data: rectangle
+      # by_distance -> distance_from_tdc_m setzen, opening_angle_deg = null
+      # by_angle    -> opening_angle_deg setzen, distance_from_tdc_m = null
+      opening_mode: by_distance
+      distance_from_tdc_m: 0.040
+      opening_angle_deg: null
+      piston_height_if_crankcase_m: 0.0
+      entrance_angle_deg: 0.0
+      width_m: 0.018
+      height_m: 0.012
+      open_fillet_radius_m: 0.0
+      full_fillet_radius_m: 0.0
+      number_of_identical_holes: 2
+      discharge_coefficients:
+        # constant -> forward_cd / reverse_cd
+        # table    -> table_file (Spalten: Öffnungshöhe | cd_forward | cd_reverse)
+        mode: constant
+        forward_cd: 0.72
+        reverse_cd: 0.68
+        # table_file: data/slot_cd_table.csv
+
+simulation:
+  # feste Integrationsschrittweite [s] > 0
+  dt_s: 0.00002
+  # Gesamtzahl der zu integrierenden Zyklen > 0
+  total_cycles: 3
+  # Anzahl der letzten Zyklen, die für Export/Plots berücksichtigt werden > 0
+  save_last_cycles: 2
+  solver:
+    # Erlaubte Solveroptionen:
+    #   euler       : expliziter Euler, sehr einfach, eher für Debug
+    #   rk4         : explizites klassisches Runge-Kutta 4. Ordnung
+    #   scipy_rk45  : adaptiver expliziter SciPy-Solver
+    #   scipy_bdf   : impliziter steifer Solver (SciPy BDF)
+    #   scipy_radau : impliziter steifer Solver (SciPy Radau)
+    kind: rk4
+    # Relative Toleranz, nur von SciPy-Solvern genutzt
+    rtol: 1.0e-6
+    # Absolute Toleranz, nur von SciPy-Solvern genutzt
+    atol: 1.0e-9
+
+postprocessing:
+  # Zielpfad für CSV-Export, relativ zum Projekt oder absolut
+  csv_path: results/master_reference.csv
+  # ein einzelnes Zeichen, z. B. ; , 	 |
+  csv_separator: ";"
+  sampling:
+    # Erlaubte Sampling-Modi:
+    #   time        : Ausgabe auf äquidistantem Zeitraster
+    #   crank_angle : Ausgabe auf äquidistantem Kurbelwinkelraster
+    # Zeitbasiertes Sampling:
+    mode: crank_angle
+    step_deg: 1.00
+    # Winkelbasiertes Sampling (alternative Variante):
+    # mode: crank_angle
+    # step_deg: 5.0

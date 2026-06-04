@@ -1,0 +1,64 @@
+name: Gesamt-, Luft-, Burned- und Restgasstrom
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  font_size: 6
+  axis_label_size: 6
+  tick_label_size: 6
+  title_size: 6
+  figure_title_size: 6
+  grid_alpha: 0.3
+  default_line_width: 0.9
+  default_marker_size: 3.5
+figures:
+- title: Species Transport - Slots
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Gesamt-, Luft-, Burned- und Restgasstrom
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_flow
+      title: Massenstrom [g/s]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: transfer_slot_1_mdot_kg_per_s
+      label: transfer total
+      axis_id: ax_flow
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: transfer_slot_1_mdot_air_kg_per_s
+      label: transfer air
+      axis_id: ax_flow
+      color: '#12b76a'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_1_mdot_kg_per_s
+      label: exhaust total
+      axis_id: ax_flow
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_1_mdot_burned_kg_per_s
+      label: exhaust burned
+      axis_id: ax_flow
+      color: '#f79009'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_1_mdot_residual_kg_per_s
+      label: exhaust residual
+      axis_id: ax_flow
+      color: '#7a5af8'
+      line_style: ':'
+      scale_factor: 1000.0
+      unit_preset: raw

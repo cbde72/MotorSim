@@ -13,20 +13,12 @@ from thermo0d.app.paths import DEFAULT_PROJECT, DEFAULT_TEST_SPACE, DEFAULT_VARI
 
 
 SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
-    'project_A156A1': [
-        '--config', str(PROJECT_ROOT / 'Projekte' / 'A156A1-2V-REX-V09d.yaml'),
+    'free_piston_v25': [
+        '--config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V25.yaml'),
         '--project', str(Path(DEFAULT_PROJECT)),
     ],
     'project_default': [
         '--config', str(PROJECT_ROOT / 'Projekte' / 'config.yaml'),
-        '--project', str(Path(DEFAULT_PROJECT)),
-    ],
-    'project_1cyl_2t': [
-        '--config', str(PROJECT_ROOT / 'Projekte' / 'config_1cyl_2t.yaml'),
-        '--project', str(Path(DEFAULT_PROJECT)),
-    ],
-    'project_1cyl_4t': [
-        '--config', str(PROJECT_ROOT / 'Projekte' / 'config_1cyl_4t.yaml'),
         '--project', str(Path(DEFAULT_PROJECT)),
     ],
     'variant_batch': [
@@ -45,13 +37,13 @@ SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
     'postprocessing_variant_batch': [
         '--project', str(Path(DEFAULT_PROJECT)),
         '--batch-postprocessing-variants',
-        '--postprocessing-base-config', str(PROJECT_ROOT / 'Projekte' / 'A156A1-2V-REX-V09d_WH02-Vibe_PP_RK45.yaml'),
+        '--postprocessing-base-config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V25.yaml'),
         '--continue-on-error',
     ],
     'postprocessing_variant_batch_dry_run': [
         '--project', str(Path(DEFAULT_PROJECT)),
         '--batch-postprocessing-variants',
-        '--postprocessing-base-config', str(PROJECT_ROOT / 'Projekte' / 'A156A1-2V-REX-V09d_WH02-Vibe_PP_RK45.yaml'),
+        '--postprocessing-base-config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V25.yaml'),
         '--continue-on-error',
         '--dry-run',
     ],
@@ -70,7 +62,7 @@ SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
 }
 
 # Nur diesen Namen umstellen, wenn du ohne echte CLI-Argumente ein anderes Setup starten willst.
-SELECTED_PRESET = 'variant_batch'
+SELECTED_PRESET = 'free_piston_v25'
 
 
 def _resolve_simulated_args(preset_name: str) -> list[str]:

@@ -1,0 +1,88 @@
+name: Kolbenweg über Zeit
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  font_size: 6
+  axis_label_size: 6
+  tick_label_size: 6
+  title_size: 6
+  figure_title_size: 6
+  grid_alpha: 0.3
+  default_line_width: 0.8
+  default_marker_size: 3.5
+figures:
+- title: s_t
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Kolbenweg über Zeit
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_x
+      limit_mode: manual
+      y_min: -60.0
+      y_max: 60.0
+      title: Kolbenweg [mm] (+54 = OT, -54 = UT)
+      side: left
+      color: '#111111'
+      min: -60.0
+      max: 60.0
+    y_lines:
+    - y: -54.0
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      axis_id: ax_x
+      label_font_size: 6
+      show_label: true
+      label: UT
+      color: '#000000'
+      line_style: --
+      line_width: 0.5
+      alpha: 0.95
+    - y: 54.0
+      label_font_size: 6
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      axis_id: ax_x
+      show_label: true
+      label: OT
+      color: '#000000'
+      line_style: --
+      line_width: 0.5
+      alpha: 0.95
+    - y: -38.0
+      label_position: above
+      label_offset_pt: 1
+      label_font_size: 4
+      axis_id: ax_x
+      show_label: true
+      label: Intake
+      color: '#0000FF'
+      line_style: dotted
+      line_width: 0.5
+      alpha: 0.9
+    - y: -36.0
+      label_font_size: 4
+      label_position: below
+      label_offset_pt: 2
+      axis_id: ax_x
+      show_label: true
+      label: Exhaust
+      color: '#FF0000'
+      line_style: dotted
+      line_width: 0.5
+      alpha: 0.9
+    series:
+    - signal_key: cylinder_1_piston_x_m
+      label: Kolbenweg
+      axis_id: ax_x
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: -1000.0
+      unit_preset: raw
+      offset: 54.04

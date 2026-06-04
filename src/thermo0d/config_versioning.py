@@ -207,6 +207,24 @@ def resolve_preprocessing_submodel_references(config_data: Mapping[str, Any] | N
                     legacy_ref=legacy_combustion_ref,
                     context=f"preprocessing.volumes[{index}] {vol_name}.combustion",
                 )
+    environment = preprocessing.get("environment")
+    if isinstance(environment, list):
+        for index, boundary in enumerate(environment):
+            if not isinstance(boundary, dict):
+                continue
+            boundary_name = str(boundary.get("name", f"environment[{index}]"))
+            ref_present = "ref" in boundary or "reference" in boundary
+            legacy_ref = boundary.pop("environment_ref", None)
+            if ref_present or legacy_ref is not None:
+                resolved_boundary = _resolve_submodel_reference(
+                    library=volume_library,
+                    local_config=boundary,
+                    legacy_ref=legacy_ref,
+                    context=f"preprocessing.environment[{index}] {boundary_name}",
+                )
+                if isinstance(resolved_boundary, dict):
+                    resolved_boundary.pop("type", None)
+                    environment[index] = resolved_boundary
     connections = preprocessing.get("connections")
     if isinstance(connections, list):
         for index, connection in enumerate(connections):
@@ -276,6 +294,10 @@ def migrate_config_data(config_data: Mapping[str, Any] | None) -> dict[str, Any]
             postprocessing["outdir"] = str(postprocessing.get("outdir") or "").strip() or None
         if "auto_update_initial_conditions" not in postprocessing:
             postprocessing["auto_update_initial_conditions"] = True
+        if str(postprocessing.get("mode", "") or "").strip().lower() == "legacy":
+            postprocessing["mode"] = "pipeline"
+        postprocessing.setdefault("mode", "pipeline")
+        postprocessing.setdefault("config", None)
         if "csv_enabled" not in postprocessing:
             postprocessing["csv_enabled"] = True
         if "excel_enabled" not in postprocessing:
@@ -374,6 +396,7 @@ def normalize_config_data(config_data: Mapping[str, Any] | None) -> dict[str, An
     pre.setdefault("features", {"mass_flow": True, "wall_heat": False, "combustion": False, "evaporation": False, "pv_work": True})
     pre.setdefault("submodels", {"volumes": {}, "wall_heat": {}, "wall_temperature": {}, "combustion": {}, "connections": {}})
     pre.setdefault("engine", {"cycle_type": "4t", "speed_rpm": 3000.0})
+    pre.setdefault("environment", [])
     pre.setdefault("volumes", [])
     pre.setdefault("connections", [])
     sync_initial_states_inplace(out)
@@ -392,6 +415,10 @@ def normalize_config_data(config_data: Mapping[str, Any] | None) -> dict[str, An
         post["outdir"] = str(post.get("outdir") or "").strip() or None
     post.setdefault("auto_update_initial_conditions", True)
     post.setdefault("csv_enabled", True)
+    if str(post.get("mode", "") or "").strip().lower() == "legacy":
+        post["mode"] = "pipeline"
+    post.setdefault("mode", "pipeline")
+    post.setdefault("config", None)
     post.setdefault("csv_path", "results/out.csv")
     post.setdefault("csv_separator", ";")
     post.setdefault("excel_enabled", False)
@@ -488,6 +515,7 @@ def migrate_yaml_text(text: str, upgraded_config: Mapping[str, Any] | None) -> s
     for pattern, repl in replacements:
         result = re.sub(pattern, repl, result)
     result = re.sub(r"(?m)^(\s*mode\s*:)\s*angle\s*(#.*)?$", r"\1 crank_angle \2", result)
+    result = _rewrite_yaml_postprocessing_legacy_mode(result)
     result = re.sub(r"(?m)[ \t]+$", "", result)
 
     result = _ensure_yaml_postprocessing_defaults(result, upgraded_config)
@@ -572,6 +600,26 @@ def _ensure_yaml_postprocessing_defaults(text: str, upgraded_config: Mapping[str
     if not blocks:
         return result
     lines.insert(insert_at, "".join(blocks))
+    return "".join(lines)
+
+
+def _rewrite_yaml_postprocessing_legacy_mode(text: str) -> str:
+    lines = text.splitlines(keepends=True)
+    in_post = False
+    post_indent = 0
+    for idx, line in enumerate(lines):
+        if re.match(r"^\s*$", line):
+            continue
+        current_indent = len(line) - len(line.lstrip(" "))
+        if re.match(r"^\s*postprocessing\s*:\s*(#.*)?(?:\n)?$", line):
+            in_post = True
+            post_indent = current_indent
+            continue
+        if in_post and current_indent <= post_indent:
+            in_post = False
+        if not in_post:
+            continue
+        lines[idx] = re.sub(r"^(\s*mode\s*:)\s*legacy\s*(#.*)?(\r?\n)?$", r"\1 pipeline \2\3", line)
     return "".join(lines)
 
 

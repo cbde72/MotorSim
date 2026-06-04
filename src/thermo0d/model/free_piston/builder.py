@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
 from thermo0d.compute.jacobian import build_rhs_jacobian_sparsity, greedy_color_columns
 from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, CombStartMode, CombustionModel, ConnCol, ConnectionType, CycleType, EvapCol, HeatTransferModel, VolumeCol, VolumeType, WallCol, WallRefCol, WallTemperatureCol, WallTemperatureZone
-from thermo0d.config.models import BounceChamberVolumeConfig, CycleAverageWallTemperatureConfig, CylinderVolumeConfig, DisabledSubmodelConfig, EnvironmentVolumeConfig, HcciDieselCombustionConfig, PlenumVolumeConfig, VibeCombustionConfig, WoschniHeatTransferConfig
+from thermo0d.config.models import BounceChamberVolumeConfig, CycleAverageWallTemperatureConfig, CylinderVolumeConfig, DisabledSubmodelConfig, HcciDieselCombustionConfig, PlenumVolumeConfig, VibeCombustionConfig, WoschniHeatTransferConfig
 from thermo0d.core.model_bundle import FreePistonModelData, ModelBundle
 from thermo0d.model.free_piston.combustion_latch import bootstrap_free_piston_combustion_latch
 from thermo0d.core.state_layout import StateLayout
@@ -12,17 +14,137 @@ from thermo0d.input.builder_common import (
     assign_state_from_mass_and_temperature,
     build_connection_tables,
     build_environment_buffers,
+    collect_environment_boundaries,
     build_feature_flags,
     build_gas_props,
     build_gas_thermo_model,
     build_postprocessing_options,
     build_simulation_options,
+    split_dynamic_volumes_and_boundaries,
 )
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_volume_from_position, free_piston_generalized_initial_state
 from thermo0d.physics.quellen_props import reduced_mixture_properties_from_temperature_quellen
 from thermo0d.physics.beck import beck_cool_flame_fuel_parameters
 from thermo0d.model.free_piston.state_layout import build_free_piston_state_layout
 from thermo0d.model.free_piston.thermo import mass_from_pTV, specific_internal_energy_from_temperature
+
+
+def _as_float_array(data: np.lib.npyio.NpzFile, key: str, *, path: Path, allow_nonfinite: bool = False) -> np.ndarray:
+    if key not in data:
+        raise ValueError(f"ignition delay table {path} is missing NPZ field {key!r}")
+    arr = np.asarray(data[key], dtype=np.float64)
+    if arr.size == 0:
+        raise ValueError(f"ignition delay table {path} field {key!r} is empty")
+    if not allow_nonfinite and not np.all(np.isfinite(arr)):
+        raise ValueError(f"ignition delay table {path} field {key!r} contains non-finite values")
+    return arr
+
+
+def _first_float_array(data: np.lib.npyio.NpzFile, keys: tuple[str, ...], *, path: Path, allow_nonfinite: bool = False) -> np.ndarray:
+    for key in keys:
+        if key in data:
+            return _as_float_array(data, key, path=path, allow_nonfinite=allow_nonfinite)
+    raise ValueError(f"ignition delay table {path} is missing NPZ field; expected one of {keys!r}")
+
+
+def _axis_from_points(values: np.ndarray) -> np.ndarray:
+    return np.unique(np.asarray(values, dtype=np.float64).reshape(-1))
+
+
+def _load_hcci_ignition_delay_table(path: str | Path) -> dict[str, np.ndarray]:
+    resolved = Path(path).resolve()
+    if not resolved.exists():
+        raise FileNotFoundError(f"ignition delay table not found: {resolved}")
+    with np.load(resolved) as data:
+        temp_raw = _first_float_array(data, ("Temperatur_K", "temperature_K", "temperatures"), path=resolved)
+        pressure_raw = _first_float_array(data, ("Druck_bar", "pressure_bar", "pressures"), path=resolved)
+        if "Lambda" in data or "lambda" in data or "lambdas" in data:
+            lambda_raw = _first_float_array(data, ("Lambda", "lambda", "lambdas"), path=resolved)
+        elif "Phi" in data or "phi" in data or "phis" in data:
+            phi_raw = _first_float_array(data, ("Phi", "phi", "phis"), path=resolved)
+            if np.any(phi_raw <= 0.0):
+                raise ValueError(f"ignition delay table {resolved} field 'Phi/phi' must be > 0")
+            lambda_raw = 1.0 / phi_raw
+        else:
+            raise ValueError(f"ignition delay table {resolved} requires either 'Lambda' or 'Phi'")
+        egr_raw = _first_float_array(data, ("EGR_Rate", "egr_rate", "egr_rates"), path=resolved)
+        delay_raw = _first_float_array(data, ("Zuendverzug_s", "zuendverzug_s", "ignition_delay_s"), path=resolved, allow_nonfinite=True)
+
+    if np.any(temp_raw <= 0.0):
+        raise ValueError(f"ignition delay table {resolved} temperatures must be > 0 K")
+    if np.any(pressure_raw <= 0.0):
+        raise ValueError(f"ignition delay table {resolved} pressures must be > 0 bar")
+    if np.any(lambda_raw <= 0.0):
+        raise ValueError(f"ignition delay table {resolved} lambda values must be > 0")
+    finite_delay = delay_raw[np.isfinite(delay_raw)]
+    if finite_delay.size == 0:
+        raise ValueError(f"ignition delay table {resolved} ignition delays contain no finite values")
+    if np.any(finite_delay <= 0.0):
+        raise ValueError(f"ignition delay table {resolved} ignition delays must be > 0 s")
+
+    axes = (
+        _axis_from_points(temp_raw),
+        _axis_from_points(pressure_raw),
+        _axis_from_points(lambda_raw),
+        _axis_from_points(egr_raw),
+    )
+    shape = tuple(int(axis.size) for axis in axes)
+
+    if delay_raw.shape == shape and all(arr.ndim == 1 and arr.size == size for arr, size in zip((temp_raw, pressure_raw, lambda_raw, egr_raw), shape)):
+        delay_grid = np.asarray(delay_raw, dtype=np.float64)
+        for dim, (raw_axis, sorted_axis) in enumerate(zip((temp_raw, pressure_raw, lambda_raw, egr_raw), axes)):
+            raw_axis_1d = np.asarray(raw_axis, dtype=np.float64).reshape(-1)
+            if not np.array_equal(raw_axis_1d, sorted_axis):
+                order = np.array([int(np.where(raw_axis_1d == value)[0][0]) for value in sorted_axis], dtype=np.int64)
+                delay_grid = np.take(delay_grid, order, axis=dim)
+    else:
+        flat_arrays = [np.asarray(arr, dtype=np.float64).reshape(-1) for arr in (temp_raw, pressure_raw, lambda_raw, egr_raw, delay_raw)]
+        point_count = flat_arrays[4].size
+        if any(arr.size != point_count for arr in flat_arrays[:4]):
+            raise ValueError(
+                f"ignition delay table {resolved} must use either 1D axes with a delay grid or equal-size point arrays"
+            )
+        expected = int(np.prod(shape))
+        if point_count != expected:
+            raise ValueError(
+                f"ignition delay table {resolved} has {point_count} points, but axes require {expected} for a full grid"
+            )
+        index_maps = [{float(value): idx for idx, value in enumerate(axis)} for axis in axes]
+        delay_grid = np.full(shape, np.nan, dtype=np.float64)
+        for temp_v, p_v, lam_v, egr_v, delay_v in zip(*flat_arrays):
+            idx = (
+                index_maps[0][float(temp_v)],
+                index_maps[1][float(p_v)],
+                index_maps[2][float(lam_v)],
+                index_maps[3][float(egr_v)],
+            )
+            if np.isfinite(delay_grid[idx]):
+                raise ValueError(f"ignition delay table {resolved} contains duplicate grid point {idx}")
+            delay_grid[idx] = float(delay_v)
+        if np.any(~np.isfinite(delay_grid)):
+            finite_grid = delay_grid[np.isfinite(delay_grid)]
+            fill_value = max(float(np.max(finite_grid)), 1.0)
+            delay_grid = np.where(np.isfinite(delay_grid), delay_grid, fill_value)
+
+    if np.any(~np.isfinite(delay_grid)):
+        finite_grid = delay_grid[np.isfinite(delay_grid)]
+        fill_value = max(float(np.max(finite_grid)), 1.0)
+        delay_grid = np.where(np.isfinite(delay_grid), delay_grid, fill_value)
+
+    return {
+        "temperature_K": np.ascontiguousarray(axes[0], dtype=np.float64),
+        "pressure_bar": np.ascontiguousarray(axes[1], dtype=np.float64),
+        "lambda": np.ascontiguousarray(axes[2], dtype=np.float64),
+        "egr_rate": np.ascontiguousarray(axes[3], dtype=np.float64),
+        "delay_s": np.ascontiguousarray(delay_grid, dtype=np.float64),
+    }
+
+
+def _resolve_table_path(builder, table_path: str) -> Path:
+    candidate = Path(table_path)
+    if candidate.is_absolute():
+        return candidate
+    return Path(builder.config_dir, candidate)
 
 
 def _initial_cylinder_burned_fraction_0to1(fp, cylinder_vol: CylinderVolumeConfig | None = None) -> float:
@@ -459,11 +581,16 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         raise ValueError("modeling.architecture='free_piston' requires a top-level free_piston section")
 
     fp = config.free_piston
-    input_volumes = list(config.volumes)
-    bounce_geom = _resolve_bounce_geometry(fp, input_volumes)
-    stateful_bounce_volumes = [vol for vol in input_volumes if isinstance(vol, BounceChamberVolumeConfig) and str(vol.model) == 'gas_exchange']
+    dynamic_input_volumes, legacy_boundaries = split_dynamic_volumes_and_boundaries(config)
+    boundary_names, boundary_pressures_pa, boundary_temperatures_K, boundary_name_to_index = collect_environment_boundaries(config)
+    for env in legacy_boundaries:
+        boundary_name_to_index[str(env.name)] = len(boundary_names)
+        boundary_names.append(str(env.name))
+        boundary_pressures_pa = np.append(boundary_pressures_pa, float(env.pressure_Pa))
+        boundary_temperatures_K = np.append(boundary_temperatures_K, float(env.temperature_K))
+    bounce_geom = _resolve_bounce_geometry(fp, dynamic_input_volumes)
     build_input_volumes = [
-        vol for vol in input_volumes
+        vol for vol in dynamic_input_volumes
         if (not isinstance(vol, BounceChamberVolumeConfig)) or (str(vol.model) == 'gas_exchange')
     ]
     placeholder_cylinders = [vol for vol in build_input_volumes if isinstance(vol, CylinderVolumeConfig)]
@@ -477,8 +604,6 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         volumes_for_build = build_input_volumes
         volume_names_input = [vol.name for vol in build_input_volumes]
     n_vol = len(volumes_for_build)
-    explicit_cylinders = [vol for vol in volumes_for_build if isinstance(vol, CylinderVolumeConfig)]
-    explicit_bounces = [vol for vol in volumes_for_build if isinstance(vol, BounceChamberVolumeConfig)]
     mechanical_dofs = 1
     cycle_type = builder._cycle_enum(config.engine.cycle_type)
     cycle_deg = 360.0 if cycle_type == CycleType.TWO_STROKE else 720.0
@@ -526,6 +651,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     hcci_start_pressure_min_by_vol_Pa = np.zeros(n_vol, dtype=np.float64)
     hcci_max_ignition_delay_by_vol_s = np.zeros(n_vol, dtype=np.float64)
     hcci_ignition_model_by_vol = np.zeros(n_vol, dtype=np.int64)
+    hcci_diagnostics_enabled_by_vol = np.zeros(n_vol, dtype=np.int64)
     hcci_burn_model_by_vol = np.zeros(n_vol, dtype=np.int64)
     hcci_two_stage_enabled_by_vol = np.zeros(n_vol, dtype=np.int64)
     hcci_activation_energy_by_vol_J_per_kg = np.zeros(n_vol, dtype=np.float64)
@@ -541,6 +667,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     hcci_cf_c_dt_by_vol = np.zeros((n_vol, 6), dtype=np.float64)
     hcci_reference_pressure_by_vol_bar = np.zeros(n_vol, dtype=np.float64)
     hcci_reference_o2_by_vol_percent = np.zeros(n_vol, dtype=np.float64)
+    hcci_tabulated_delay_tables_by_vol: list[object | None] = [None] * n_vol
 
     cylinder_cfg_for_submodels: CylinderVolumeConfig | None = None
     cylinder_cfg_by_index: dict[int, CylinderVolumeConfig] = {}
@@ -676,16 +803,6 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             y_init[u_idx] = initial_bounce_internal_energy_J
             initial_burned_mass_kg = initial_bounce_mass_kg * builder._initial_burned_fraction_0to1(vol)
             y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
-        elif isinstance(vol, EnvironmentVolumeConfig):
-            vol_matrix[i, VolumeCol.TYPE] = float(VolumeType.ENVIRONMENT)
-            vol_matrix[i, VolumeCol.KIN_ROW] = -1.0
-            vol_matrix[i, VolumeCol.FIXED_VOLUME] = 0.0
-            environment_is_fixed[i] = 1
-            environment_pressures_pa[i] = float(vol.pressure_Pa)
-            environment_temperatures_K[i] = float(vol.temperature_K)
-            y_init[m_idx] = 0.0
-            y_init[u_idx] = 0.0
-            y_init[state_layout.burned_mass_index(i)] = 0.0
         else:
             raise TypeError(f'Unsupported volume config: {type(vol)!r}')
 
@@ -728,6 +845,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     wall_temperature_params_by_vol = np.zeros((n_vol, n_wall_zones, len(WallTemperatureCol)), dtype=np.float64)
     wall_temperature_initials: list[tuple[int, str, float]] = []
     wall_temperature_average_initials: list[tuple[int, str, float]] = []
+    wall_temperature_average_pending: list[int] = []
     for cyl_i in cylinder_indices:
         cyl_cfg_i = cylinder_cfg_by_index.get(int(cyl_i), cylinder_cfg_for_submodels)
         wall_matrix_i, wall_ref_matrix_i, wall_ref_matrix_safe_i, wall_idx_i = _build_free_piston_wall_matrices(
@@ -741,7 +859,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
                 wall_temp_cfg = cyl_cfg_i.wall_temperature
                 total_area = 0.0
                 weighted_temp = 0.0
-                base_state_idx = state_layout.total_size + len(wall_temperature_initials) + len(wall_temperature_average_initials)
+                base_state_idx = state_layout.total_size + len(wall_temperature_initials)
                 for local_zone_offset, (zone_enum, zone_name, zone_cfg) in enumerate(_wall_temperature_zones(wall_temp_cfg)):
                     zone = int(zone_enum)
                     state_idx = base_state_idx + local_zone_offset
@@ -754,9 +872,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
                     wall_temperature_initials.append((int(cyl_i), str(zone_name), float(zone_cfg.initial_temperature_K)))
                     total_area += float(zone_cfg.area_m2)
                     weighted_temp += float(zone_cfg.area_m2) * float(zone_cfg.initial_temperature_K)
-                avg_base_idx = base_state_idx + n_wall_zones
-                wall_temperature_average_state_index_by_vol[int(cyl_i), 0] = avg_base_idx
-                wall_temperature_average_state_index_by_vol[int(cyl_i), 1] = avg_base_idx + 1
+                wall_temperature_average_pending.append(int(cyl_i))
                 wall_temperature_average_initials.append((int(cyl_i), "alpha_avg_W_per_m2K", 0.0))
                 wall_temperature_average_initials.append((int(cyl_i), "T_alpha_avg_KW_per_m2K", 0.0))
                 if total_area > 0.0:
@@ -772,6 +888,10 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     wall_temperature_extra_state_count = len(wall_temperature_initials) + len(wall_temperature_average_initials)
     if wall_temperature_extra_state_count:
         old_size = y_init.size
+        avg_state_base_idx = old_size + len(wall_temperature_initials)
+        for offset, cyl_i in enumerate(wall_temperature_average_pending):
+            wall_temperature_average_state_index_by_vol[int(cyl_i), 0] = avg_state_base_idx + 2 * offset
+            wall_temperature_average_state_index_by_vol[int(cyl_i), 1] = avg_state_base_idx + 2 * offset + 1
         extra_labels = [f"{volume_names[i]}_wall_{zone_name}_temperature_K" for i, zone_name, _temp in wall_temperature_initials]
         extra_labels += [f"{volume_names[i]}_wall_temperature_{avg_name}" for i, avg_name, _value in wall_temperature_average_initials]
         state_layout = state_layout.with_extra_states(extra_labels)
@@ -824,57 +944,75 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             if getattr(combustion_cfg_local, 'injection_duration_s', None) is not None
             else float(getattr(combustion_cfg_local, 'injection_duration_ms', 0.0) or 0.0) * 1.0e-3
         )
+        hcci_delay_cfg = combustion_cfg_local if is_hcci_diesel else None
+        if not is_hcci_diesel and isinstance(combustion_cfg_local, VibeCombustionConfig) and combustion_cfg_local.hcci_diagnostics_ref is not None:
+            ref_name = str(combustion_cfg_local.hcci_diagnostics_ref)
+            combustion_library = getattr(getattr(getattr(builder.config, 'preprocessing', None), 'submodels', None), 'combustion', {}) or {}
+            raw_hcci_cfg = combustion_library.get(ref_name)
+            if raw_hcci_cfg is None:
+                raise ValueError(f"vibe combustion hcci_diagnostics_ref references unknown combustion submodel {ref_name!r}")
+            hcci_delay_cfg = HcciDieselCombustionConfig.model_validate(raw_hcci_cfg)
+            hcci_diagnostics_enabled_by_vol[int(cyl_i)] = 1
+        if hcci_delay_cfg is not None:
+            if is_hcci_diesel:
+                hcci_enabled_by_vol[int(cyl_i)] = 1
+                hcci_diagnostics_enabled_by_vol[int(cyl_i)] = 1
+            ign_model_str = hcci_delay_cfg.ignition_model
+            if ign_model_str in ("beck_2003_1_arrhenius", "beck_2003_two_stage"):
+                hcci_tau_A_by_vol_s[int(cyl_i)] = float(hcci_delay_cfg.beck_c1_s)
+                hcci_pressure_exponent_by_vol[int(cyl_i)] = float(hcci_delay_cfg.beck_c2)
+            else:
+                hcci_tau_A_by_vol_s[int(cyl_i)] = float(hcci_delay_cfg.tau_A_s)
+                hcci_pressure_exponent_by_vol[int(cyl_i)] = float(hcci_delay_cfg.tau_pressure_exponent)
+            hcci_activation_temperature_by_vol_K[int(cyl_i)] = float(hcci_delay_cfg.tau_activation_temperature_K)
+            hcci_reference_pressure_by_vol_Pa[int(cyl_i)] = float(hcci_delay_cfg.tau_reference_pressure_Pa)
+            hcci_reference_lambda_by_vol[int(cyl_i)] = float(hcci_delay_cfg.tau_reference_lambda)
+            hcci_lambda_slowdown_exponent_by_vol[int(cyl_i)] = float(hcci_delay_cfg.lambda_slowdown_exponent)
+            hcci_residual_slowdown_factor_by_vol[int(cyl_i)] = float(hcci_delay_cfg.residual_slowdown_factor)
+            hcci_start_temperature_min_by_vol_K[int(cyl_i)] = float(hcci_delay_cfg.start_temperature_min_K)
+            hcci_start_pressure_min_by_vol_Pa[int(cyl_i)] = float(hcci_delay_cfg.start_pressure_min_Pa)
+            hcci_max_ignition_delay_by_vol_s[int(cyl_i)] = float(hcci_delay_cfg.max_ignition_delay_s)
+
+            if ign_model_str == "beck_2003_1_arrhenius":
+                hcci_ignition_model_by_vol[int(cyl_i)] = 1
+            elif ign_model_str == "beck_2003_two_stage":
+                hcci_ignition_model_by_vol[int(cyl_i)] = 2
+                hcci_two_stage_enabled_by_vol[int(cyl_i)] = 1
+            elif ign_model_str == "tabulated_livengood_wu":
+                hcci_ignition_model_by_vol[int(cyl_i)] = 3
+                hcci_tabulated_delay_tables_by_vol[int(cyl_i)] = _load_hcci_ignition_delay_table(
+                    _resolve_table_path(builder, str(hcci_delay_cfg.ignition_delay_table_npz))
+                )
+
+            if hcci_delay_cfg.burn_model == "vibe-beck":
+                hcci_burn_model_by_vol[int(cyl_i)] = 1
+
+            hcci_reference_pressure_by_vol_bar[int(cyl_i)] = float(hcci_delay_cfg.beck_reference_pressure_bar)
+            hcci_reference_o2_by_vol_percent[int(cyl_i)] = float(hcci_delay_cfg.beck_reference_o2_percent)
+            hcci_cool_flame_energy_fraction_by_vol[int(cyl_i)] = float(hcci_delay_cfg.cool_flame_energy_fraction)
+            hcci_cool_flame_duration_by_vol_s[int(cyl_i)] = float(hcci_delay_cfg.cool_flame_duration_ms) * 1.0e-3
+            cool_flame_burn_model = str(hcci_delay_cfg.cool_flame_burn_model)
+            hcci_cool_flame_burn_model_by_vol[int(cyl_i)] = 1 if cool_flame_burn_model in ("vibe-beck_CF", "vibe-beck") else 0
+            hcci_cool_flame_a_by_vol[int(cyl_i)] = float(hcci_delay_cfg.cool_flame_a)
+            cool_flame_m = 1.7 if cool_flame_burn_model == "vibe-beck_CF" else float(hcci_delay_cfg.cool_flame_m)
+            hcci_cool_flame_m_by_vol[int(cyl_i)] = float(cool_flame_m)
+            hcci_cool_flame_shape_m_by_vol[int(cyl_i)] = float(cool_flame_m)
+
+            beck_params = beck_cool_flame_fuel_parameters(hcci_delay_cfg.beck_cf_fuel_name)
+            hcci_cool_flame_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(beck_params.cool_flame_activation_energy_J_per_kg)
+            hf_ea = hcci_delay_cfg.tau_activation_energy_J_per_kg if hcci_delay_cfg.tau_activation_energy_J_per_kg is not None else beck_params.hot_flame_activation_energy_J_per_kg
+            hcci_hot_flame_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(hf_ea)
+            hcci_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(hf_ea)
+
+            hcci_cf_c_dq_by_vol[int(cyl_i)] = np.array(beck_params.dqmax, dtype=np.float64)
+            hcci_cf_c_dt_by_vol[int(cyl_i)] = np.array(beck_params.duration, dtype=np.float64)
+
         if is_hcci_diesel:
             start_deg = 0.0
             duration_value = float(combustion_cfg_local.duration_s) if combustion_cfg_local.duration_s is not None else float(combustion_cfg_local.duration_ms) * 1.0e-3
             ref_enum_value = float(builder._ref_enum('compression_tdc'))
             start_mode_enum = CombStartMode.AUTOIGNITION
             duration_mode_enum = CombDurationMode.TIME
-            hcci_enabled_by_vol[int(cyl_i)] = 1
-            ign_model_str = combustion_cfg_local.ignition_model
-            if ign_model_str in ("beck_2003_1_arrhenius", "beck_2003_two_stage"):
-                hcci_tau_A_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.beck_c1_s)
-                hcci_pressure_exponent_by_vol[int(cyl_i)] = float(combustion_cfg_local.beck_c2)
-            else:
-                hcci_tau_A_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.tau_A_s)
-                hcci_pressure_exponent_by_vol[int(cyl_i)] = float(combustion_cfg_local.tau_pressure_exponent)
-            hcci_activation_temperature_by_vol_K[int(cyl_i)] = float(combustion_cfg_local.tau_activation_temperature_K)
-            hcci_reference_pressure_by_vol_Pa[int(cyl_i)] = float(combustion_cfg_local.tau_reference_pressure_Pa)
-            hcci_reference_lambda_by_vol[int(cyl_i)] = float(combustion_cfg_local.tau_reference_lambda)
-            hcci_lambda_slowdown_exponent_by_vol[int(cyl_i)] = float(combustion_cfg_local.lambda_slowdown_exponent)
-            hcci_residual_slowdown_factor_by_vol[int(cyl_i)] = float(combustion_cfg_local.residual_slowdown_factor)
-            hcci_start_temperature_min_by_vol_K[int(cyl_i)] = float(combustion_cfg_local.start_temperature_min_K)
-            hcci_start_pressure_min_by_vol_Pa[int(cyl_i)] = float(combustion_cfg_local.start_pressure_min_Pa)
-            hcci_max_ignition_delay_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.max_ignition_delay_s)
-            
-            if ign_model_str == "beck_2003_1_arrhenius":
-                hcci_ignition_model_by_vol[int(cyl_i)] = 1
-            elif ign_model_str == "beck_2003_two_stage":
-                hcci_ignition_model_by_vol[int(cyl_i)] = 2
-                hcci_two_stage_enabled_by_vol[int(cyl_i)] = 1
-                
-            if combustion_cfg_local.burn_model == "vibe-beck":
-                hcci_burn_model_by_vol[int(cyl_i)] = 1
-                
-            hcci_reference_pressure_by_vol_bar[int(cyl_i)] = float(combustion_cfg_local.beck_reference_pressure_bar)
-            hcci_reference_o2_by_vol_percent[int(cyl_i)] = float(combustion_cfg_local.beck_reference_o2_percent)
-            hcci_cool_flame_energy_fraction_by_vol[int(cyl_i)] = float(combustion_cfg_local.cool_flame_energy_fraction)
-            hcci_cool_flame_duration_by_vol_s[int(cyl_i)] = float(combustion_cfg_local.cool_flame_duration_ms) * 1.0e-3
-            cool_flame_burn_model = str(combustion_cfg_local.cool_flame_burn_model)
-            hcci_cool_flame_burn_model_by_vol[int(cyl_i)] = 1 if cool_flame_burn_model in ("vibe-beck_CF", "vibe-beck") else 0
-            hcci_cool_flame_a_by_vol[int(cyl_i)] = float(combustion_cfg_local.cool_flame_a)
-            cool_flame_m = 1.7 if cool_flame_burn_model == "vibe-beck_CF" else float(combustion_cfg_local.cool_flame_m)
-            hcci_cool_flame_m_by_vol[int(cyl_i)] = float(cool_flame_m)
-            hcci_cool_flame_shape_m_by_vol[int(cyl_i)] = float(cool_flame_m)
-            
-            beck_params = beck_cool_flame_fuel_parameters(combustion_cfg_local.beck_cf_fuel_name)
-            hcci_cool_flame_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(beck_params.cool_flame_activation_energy_J_per_kg)
-            hf_ea = combustion_cfg_local.tau_activation_energy_J_per_kg if combustion_cfg_local.tau_activation_energy_J_per_kg is not None else beck_params.hot_flame_activation_energy_J_per_kg
-            hcci_hot_flame_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(hf_ea)
-            hcci_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(hf_ea)
-            
-            hcci_cf_c_dq_by_vol[int(cyl_i)] = np.array(beck_params.dqmax, dtype=np.float64)
-            hcci_cf_c_dt_by_vol[int(cyl_i)] = np.array(beck_params.duration, dtype=np.float64)
         else:
             start_deg, duration_value, ref_type, start_mode_enum, duration_mode_enum = _resolve_combustion_timing_for_free_piston(
                 combustion_cfg_local,
@@ -910,6 +1048,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         vol_matrix=vol_matrix,
         kin_matrix=kin_matrix,
         name_to_index=name_to_index,
+        boundary_name_to_index=boundary_name_to_index,
         allow_valves=False,
         allow_slot_by_angle=False,
     )
@@ -956,9 +1095,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
 
     cv_fallback = float(config.gas_properties.cv_J_per_kgK)
     if gas_thermo_model == 'promo':
-        for i, vol in enumerate(config.volumes):
-            if isinstance(vol, EnvironmentVolumeConfig):
-                continue
+        for i, vol in enumerate(volumes_for_build):
             m_idx_i = int(state_layout.mass_index(i))
             u_idx_i = int(state_layout.energy_index(i))
             air_idx_i = int(state_layout.air_mass_index(i))
@@ -1010,8 +1147,9 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         load_power_target_W=float(fp.load.power_target_W if getattr(fp.load, 'power_target_W', None) is not None else 0.0),
         load_efficiency_0to1=float(fp.load.efficiency_0to1 if getattr(fp.load, 'efficiency_0to1', None) is not None else 1.0),
         load_min_velocity_m_per_s=float(fp.load.min_velocity_m_per_s if getattr(fp.load, 'min_velocity_m_per_s', None) is not None else 0.1),
-        load_assist_velocity_threshold_m_per_s=float(fp.load.assist_velocity_threshold_m_per_s if getattr(fp.load, 'assist_velocity_threshold_m_per_s', None) is not None else 0.0),
-        load_assist_force_N=float(fp.load.assist_force_N if getattr(fp.load, 'assist_force_N', None) is not None else 0.0),
+        load_motor_assist_until_soc=bool(getattr(fp.load, 'motor_assist_until_soc', True)),
+        load_assist_velocity_threshold_m_per_s=float(fp.load.assist_velocity_threshold_m_per_s if bool(getattr(fp.load, 'motor_assist_enabled', False)) and getattr(fp.load, 'assist_velocity_threshold_m_per_s', None) is not None else 0.0),
+        load_assist_force_N=float(fp.load.assist_force_N if bool(getattr(fp.load, 'motor_assist_enabled', False)) and getattr(fp.load, 'assist_force_N', None) is not None else 0.0),
         load_target_margin_m=float(fp.load.target_margin_m if getattr(fp.load, 'target_margin_m', None) is not None else 0.0),
         load_hard_margin_m=float(fp.load.hard_margin_m if getattr(fp.load, 'hard_margin_m', None) is not None else 0.0),
         load_stop_kp=float(fp.load.stop_kp if getattr(fp.load, 'stop_kp', None) is not None else 1.0),
@@ -1070,6 +1208,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         hcci_start_pressure_min_by_vol_Pa=hcci_start_pressure_min_by_vol_Pa,
         hcci_max_ignition_delay_by_vol_s=hcci_max_ignition_delay_by_vol_s,
         hcci_ignition_model_by_vol=hcci_ignition_model_by_vol,
+        hcci_diagnostics_enabled_by_vol=hcci_diagnostics_enabled_by_vol,
         hcci_burn_model_by_vol=hcci_burn_model_by_vol,
         hcci_two_stage_enabled_by_vol=hcci_two_stage_enabled_by_vol,
         hcci_activation_energy_by_vol_J_per_kg=hcci_activation_energy_by_vol_J_per_kg,
@@ -1085,6 +1224,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         hcci_cf_c_dt_by_vol=hcci_cf_c_dt_by_vol,
         hcci_reference_pressure_by_vol_bar=hcci_reference_pressure_by_vol_bar,
         hcci_reference_o2_by_vol_percent=hcci_reference_o2_by_vol_percent,
+        hcci_tabulated_delay_tables_by_vol=tuple(hcci_tabulated_delay_tables_by_vol),
         runtime_scavenging_transfer_in_by_vol_kg_per_s=np.zeros(n_vol, dtype=np.float64),
         runtime_scavenging_exhaust_out_by_vol_kg_per_s=np.zeros(n_vol, dtype=np.float64),
         runtime_scavenging_burned_correction_by_vol_kg_per_s=np.zeros(n_vol, dtype=np.float64),
@@ -1134,6 +1274,9 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         environment_is_fixed=environment_is_fixed,
         environment_pressures_pa=environment_pressures_pa,
         environment_temperatures_K=environment_temperatures_K,
+        boundary_names=boundary_names,
+        boundary_pressures_pa=boundary_pressures_pa,
+        boundary_temperatures_K=boundary_temperatures_K,
         combustion_fuel_mass_by_vol=combustion_fuel_mass_by_vol,
         combustion_afr_stoich_by_vol=combustion_afr_stoich_by_vol,
         combustion_lambda_target_by_vol=combustion_lambda_target_by_vol,

@@ -1,0 +1,35 @@
+versioning:
+  package_version: 7.1.124
+  config_schema_version: 8
+  loaded_config_schema_version: 0
+  migration_applied: true
+name: cylinder_1 Druck-Volumen - letzter UT-OT-UT-Zyklus
+style_sheet: ../../plot_style_sheet.yaml
+figures:
+- title: last_ut_ot_ut_pv_cylinder_1
+  rows: 1
+  cols: 1
+  subplots:
+  - title: cylinder_1 Druck-Volumen - letzter UT-OT-UT-Zyklus
+    plot_type: line
+    x_signal: cylinder_1_V_m3
+    x_title: Zylindervolumen [cm3]
+    x_scale_factor: 1000000.0
+    x_limit_mode: auto
+    info_box:
+      enabled: true
+      kind: last_ut_ot_ut_pv
+      cylinder: cylinder_1
+    y_axes:
+    - id: p
+      title: Zylinderdruck [bar]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: cylinder_1_p_Pa
+      label: cylinder_1
+      axis_id: p
+      color: '#b42318'
+      line_style: '-'
+      line_width: 2.0
+      scale_factor: 1.0e-05

@@ -1,228 +1,32 @@
-# Enhanced Stroke Visualization Configuration
-# Optimized for UT-OT-UT frame export with high-quality rendering
-
-# Global style settings
-font_family: "DejaVu Sans"
-font_size: 9.0
-title_size: 11.0
-axis_label_size: 9.5
-tick_label_size: 8.0
-figure_title_size: 12.0
-grid_visible: true
-grid_alpha: 0.35
-legend_visible: true
-legend_position: "upper left"
-tight_layout: true
-default_line_width: 2.2
-default_marker_size: 5.0
-figure_title_visible: true
-subplot_title_visible: true
-
-# Figures for stroke analysis
+name: Zylindervolumen vs. Zylinderdruck
+style_sheet: ../plot_style_sheet.yaml
 figures:
-  # Figure 1: pV Diagram (Last UT-OT-UT Cycle)
-  - title: "pV-Diagramm: Letzter vollständiger Hub (UT-OT-UT)"
-    rows: 1
-    cols: 1
-    subplots:
-      - title: "Zylindervolumen vs. Zylinderdruck"
-        x_signal: "cylinder_0_V_m3"
-        x_title: "Zylindervolumen [cm³]"
-        y_axes:
-          - id: "pressure_axis"
-            title: "Zylinderdruck [bar]"
-            side: "left"
-            color: "#111111"
-        series:
-          - signal_key: "cylinder_0_p_Pa"
-            label: "Zylinderdruck (letzter Hub)"
-            axis_id: "pressure_axis"
-            color: "#1f77b4"          # Blau
-            line_style: "-"
-            line_width: 2.5
-            scale_factor: 0.00001     # Pa → bar
-
-        # UT/OT Events
-        events:
-          - x: 50.0                  # Approx. min volume
-            label: "OT (Top Dead Center)"
-            color: "#d62728"          # Rot
-            line_style: ":"
-            line_width: 1.5
-            alpha: 0.8
-            show_label: true
-            event_type: "tdc"
-
-  # Figure 2: Pressure vs. Crank Angle
-  - title: "Zylinderdruck vs. Kurbelwinkel"
-    rows: 1
-    cols: 1
-    subplots:
-      - title: "Druckprofil über Kurbelwinkel (0°-360°)"
-        x_signal: "cylinder_0_theta_deg"
-        x_title: "Kurbelwinkel [°]"
-        y_axes:
-          - id: "pressure"
-            title: "Druck [bar]"
-            side: "left"
-          - id: "volume"
-            title: "Volumen [cm³]"
-            side: "right"
-            color: "#666666"
-        series:
-          - signal_key: "cylinder_0_p_Pa"
-            label: "Druck"
-            axis_id: "pressure"
-            color: "#ff7f0e"          # Orange
-            line_style: "-"
-            line_width: 2.5
-            scale_factor: 0.00001
-
-          - signal_key: "cylinder_0_V_m3"
-            label: "Volumen"
-            axis_id: "volume"
-            color: "#2ca02c"          # Grün
-            line_style: "--"
-            line_width: 1.8
-            scale_factor: 1.0e6       # m³ → cm³
-
-        events:
-          - x: 0.0
-            label: "UT (Lower Dead Center)"
-            color: "#2ca02c"          # Grün
-            line_style: ":"
-            show_label: true
-          - x: 180.0
-            label: "OT (Top Dead Center)"
-            color: "#d62728"          # Rot
-            line_style: ":"
-            show_label: true
-          - x: 360.0
-            label: "UT (Lower Dead Center)"
-            color: "#2ca02c"
-            line_style: ":"
-            show_label: true
-
-  # Figure 3: Multi-Parameter Analysis
-  - title: "Mehrparameter-Analyse: Druck, Temperatur, Volumen"
-    rows: 3
-    cols: 1
-    subplots:
-      # Pressure
-      - title: "Zylinderdruck"
-        x_signal: "cylinder_0_theta_deg"
-        x_title: "Kurbelwinkel [°]"
-        y_axes:
-          - id: "p_ax"
-            title: "Druck [bar]"
-            side: "left"
-        series:
-          - signal_key: "cylinder_0_p_Pa"
-            label: "Druck"
-            axis_id: "p_ax"
-            color: "#1f77b4"
-            line_style: "-"
-            scale_factor: 0.00001
-
-      # Temperature
-      - title: "Zylindertemperatur"
-        x_signal: "cylinder_0_theta_deg"
-        x_title: "Kurbelwinkel [°]"
-        y_axes:
-          - id: "t_ax"
-            title: "Temperatur [K]"
-            side: "left"
-        series:
-          - signal_key: "cylinder_0_T_K"
-            label: "Temperatur"
-            axis_id: "t_ax"
-            color: "#ff7f0e"
-            line_style: "-"
-            scale_factor: 1.0
-
-      # Volume
-      - title: "Hubvolumen"
-        x_signal: "cylinder_0_theta_deg"
-        x_title: "Kurbelwinkel [°]"
-        y_axes:
-          - id: "v_ax"
-            title: "Volumen [cm³]"
-            side: "left"
-        series:
-          - signal_key: "cylinder_0_V_m3"
-            label: "Volumen"
-            axis_id: "v_ax"
-            color: "#2ca02c"
-            line_style: "-"
-            scale_factor: 1.0e6
-
-  # Figure 4: Flow Analysis
-  - title: "Massenströme & Ventilposition"
-    rows: 2
-    cols: 1
-    subplots:
-      - title: "Massenströme (Einlass / Auslass)"
-        x_signal: "cylinder_0_theta_deg"
-        x_title: "Kurbelwinkel [°]"
-        y_axes:
-          - id: "flow_ax"
-            title: "Massenstrom [kg/s]"
-            side: "left"
-        series:
-          - signal_key: "connection_intake_valve_mdot_kg_per_s"
-            label: "Einlassstrom"
-            axis_id: "flow_ax"
-            color: "#175cd3"          # Blau (Einlass)
-            line_style: "-"
-            scale_factor: 1.0
-
-          - signal_key: "connection_exhaust_valve_mdot_kg_per_s"
-            label: "Auslasstrom"
-            axis_id: "flow_ax"
-            color: "#b42318"          # Rot (Auslass)
-            line_style: "-"
-            scale_factor: 1.0
-
-      - title: "Ventilposition & Effektive Fläche"
-        x_signal: "cylinder_0_theta_deg"
-        x_title: "Kurbelwinkel [°]"
-        y_axes:
-          - id: "lift_ax"
-            title: "Ventilhub [mm]"
-            side: "left"
-          - id: "area_ax"
-            title: "Eff. Fläche [mm²]"
-            side: "right"
-        series:
-          - signal_key: "connection_intake_valve_lift_mm"
-            label: "Einlasshub"
-            axis_id: "lift_ax"
-            color: "#175cd3"
-            line_style: "-"
-            scale_factor: 1000.0      # m → mm
-
-          - signal_key: "connection_exhaust_valve_lift_mm"
-            label: "Auslaßhub"
-            axis_id: "lift_ax"
-            color: "#b42318"
-            line_style: "-"
-            scale_factor: 1000.0
-
-# Frame Export Configuration (optional, für kommende Implementierung)
-export_frames:
-  enabled: false                # Aktivieren für Frame-Generierung
-  step_deg: 5.0                 # Kurbelwinkel-Schritt (360/5 = 72 Frames)
-  axis_min_deg: 0.0             # Start-Winkel
-  axis_max_deg: 360.0           # End-Winkel
-  export_video: true            # MP4-Export
-  video_fps: 30                 # Frame-Rate
-  video_codec: "libx264"        # H.264 (universal)
-  resolution_multiplier: 1.0    # 1.0 = normal DPI (150)
-
-# Alternative: High-resolution export
-export_frames_hires:
-  enabled: false
-  step_deg: 1.0                 # 360 Frames für sehr flüssiges Video
-  export_video: true
-  video_fps: 60
-  resolution_multiplier: 2.0    # 2x DPI = 300 DPI
+- title: 'pV-Diagramm: Letzter vollständiger Hub (UT-OT-UT)'
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Zylindervolumen vs. Zylinderdruck
+    x_signal: cylinder_0_V_m3
+    x_title: Zylindervolumen [cm³]
+    y_axes:
+    - id: pressure_axis
+      title: Zylinderdruck [bar]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: cylinder_0_p_Pa
+      label: Zylinderdruck (letzter Hub)
+      axis_id: pressure_axis
+      color: '#1f77b4'
+      line_style: '-'
+      line_width: 2.5
+      scale_factor: 1.0e-05
+    events:
+    - x: 50.0
+      label: OT (Top Dead Center)
+      color: '#d62728'
+      line_style: ':'
+      line_width: 1.5
+      alpha: 0.8
+      show_label: true
+      event_type: tdc

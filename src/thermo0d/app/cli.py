@@ -14,6 +14,7 @@ from thermo0d.app.postprocessing_variants import (
 from thermo0d.app.runner import run_simulation
 from thermo0d.input.config_loader import ConfigLoadError
 from thermo0d.input.config_resolver import ConfigResolver
+from thermo0d.output.pipeline import run_pipeline_from_raw_archive
 
 
 def parse_args(args_list: list[str] | None = None):
@@ -80,6 +81,24 @@ def parse_args(args_list: list[str] | None = None):
         '--dry-run',
         action='store_true',
         help='Nur auflösen und anzeigen, welche Konfiguration(en) ausgeführt würden.',
+    )
+    parser.add_argument(
+        '--postprocess-raw',
+        type=str,
+        default=None,
+        help='Separates Pipeline-Postprocessing aus einem zuvor geschriebenen run_raw.npz ausfuehren.',
+    )
+    parser.add_argument(
+        '--pipeline-config',
+        type=str,
+        default=None,
+        help='Pipeline-Konfigurationsdatei fuer --postprocess-raw.',
+    )
+    parser.add_argument(
+        '--postprocess-output-dir',
+        type=str,
+        default=None,
+        help='Optionaler Ausgabeordner fuer --postprocess-raw.',
     )
     excel_group = parser.add_mutually_exclusive_group()
     excel_group.add_argument(
@@ -163,6 +182,20 @@ def main(args_list: list[str] | None = None) -> int:
         default_test_space=args.test_space,
         default_variants_dir=args.variants_dir,
     )
+    if args.postprocess_raw:
+        if args.dry_run:
+            print(f'[postprocess-raw] {Path(args.postprocess_raw).resolve()}')
+            if args.pipeline_config:
+                print(f'[pipeline-config] {Path(args.pipeline_config).resolve()}')
+            if args.postprocess_output_dir:
+                print(f'[output-dir] {Path(args.postprocess_output_dir).resolve()}')
+            return 0
+        run_pipeline_from_raw_archive(
+            args.postprocess_raw,
+            args.pipeline_config,
+            output_dir=args.postprocess_output_dir,
+        )
+        return 0
     resolver = ConfigResolver(args.project, args.variants_dir)
     project_dir = resolver.resolve_project_dir(args.project, args.pick_project, args.no_gui_pick)
 

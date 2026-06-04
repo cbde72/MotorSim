@@ -1,0 +1,35 @@
+name: Slot-Höhen über Kolbenweg
+style_sheet: ../plot_style_sheet.yaml
+figures:
+- title: Free-Piston Slots und Aeff über Kolbenweg
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Slot-Höhen über Kolbenweg
+    plot_type: line
+    x_signal: free_piston_x_m
+    x_title: Kolbenweg [mm] (+54 = OT, -54 = UT)
+    x_unit_preset: raw
+    x_scale_factor: -1000.0
+    x_offset: 54.04
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_hx
+      title: Slot-Höhe [mm]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: transfer_slot_slot_height_m
+      label: Transfer Slot-Höhe
+      axis_id: ax_hx
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_slot_height_m
+      label: Auslass Slot-Höhe
+      axis_id: ax_hx
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw

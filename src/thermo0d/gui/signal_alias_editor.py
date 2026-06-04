@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 import re
 from typing import Any
@@ -51,6 +52,8 @@ class SignalAliasEditor(QMainWindow):
         self.project_dir = Path(project_dir).resolve()
         self.alias_path = self.project_dir / DEFAULT_SIGNAL_ALIAS_NAME
         self.export_path = self.project_dir / DEFAULT_SIGNAL_EXPORT_NAME
+        self.pipeline_config_path = self.project_dir / "postprocessing.yaml"
+        self.pipeline_config_data: dict[str, Any] = {}
         self.auto_generate_missing = bool(auto_generate_missing)
         self.data: dict[str, Any] = {}
         self.style_action_group = QActionGroup(self)
@@ -124,6 +127,10 @@ class SignalAliasEditor(QMainWindow):
         self.act_regen.triggered.connect(self.regenerate_file)
         self.act_export = QAction("Export-Datei schreiben", self)
         self.act_export.triggered.connect(self.export_file)
+        self.act_pipeline_config = QAction("Pipeline-Config schreiben", self)
+        self.act_pipeline_config.triggered.connect(self.write_pipeline_config_file)
+        self.act_pipeline_config_open = QAction("Pipeline-Config öffnen", self)
+        self.act_pipeline_config_open.triggered.connect(self.open_pipeline_config_file)
         self.act_layout_save = QAction("Layout speichern", self)
         self.act_layout_save.triggered.connect(self.save_layout_to_settings)
         self.act_layout_reset = QAction("Layout zurücksetzen", self)
@@ -133,7 +140,7 @@ class SignalAliasEditor(QMainWindow):
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("Datei")
-        for action in [self.act_open, self.act_save, self.act_regen, self.act_export]:
+        for action in [self.act_open, self.act_save, self.act_regen, self.act_export, self.act_pipeline_config_open, self.act_pipeline_config]:
             file_menu.addAction(action)
         file_menu.addSeparator()
         file_menu.addAction(self.act_quit)
@@ -148,7 +155,7 @@ class SignalAliasEditor(QMainWindow):
         toolbar = QToolBar("Main", self)
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
-        for action in [self.act_open, self.act_save, self.act_regen, self.act_export]:
+        for action in [self.act_open, self.act_save, self.act_regen, self.act_export, self.act_pipeline_config_open, self.act_pipeline_config]:
             toolbar.addAction(action)
         toolbar.addSeparator()
         toolbar.addAction(self.act_layout_save)
@@ -211,6 +218,10 @@ class SignalAliasEditor(QMainWindow):
         save_btn.clicked.connect(self.save_file)
         export_btn = QPushButton("Export-Datei")
         export_btn.clicked.connect(self.export_file)
+        pipeline_btn = QPushButton("Pipeline-Config")
+        pipeline_btn.clicked.connect(self.write_pipeline_config_file)
+        pipeline_load_btn = QPushButton("Pipeline laden")
+        pipeline_load_btn.clicked.connect(self.open_pipeline_config_file)
         top.addWidget(QLabel("Datei:"))
         top.addWidget(self.path_label, 1)
         top.addWidget(QLabel("Filter:"))
@@ -223,6 +234,8 @@ class SignalAliasEditor(QMainWindow):
         top.addWidget(self.component_filter_combo)
         top.addWidget(save_btn)
         top.addWidget(export_btn)
+        top.addWidget(pipeline_load_btn)
+        top.addWidget(pipeline_btn)
         layout.addLayout(top)
         return root
 
@@ -732,6 +745,223 @@ class SignalAliasEditor(QMainWindow):
         self.settings.setValue('files/last_export_path', str(self.export_path))
         self._update_statusbar_fields()
         self.statusBar().showMessage(f"Signal-Export-Datei geschrieben: {self.export_path}", 3000)
+
+    @staticmethod
+    def _pipeline_selected_keys(data: dict[str, Any]) -> list[str]:
+        signals = data.get("signals") if isinstance(data.get("signals"), dict) else {}
+        raw_selected = signals.get("selected") if isinstance(signals, dict) else []
+        if not isinstance(raw_selected, list):
+            return []
+        selected: list[str] = []
+        seen: set[str] = set()
+        for value in raw_selected:
+            key = str(value).strip()
+            if key and key not in seen:
+                selected.append(key)
+                seen.add(key)
+        return selected
+
+    @staticmethod
+    def _unit_from_signal_key(key: str) -> str:
+        suffixes = (
+            ("_m_per_s2", "m/s²"),
+            ("_m_per_s", "m/s"),
+            ("_kg_per_s", "kg/s"),
+            ("_W_per_m2K", "W/m²K"),
+            ("_0to1", "-"),
+            ("_Pa", "Pa"),
+            ("_K", "K"),
+            ("_kg", "kg"),
+            ("_J", "J"),
+            ("_W", "W"),
+            ("_m3", "m³"),
+            ("_m2", "m²"),
+            ("_m", "m"),
+            ("_deg", "deg"),
+            ("_s", "s"),
+        )
+        for suffix, unit in suffixes:
+            if str(key).endswith(suffix):
+                return unit
+        if key == "cycle_index":
+            return "-"
+        return ""
+
+    @classmethod
+    def _pipeline_alias_row_for_missing_key(cls, key: str) -> dict[str, Any]:
+        source = "pipeline_config"
+        category = "pipeline"
+        signal_kind = "raw"
+        if key.startswith("d_") and key.endswith("_dt"):
+            source = "rhs"
+            category = "rhs"
+            signal_kind = "derivative"
+        elif key.endswith(("_cycle_J", "_cycle_kg")) or key.endswith("_indicated_power_W"):
+            source = "pipeline_integral"
+            category = "energy"
+            signal_kind = "integral"
+        elif key not in {"t_s", "cycle_index"}:
+            source = "reconstruction"
+            category = "derived"
+            signal_kind = "reconstructed"
+        unit = cls._unit_from_signal_key(key)
+        return {
+            "export_enabled": True,
+            "key": key,
+            "unit": unit,
+            "target_unit": normalize_target_unit(unit, unit),
+            "short_name": "",
+            "source": source,
+            "category": category,
+            "signal_family": category,
+            "signal_kind": signal_kind,
+            "default_name": key,
+            "display_name": key,
+        }
+
+    def _apply_pipeline_config_to_alias_rows(self, config_data: dict[str, Any]) -> tuple[int, int]:
+        selected = self._pipeline_selected_keys(config_data)
+        selected_set = set(selected)
+        rows = self.data.get("signals") if isinstance(self.data.get("signals"), list) else []
+        known_keys = {str(row.get("key", "")).strip() for row in rows if isinstance(row, dict)}
+        missing = [key for key in selected if key not in known_keys]
+        for key in missing:
+            rows.append(self._pipeline_alias_row_for_missing_key(key))
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            key = str(row.get("key", "")).strip()
+            row["export_enabled"] = key in selected_set
+        self.data["signals"] = rows
+        self.populate_table()
+        return len(selected), len(missing)
+
+    def open_pipeline_config_file(self) -> None:
+        path, _ = get_open_file_name(self, "Pipeline-Config öffnen", str(self.pipeline_config_path), "YAML (*.yaml *.yml)")
+        if not path:
+            return
+        target = Path(path)
+        try:
+            raw = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
+        except Exception as exc:
+            self._show_file_error(
+                "Pipeline-Config laden",
+                "Die Pipeline-Config konnte nicht geladen werden.",
+                target,
+                exc,
+            )
+            return
+        if not isinstance(raw, dict):
+            show_warning(self, "Pipeline-Config", "Die Pipeline-Config enthält keine YAML-Mapping-Struktur.")
+            return
+        self.pipeline_config_path = target.resolve()
+        self.pipeline_config_data = raw
+        selected_count, missing_count = self._apply_pipeline_config_to_alias_rows(raw)
+        self._update_statusbar_fields()
+        suffix = f", {missing_count} fehlende Signale ergänzt" if missing_count else ""
+        self.statusBar().showMessage(f"Pipeline-Config geladen: {selected_count} Signale markiert{suffix}", 4500)
+
+    @staticmethod
+    def _pipeline_kind_from_alias_row(row: dict[str, Any]) -> str:
+        kind = str(row.get("signal_kind", "") or row.get("category", "") or row.get("source", "")).strip().lower()
+        key = str(row.get("key", "") or "")
+        if key.startswith("d_") and key.endswith("_dt"):
+            return "derivative"
+        if key.endswith("_cycle_J") or key.endswith("_cycle_kg"):
+            return "integral"
+        if "derived" in kind or "reconstructed" in kind or "rekonstr" in kind:
+            return "reconstructed"
+        return "raw"
+
+    def _build_pipeline_config_from_rows(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
+        selected = [str(row.get("key", "")).strip() for row in rows if row.get("export_enabled") and str(row.get("key", "")).strip()]
+        kinds = []
+        for row in rows:
+            if not row.get("export_enabled"):
+                continue
+            kind = self._pipeline_kind_from_alias_row(row)
+            if kind not in kinds:
+                kinds.append(kind)
+        if "raw" not in kinds:
+            kinds.insert(0, "raw")
+        data = copy.deepcopy(self.pipeline_config_data) if isinstance(self.pipeline_config_data, dict) else {}
+        data.setdefault("version", 1)
+        data.setdefault("raw", {
+            "enabled": True,
+            "path": "raw/run_raw.npz",
+            "compression": "compressed",
+            "dtype": "float32",
+        })
+        data.setdefault("signals", {})
+        data.setdefault("csv", {
+            "enabled": True,
+            "path": "csv/signals.csv",
+            "separator": ";",
+            "include_units_row": True,
+            "include_kind_row": True,
+        })
+        data.setdefault("reconstruction", {})
+        data.setdefault("integrals", {})
+        data.setdefault("summary", {
+            "enabled": True,
+            "path": "summary/run_summary.yaml",
+            "text_path": "summary/run_summary.txt",
+        })
+        data.setdefault("offline", {})
+        if not isinstance(data["signals"], dict):
+            data["signals"] = {}
+        if not isinstance(data["reconstruction"], dict):
+            data["reconstruction"] = {}
+        if not isinstance(data["integrals"], dict):
+            data["integrals"] = {}
+        if not isinstance(data["offline"], dict):
+            data["offline"] = {}
+        data["signals"].update({
+            "selected": selected,
+            "include_kinds": kinds,
+            "remove_zero_columns": bool(data["signals"].get("remove_zero_columns", True)),
+            "zero_tolerance": float(data["signals"].get("zero_tolerance", 0.0) or 0.0),
+            "keep_zero_selected": bool(data["signals"].get("keep_zero_selected", False)),
+        })
+        data["reconstruction"]["enabled"] = "reconstructed" in kinds
+        data["reconstruction"].setdefault("only_selected", True)
+        data["integrals"]["enabled"] = "integral" in kinds
+        data["integrals"].setdefault("only_selected", True)
+        data["integrals"].setdefault("cycle_mode", "full_run")
+        data["integrals"].setdefault("absolute_heat_loss", True)
+        data["offline"].setdefault("enabled", True)
+        data["offline"].setdefault("allow_reconstruction", False)
+        data["offline"].setdefault("allow_derivatives", False)
+        return data
+
+    def write_pipeline_config_file(self) -> None:
+        rows = self._collect_table()
+        selected = [row for row in rows if row.get("export_enabled")]
+        if not selected:
+            show_warning(self, "Pipeline-Config", "Es ist kein Signal zum Export ausgewählt.")
+            return
+        path, _ = get_save_file_name(self, "Pipeline-Config schreiben", str(self.pipeline_config_path), "YAML (*.yaml *.yml)")
+        if not path:
+            return
+        target = Path(path)
+        if target.suffix.lower() not in {".yaml", ".yml"}:
+            target = target.with_suffix(".yaml")
+        data = self._build_pipeline_config_from_rows(rows)
+        try:
+            self.data["signals"] = rows
+            self.alias_path.write_text(yaml.safe_dump(self.data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+            target.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        except Exception as exc:
+            self._show_file_error(
+                "Pipeline-Config",
+                "Die Pipeline-Config konnte nicht geschrieben werden.",
+                target,
+                exc,
+            )
+            return
+        self.pipeline_config_path = target.resolve()
+        self.pipeline_config_data = data
+        self.statusBar().showMessage(f"Pipeline-Config geschrieben: {self.pipeline_config_path}", 3500)
 
     def _last_export_path(self) -> Path | None:
         text = str(self.settings.value('files/last_export_path', '') or '').strip()

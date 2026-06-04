@@ -10,7 +10,7 @@ import numpy as np
 
 from thermo0d.compute.analysis import CycleIndexCalculator, CycleSummary, CycleSummaryCalculator
 from thermo0d.compute.executor import SimulationExecutor
-from thermo0d.core.model_bundle import ModelBundle, PlotLayoutEntryOptions
+from thermo0d.core.model_bundle import ModelBundle
 from thermo0d.app.paths import PathManager
 from thermo0d.input.config_loader import ConfigLoader
 from thermo0d.input.model_builder import build_model_bundle
@@ -23,12 +23,6 @@ from thermo0d.output.console import (
     ConsoleTimingReporter,
 )
 from thermo0d.output.geometry_report import write_geometry_readme
-from thermo0d.output.plot_layout import ensure_default_plot10_yaml, ensure_default_plot_yaml, render_plot_project
-from thermo0d.output.plots import (
-    write_free_piston_last_ut_ot_ut_diagnostic_plots,
-    write_free_piston_last_ut_ot_ut_pv_plot,
-    write_free_piston_last_ut_ot_ut_species_plot,
-)
 from thermo0d.output.service import PostprocessingService
 from thermo0d.config.restart_state_update import update_config_initials_from_last_compression_at_x0
 
@@ -78,9 +72,6 @@ class SimulationAppRunner:
             return None
         text = str(raw).strip()
         return text or None
-
-    def _plot_output_dir(self) -> Path | None:
-        return PathManager.resolve_plot_output_dir(self.config_path, self._configured_outdir())
 
     def _result_dir(self) -> Path:
         return PathManager.resolve_output_dir(self.config_path, self._configured_outdir())
@@ -161,45 +152,6 @@ class SimulationAppRunner:
             target.parent.mkdir(parents=True, exist_ok=True)
             copy2(src, target)
 
-    def _select_plot_rows(self, post) -> list[dict[str, float | int]]:
-        source = str(getattr(self.bundle.postprocessing, 'plots_source', 'last_cycle_uniform') or 'last_cycle_uniform').lower()
-        if source == 'export_rows':
-            return list(post.export_rows or [])
-        return list(post.last_cycle_uniform_rows or post.export_rows or [])
-
-    def _default_layout_entries(self) -> list[PlotLayoutEntryOptions]:
-        return [
-            PlotLayoutEntryOptions(enabled=True, path='plot.yaml', prefix=''),
-            PlotLayoutEntryOptions(enabled=True, path='plot10.yaml', prefix='plot10'),
-        ]
-
-    def _prepare_layout_paths(self) -> list[tuple[PlotLayoutEntryOptions, Path]]:
-        entries = list(getattr(self.bundle.postprocessing, 'plot_layout_entries', []) or [])
-        auto_defaults = bool(getattr(self.bundle.postprocessing, 'plot_layout_auto_create_defaults', True))
-        if not entries and auto_defaults:
-            entries = self._default_layout_entries()
-        resolved: list[tuple[PlotLayoutEntryOptions, Path]] = []
-        for entry in entries:
-            if not bool(getattr(entry, 'enabled', True)):
-                continue
-            path_text = str(getattr(entry, 'path', '') or '').strip()
-            if not path_text:
-                continue
-            out_path = PathManager.resolve_layout_path(
-                self.config_path,
-                path_text,
-                configured_outdir=self._configured_outdir(),
-                prefer_output_dir_when_missing=auto_defaults,
-            )
-            if auto_defaults and not out_path.exists():
-                name = out_path.name.lower()
-                if name == 'plot.yaml':
-                    ensure_default_plot_yaml(self.bundle, self.config_path, output_path=out_path)
-                elif name == 'plot10.yaml':
-                    ensure_default_plot10_yaml(self.bundle, self.config_path, output_path=out_path)
-            resolved.append((entry, out_path))
-        return resolved
-
     def run(self, excel: bool | None = None) -> RunArtifacts:
         ConsoleProgressReporter.print(f'Simulation: starte Solver für {self.config_path.name}')
         execution = SimulationExecutor(self.bundle).run()
@@ -216,66 +168,8 @@ class SimulationAppRunner:
 
             post = PostprocessingService(self.bundle, self.config_path).run(execution.t, execution.y, cycle_indices, excel=excel)
 
-            plot_layout_paths: list[str] = []
-            generated_plot_paths: list[str] = []
-            if bool(getattr(self.bundle.postprocessing, 'plots_enabled', True)):
-                plot_rows = self._select_plot_rows(post)
-                if plot_rows:
-                    output_dir = self._plot_output_dir()
-                    for entry, layout_path in self._prepare_layout_paths():
-                        if not layout_path.exists():
-                            ConsoleArtifactReporter.print_status(layout_path.name, 'warn', elapsed_s=0.0, reason='layout-missing')
-                            continue
-                        ConsoleProgressReporter.print(f'Plot: rendere {layout_path.name}')
-                        prefix_parts = [self.config_path.stem]
-                        entry_prefix = str(getattr(entry, 'prefix', '') or '').strip()
-                        if entry_prefix:
-                            prefix_parts.append(entry_prefix)
-                        prefix = '__'.join(prefix_parts)
-                        started = perf_counter()
-                        rendered_paths = render_plot_project(plot_rows, layout_path, output_dir=output_dir, prefix=prefix, run_config_path=self.config_path)
-                        elapsed = perf_counter() - started
-                        generated_plot_paths.extend(rendered_paths)
-                        plot_layout_paths.append(str(layout_path))
-                        ConsoleArtifactReporter.print_many_status(layout_path.name, rendered_paths, elapsed_s=elapsed)
-                else:
-                    for entry, layout_path in self._prepare_layout_paths():
-                        ConsoleArtifactReporter.print_skipped(layout_path.name, elapsed_s=0.0, reason='no-rows')
-
-            if bool(getattr(self.bundle.postprocessing, 'plots_enabled', True)):
-                pv_plot_rows = list(post.export_rows or [])
-                if pv_plot_rows:
-                    output_dir = self._plot_output_dir()
-                    pv_plot_path = output_dir / f"{self.config_path.stem}__last_ut_ot_ut_pv.png"
-                    started = perf_counter()
-                    written_pv_paths = write_free_piston_last_ut_ot_ut_pv_plot(self.bundle, pv_plot_rows, pv_plot_path, run_config_path=self.config_path)
-                    elapsed = perf_counter() - started
-                    if written_pv_paths:
-                        generated_plot_paths.extend(written_pv_paths)
-                        ConsoleArtifactReporter.print_many_status('plot:last-ut-ot-ut-pv', written_pv_paths, elapsed_s=elapsed)
-                    else:
-                        ConsoleArtifactReporter.print_status('plot:last-ut-ot-ut-pv', 'warn', elapsed_s=elapsed, reason='no-complete-ut-ot-ut')
-                    species_plot_path = output_dir / f"{self.config_path.stem}__last_ut_ot_ut_species.png"
-                    started = perf_counter()
-                    written_species_path = write_free_piston_last_ut_ot_ut_species_plot(self.bundle, pv_plot_rows, species_plot_path, run_config_path=self.config_path)
-                    elapsed = perf_counter() - started
-                    if written_species_path is not None:
-                        generated_plot_paths.append(written_species_path)
-                        ConsoleArtifactReporter.print_path_status('plot:last-ut-ot-ut-species', written_species_path, elapsed_s=elapsed)
-                    else:
-                        ConsoleArtifactReporter.print_status('plot:last-ut-ot-ut-species', 'warn', elapsed_s=elapsed, reason='no-complete-ut-ot-ut')
-                    started = perf_counter()
-                    written_diagnostic_paths = write_free_piston_last_ut_ot_ut_diagnostic_plots(self.bundle, pv_plot_rows, output_dir, self.config_path.stem, run_config_path=self.config_path)
-                    elapsed = perf_counter() - started
-                    if written_diagnostic_paths:
-                        generated_plot_paths.extend(written_diagnostic_paths)
-                        ConsoleArtifactReporter.print_many_status('plot:last-ut-ot-ut-diagnostics', written_diagnostic_paths, elapsed_s=elapsed)
-                    else:
-                        ConsoleArtifactReporter.print_status('plot:last-ut-ot-ut-diagnostics', 'warn', elapsed_s=elapsed, reason='no-complete-ut-ot-ut')
-                else:
-                    ConsoleArtifactReporter.print_skipped('plot:last-ut-ot-ut-pv', elapsed_s=0.0, reason='no-rows')
-                    ConsoleArtifactReporter.print_skipped('plot:last-ut-ot-ut-species', elapsed_s=0.0, reason='no-rows')
-                    ConsoleArtifactReporter.print_skipped('plot:last-ut-ot-ut-diagnostics', elapsed_s=0.0, reason='no-rows')
+            plot_layout_paths = list(getattr(post, 'plot_layout_paths', []) or [])
+            generated_plot_paths = list(getattr(post, 'generated_plot_paths', []) or [])
         else:
             ConsoleProgressReporter.print('Analyse: berechne cycle_index')
             started = perf_counter()
@@ -293,66 +187,8 @@ class SimulationAppRunner:
 
             post = PostprocessingService(self.bundle, self.config_path).run(execution.t, execution.y, cycle_indices, excel=excel)
 
-            plot_layout_paths: list[str] = []
-            generated_plot_paths: list[str] = []
-            if bool(getattr(self.bundle.postprocessing, 'plots_enabled', True)):
-                plot_rows = self._select_plot_rows(post)
-                if plot_rows:
-                    output_dir = self._plot_output_dir()
-                    for entry, layout_path in self._prepare_layout_paths():
-                        if not layout_path.exists():
-                            ConsoleArtifactReporter.print_status(layout_path.name, 'warn', elapsed_s=0.0, reason='layout-missing')
-                            continue
-                        ConsoleProgressReporter.print(f'Plot: rendere {layout_path.name}')
-                        prefix_parts = [self.config_path.stem]
-                        entry_prefix = str(getattr(entry, 'prefix', '') or '').strip()
-                        if entry_prefix:
-                            prefix_parts.append(entry_prefix)
-                        prefix = '__'.join(prefix_parts)
-                        started = perf_counter()
-                        rendered_paths = render_plot_project(plot_rows, layout_path, output_dir=output_dir, prefix=prefix, run_config_path=self.config_path)
-                        elapsed = perf_counter() - started
-                        generated_plot_paths.extend(rendered_paths)
-                        plot_layout_paths.append(str(layout_path))
-                        ConsoleArtifactReporter.print_many_status(layout_path.name, rendered_paths, elapsed_s=elapsed)
-                else:
-                    for entry, layout_path in self._prepare_layout_paths():
-                        ConsoleArtifactReporter.print_skipped(layout_path.name, elapsed_s=0.0, reason='no-rows')
-
-            if bool(getattr(self.bundle.postprocessing, 'plots_enabled', True)):
-                pv_plot_rows = list(post.export_rows or [])
-                if pv_plot_rows:
-                    output_dir = self._plot_output_dir()
-                    pv_plot_path = output_dir / f"{self.config_path.stem}__last_ut_ot_ut_pv.png"
-                    started = perf_counter()
-                    written_pv_paths = write_free_piston_last_ut_ot_ut_pv_plot(self.bundle, pv_plot_rows, pv_plot_path, run_config_path=self.config_path)
-                    elapsed = perf_counter() - started
-                    if written_pv_paths:
-                        generated_plot_paths.extend(written_pv_paths)
-                        ConsoleArtifactReporter.print_many_status('plot:last-ut-ot-ut-pv', written_pv_paths, elapsed_s=elapsed)
-                    else:
-                        ConsoleArtifactReporter.print_status('plot:last-ut-ot-ut-pv', 'warn', elapsed_s=elapsed, reason='no-complete-ut-ot-ut')
-                    species_plot_path = output_dir / f"{self.config_path.stem}__last_ut_ot_ut_species.png"
-                    started = perf_counter()
-                    written_species_path = write_free_piston_last_ut_ot_ut_species_plot(self.bundle, pv_plot_rows, species_plot_path, run_config_path=self.config_path)
-                    elapsed = perf_counter() - started
-                    if written_species_path is not None:
-                        generated_plot_paths.append(written_species_path)
-                        ConsoleArtifactReporter.print_path_status('plot:last-ut-ot-ut-species', written_species_path, elapsed_s=elapsed)
-                    else:
-                        ConsoleArtifactReporter.print_status('plot:last-ut-ot-ut-species', 'warn', elapsed_s=elapsed, reason='no-complete-ut-ot-ut')
-                    started = perf_counter()
-                    written_diagnostic_paths = write_free_piston_last_ut_ot_ut_diagnostic_plots(self.bundle, pv_plot_rows, output_dir, self.config_path.stem, run_config_path=self.config_path)
-                    elapsed = perf_counter() - started
-                    if written_diagnostic_paths:
-                        generated_plot_paths.extend(written_diagnostic_paths)
-                        ConsoleArtifactReporter.print_many_status('plot:last-ut-ot-ut-diagnostics', written_diagnostic_paths, elapsed_s=elapsed)
-                    else:
-                        ConsoleArtifactReporter.print_status('plot:last-ut-ot-ut-diagnostics', 'warn', elapsed_s=elapsed, reason='no-complete-ut-ot-ut')
-                else:
-                    ConsoleArtifactReporter.print_skipped('plot:last-ut-ot-ut-pv', elapsed_s=0.0, reason='no-rows')
-                    ConsoleArtifactReporter.print_skipped('plot:last-ut-ot-ut-species', elapsed_s=0.0, reason='no-rows')
-                    ConsoleArtifactReporter.print_skipped('plot:last-ut-ot-ut-diagnostics', elapsed_s=0.0, reason='no-rows')
+            plot_layout_paths = list(getattr(post, 'plot_layout_paths', []) or [])
+            generated_plot_paths = list(getattr(post, 'generated_plot_paths', []) or [])
 
         update_enabled = bool(getattr(self.bundle.postprocessing, 'auto_update_initial_conditions', True))
         started = perf_counter()
@@ -401,8 +237,11 @@ class SimulationAppRunner:
             ConsoleTimingReporter.print('console:geometry', perf_counter() - started)
 
         started = perf_counter()
-        readme_rows = post.export_rows or post.last_cycle_uniform_rows
-        readme_path = write_geometry_readme(self.bundle, result_dir, filename='README.md', rows=readme_rows)
+        if post.summary_markdown_path:
+            readme_path = Path(post.summary_markdown_path)
+        else:
+            readme_rows = post.export_rows or post.last_cycle_uniform_rows
+            readme_path = write_geometry_readme(self.bundle, result_dir, filename='README.md', rows=readme_rows)
         ConsoleArtifactReporter.print_path_status('readme:geometry', readme_path, elapsed_s=perf_counter() - started)
 
         plot_layout_path = plot_layout_paths[0] if plot_layout_paths else None

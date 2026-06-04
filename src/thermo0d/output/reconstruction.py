@@ -5,7 +5,7 @@ import math
 
 import numpy as np
 
-from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnCol, ConnectionType, VolumeCol, VolumeType, WallTemperatureCol, WallTemperatureZone
+from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnCol, ConnectionType, EndpointKind, VolumeCol, VolumeType, WallTemperatureCol, WallTemperatureZone
 from thermo0d.physics.flow import de_st_venant_wantzel_signed
 from thermo0d.physics.kinematics import cylinder_kinematic_state_from_time
 from thermo0d.model.free_piston.forces import compute_load_info
@@ -93,6 +93,34 @@ def _free_piston_local_kinematics(bundle, vol_idx: int, y_arr: np.ndarray, sampl
         angle_max_rad=float(getattr(fp, 'rotary_angle_max_rad', 0.0) or 0.0),
         effective_radius_m=float(getattr(fp, 'rotary_effective_radius_m', 1.0) or 1.0),
     )
+
+
+def _free_piston_assist_shutdown_time_s(fp) -> float | None:
+    if not bool(getattr(fp, 'load_motor_assist_until_soc', True)):
+        return None
+    soc_times: list[float] = []
+    soc_time = float(getattr(fp, 'runtime_soc_time_s', 0.0) or 0.0)
+    if soc_time > 0.0:
+        soc_times.append(soc_time)
+    soc_by_vol = getattr(fp, 'runtime_soc_time_by_vol_s', None)
+    if soc_by_vol is not None:
+        arr = np.asarray(soc_by_vol, dtype=np.float64)
+        finite = arr[np.isfinite(arr) & (arr > 0.0)]
+        if finite.size:
+            soc_times.append(float(np.min(finite)))
+    if not soc_times:
+        return None
+    return min(soc_times)
+
+
+def _free_piston_assist_params_for_time(fp, t_s: float, shutdown_time_s: float | None) -> tuple[float, float]:
+    threshold = float(getattr(fp, 'load_assist_velocity_threshold_m_per_s', 0.0) or 0.0)
+    force = float(getattr(fp, 'load_assist_force_N', 0.0) or 0.0)
+    if threshold <= 0.0 or force <= 0.0:
+        return 0.0, 0.0
+    if shutdown_time_s is not None and float(t_s) >= float(shutdown_time_s):
+        return 0.0, 0.0
+    return threshold, force
 
 
 def _prefix_without_trailing_index(name: str) -> str | None:
@@ -249,8 +277,11 @@ def _hcci_ignition_delays_for_sample(
     if fp is None or _hcci_ignition_delay_s is None:
         return 0.0, 0.0
     enabled = getattr(fp, 'hcci_enabled_by_vol', np.zeros(0, dtype=np.int64))
+    diagnostics_enabled = getattr(fp, 'hcci_diagnostics_enabled_by_vol', np.zeros(0, dtype=np.int64))
     cyl = int(cyl_idx)
-    if cyl >= int(getattr(enabled, 'shape', (0,))[0]) or not bool(enabled[cyl]):
+    hcci_active = cyl < int(getattr(enabled, 'shape', (0,))[0]) and bool(enabled[cyl])
+    diag_active = cyl < int(getattr(diagnostics_enabled, 'shape', (0,))[0]) and bool(diagnostics_enabled[cyl])
+    if not hcci_active and not diag_active:
         return 0.0, 0.0
     if mass_kg <= 1.0e-18 or air_mass_kg <= 1.0e-18 or fuel_mass_kg <= 1.0e-18:
         return 0.0, 0.0
@@ -577,6 +608,8 @@ class SignalReconstructionService:
         environment_is_fixed = getattr(bundle, 'environment_is_fixed', None)
         environment_pressures_pa = getattr(bundle, 'environment_pressures_pa', None)
         environment_temperatures_K = getattr(bundle, 'environment_temperatures_K', None)
+        boundary_pressures_pa = getattr(bundle, 'boundary_pressures_pa', None)
+        boundary_temperatures_K = getattr(bundle, 'boundary_temperatures_K', None)
         wall_bore_by_vol = getattr(bundle, 'wall_bore_by_vol', None)
         wall_ups_by_vol = getattr(bundle, 'wall_ups_by_vol', None)
         if environment_is_fixed is None:
@@ -585,6 +618,10 @@ class SignalReconstructionService:
             environment_pressures_pa = np.zeros(n_vol, dtype=np.float64)
         if environment_temperatures_K is None:
             environment_temperatures_K = np.zeros(n_vol, dtype=np.float64)
+        if boundary_pressures_pa is None:
+            boundary_pressures_pa = np.zeros(0, dtype=np.float64)
+        if boundary_temperatures_K is None:
+            boundary_temperatures_K = np.zeros(0, dtype=np.float64)
         if wall_bore_by_vol is None:
             wall_bore_by_vol = np.zeros(n_vol, dtype=np.float64)
             for i in range(n_vol):
@@ -632,6 +669,8 @@ class SignalReconstructionService:
         hcci_integral_by_vol = np.zeros(n_vol, dtype=np.float64)
         hcci_cool_integral_by_vol = np.zeros(n_vol, dtype=np.float64)
         hcci_cool_done_by_vol = np.zeros(n_vol, dtype=np.int64)
+        fp_for_assist = getattr(bundle, 'free_piston', None) if getattr(bundle, 'architecture', 'classic') == 'free_piston' else None
+        assist_shutdown_time_s = _free_piston_assist_shutdown_time_s(fp_for_assist) if fp_for_assist is not None else None
 
         for k, tk in enumerate(t_arr):
             dt_sample_s = max(0.0, float(t_arr[k]) - float(t_arr[k - 1])) if k > 0 else 0.0
@@ -742,6 +781,7 @@ class SignalReconstructionService:
                             friction_force = 0.0
                         else:
                             friction_force = -(fp.friction_fc_N * np.copysign(1.0, piston_v) + fp.friction_cv_Ns_per_m * piston_v)
+                        assist_threshold, assist_force = _free_piston_assist_params_for_time(fp, float(tk), assist_shutdown_time_s)
                         load_info = compute_load_info(
                             fp.load_model,
                             fp.load_damping_Ns_per_m,
@@ -754,8 +794,8 @@ class SignalReconstructionService:
                             power_target_W=fp.load_power_target_W,
                             efficiency_0to1=fp.load_efficiency_0to1,
                             min_velocity_m_per_s=fp.load_min_velocity_m_per_s,
-                            assist_velocity_threshold_m_per_s=fp.load_assist_velocity_threshold_m_per_s,
-                            assist_force_N=fp.load_assist_force_N,
+                            assist_velocity_threshold_m_per_s=assist_threshold,
+                            assist_force_N=assist_force,
                             target_margin_m=fp.load_target_margin_m,
                             hard_margin_m=fp.load_hard_margin_m,
                             stop_kp=fp.load_stop_kp,
@@ -789,6 +829,9 @@ class SignalReconstructionService:
                         cls._ensure_float_column(columns, 'free_piston_generator_damping_eff_Ns_per_m', n_samples)[k] = float(load_info.effective_damping_Ns_per_m)
                         cls._ensure_float_column(columns, 'free_piston_generator_force_base_N', n_samples)[k] = float(load_info.base_force_N)
                         cls._ensure_float_column(columns, 'free_piston_generator_force_power_N', n_samples)[k] = float(load_info.power_force_N)
+                        assist_force_output_N = float(load_info.power_force_N) if str(getattr(fp, 'load_model', '') or '').strip().lower() == 'generator_controlled' and assist_force > 0.0 else 0.0
+                        cls._ensure_float_column(columns, 'free_piston_generator_assist_force_N', n_samples)[k] = assist_force_output_N
+                        cls._ensure_float_column(columns, 'free_piston_generator_assist_torque_Nm', n_samples)[k] = assist_force_output_N * float(getattr(fp, 'rotary_effective_radius_m', 0.0) or 0.0)
                         cls._ensure_float_column(columns, 'free_piston_generator_force_stop_N', n_samples)[k] = float(load_info.stop_force_N)
                         cls._ensure_float_column(columns, 'free_piston_generator_distance_to_stop_m', n_samples)[k] = float(load_info.distance_to_stop_m)
                         cls._ensure_float_column(columns, 'free_piston_generator_midstroke_weight', n_samples)[k] = float(load_info.midstroke_weight_0to1)
@@ -955,6 +998,7 @@ class SignalReconstructionService:
                     friction_force = 0.0
                 else:
                     friction_force = -(fp.friction_fc_N * np.copysign(1.0, piston_v) + fp.friction_cv_Ns_per_m * piston_v)
+                assist_threshold, assist_force = _free_piston_assist_params_for_time(fp, float(tk), assist_shutdown_time_s)
                 load_info = compute_load_info(
                     fp.load_model,
                     fp.load_damping_Ns_per_m,
@@ -967,8 +1011,8 @@ class SignalReconstructionService:
                     power_target_W=fp.load_power_target_W,
                     efficiency_0to1=fp.load_efficiency_0to1,
                     min_velocity_m_per_s=fp.load_min_velocity_m_per_s,
-                    assist_velocity_threshold_m_per_s=fp.load_assist_velocity_threshold_m_per_s,
-                    assist_force_N=fp.load_assist_force_N,
+                    assist_velocity_threshold_m_per_s=assist_threshold,
+                    assist_force_N=assist_force,
                     target_margin_m=fp.load_target_margin_m,
                     hard_margin_m=fp.load_hard_margin_m,
                     stop_kp=fp.load_stop_kp,
@@ -1002,6 +1046,9 @@ class SignalReconstructionService:
                 cls._ensure_float_column(columns, 'free_piston_generator_damping_eff_Ns_per_m', n_samples)[k] = float(load_info.effective_damping_Ns_per_m)
                 cls._ensure_float_column(columns, 'free_piston_generator_force_base_N', n_samples)[k] = float(load_info.base_force_N)
                 cls._ensure_float_column(columns, 'free_piston_generator_force_power_N', n_samples)[k] = float(load_info.power_force_N)
+                assist_force_output_N = float(load_info.power_force_N) if str(getattr(fp, 'load_model', '') or '').strip().lower() == 'generator_controlled' and assist_force > 0.0 else 0.0
+                cls._ensure_float_column(columns, 'free_piston_generator_assist_force_N', n_samples)[k] = assist_force_output_N
+                cls._ensure_float_column(columns, 'free_piston_generator_assist_torque_Nm', n_samples)[k] = assist_force_output_N * float(getattr(fp, 'rotary_effective_radius_m', 0.0) or 0.0)
                 cls._ensure_float_column(columns, 'free_piston_generator_force_stop_N', n_samples)[k] = float(load_info.stop_force_N)
                 cls._ensure_float_column(columns, 'free_piston_generator_distance_to_stop_m', n_samples)[k] = float(load_info.distance_to_stop_m)
                 cls._ensure_float_column(columns, 'free_piston_generator_midstroke_weight', n_samples)[k] = float(load_info.midstroke_weight_0to1)
@@ -1012,7 +1059,19 @@ class SignalReconstructionService:
                 left = int(conn[ConnCol.FROM_VOL])
                 right = int(conn[ConnCol.TO_VOL])
                 conn_type = int(conn[ConnCol.TYPE])
-                cyl_idx = left if int(vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER else right
+                left_kind = int(conn[ConnCol.FROM_KIND]) if conn.shape[0] > int(ConnCol.FROM_KIND) else int(EndpointKind.VOLUME)
+                right_kind = int(conn[ConnCol.TO_KIND]) if conn.shape[0] > int(ConnCol.TO_KIND) else int(EndpointKind.VOLUME)
+                left_is_volume = left_kind == int(EndpointKind.VOLUME)
+                right_is_volume = right_kind == int(EndpointKind.VOLUME)
+                p_left = float(pressure_by_vol[left]) if left_is_volume else max(float(boundary_pressures_pa[left]), 1.0)
+                t_left = float(temperature_by_vol[left]) if left_is_volume else max(float(boundary_temperatures_K[left]), 1.0)
+                p_right = float(pressure_by_vol[right]) if right_is_volume else max(float(boundary_pressures_pa[right]), 1.0)
+                t_right = float(temperature_by_vol[right]) if right_is_volume else max(float(boundary_temperatures_K[right]), 1.0)
+                cyl_idx = -1
+                if left_is_volume and int(vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER:
+                    cyl_idx = left
+                elif right_is_volume and int(vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER:
+                    cyl_idx = right
                 geom_area_m2 = 0.0
                 cd_forward = 0.0
                 cd_reverse = 0.0
@@ -1020,7 +1079,7 @@ class SignalReconstructionService:
                 aeff_reverse = 0.0
 
                 if conn_type == ConnectionType.VALVE:
-                    if int(vol_matrix[cyl_idx, VolumeCol.TYPE]) != VolumeType.CYLINDER:
+                    if cyl_idx < 0:
                         continue
                     lift_m, bore_area_m2, area_forward_m2, area_reverse_m2, alpha_forward, alpha_reverse = _call_evaluate_valve_state(
                         conn,
@@ -1040,7 +1099,7 @@ class SignalReconstructionService:
                     cls._ensure_float_column(columns, f'{conn_name}_A_eff_forward_m2', n_samples)[k] = aeff_forward
                     cls._ensure_float_column(columns, f'{conn_name}_A_eff_reverse_m2', n_samples)[k] = aeff_reverse
                 elif conn_type == ConnectionType.SLOT:
-                    if int(vol_matrix[cyl_idx, VolumeCol.TYPE]) != VolumeType.CYLINDER:
+                    if cyl_idx < 0:
                         continue
                     open_height_m, geom_area_m2, area_forward_m2, area_reverse_m2, cd_forward, cd_reverse = _evaluate_slot_state(conn, piston_x_by_vol[cyl_idx], cd_table)
                     geom_area_m2 = float(geom_area_m2)
@@ -1058,7 +1117,7 @@ class SignalReconstructionService:
                     cls._ensure_float_column(columns, f'{conn_name}_A_eff_forward_m2', n_samples)[k] = aeff_forward
                     cls._ensure_float_column(columns, f'{conn_name}_A_eff_reverse_m2', n_samples)[k] = aeff_reverse
                 elif conn_type == ConnectionType.CHECK_VALVE:
-                    geom_area_m2, cd_forward, cd_reverse = _evaluate_check_valve_area(conn, pressure_by_vol[left], pressure_by_vol[right])
+                    geom_area_m2, cd_forward, cd_reverse = _evaluate_check_valve_area(conn, p_left, p_right)
                     aeff_forward = float(geom_area_m2 * cd_forward)
                     aeff_reverse = float(geom_area_m2 * cd_reverse)
                     cls._ensure_float_column(columns, f'{conn_name}_A_geom_m2', n_samples)[k] = float(geom_area_m2)
@@ -1068,21 +1127,21 @@ class SignalReconstructionService:
                 else:
                     continue
 
-                if pressure_by_vol[left] >= pressure_by_vol[right]:
-                    gamma_up = float(kappa_by_vol[left])
-                    gas_constant_up = float(gas_constant_by_vol[left])
-                    cp_up = float(cp_by_vol[left])
-                    temp_up = float(temperature_by_vol[left])
+                if p_left >= p_right:
+                    gamma_up = float(kappa_by_vol[left]) if left_is_volume else float(kappa_default)
+                    gas_constant_up = float(gas_constant_by_vol[left]) if left_is_volume else float(gas_constant_default)
+                    cp_up = float(cp_by_vol[left]) if left_is_volume else float(cp_default)
+                    temp_up = t_left
                 else:
-                    gamma_up = float(kappa_by_vol[right])
-                    gas_constant_up = float(gas_constant_by_vol[right])
-                    cp_up = float(cp_by_vol[right])
-                    temp_up = float(temperature_by_vol[right])
+                    gamma_up = float(kappa_by_vol[right]) if right_is_volume else float(kappa_default)
+                    gas_constant_up = float(gas_constant_by_vol[right]) if right_is_volume else float(gas_constant_default)
+                    cp_up = float(cp_by_vol[right]) if right_is_volume else float(cp_default)
+                    temp_up = t_right
                 mdot_kg_per_s = float(de_st_venant_wantzel_signed(
-                    pressure_by_vol[left],
-                    temperature_by_vol[left],
-                    pressure_by_vol[right],
-                    temperature_by_vol[right],
+                    p_left,
+                    t_left,
+                    p_right,
+                    t_right,
                     geom_area_m2,
                     cd_forward,
                     cd_reverse,
@@ -1091,11 +1150,17 @@ class SignalReconstructionService:
                 ))
                 if mdot_kg_per_s >= 0.0:
                     upstream_state = y_arr[:, k]
-                    upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(state_layout, upstream_state, left, environment_is_fixed)
+                    if left_is_volume:
+                        upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(state_layout, upstream_state, left, environment_is_fixed)
+                    else:
+                        upstream_burned_fraction, upstream_air_fraction = 0.0, 1.0
                     h_up = cp_up * temp_up
                 else:
                     upstream_state = y_arr[:, k]
-                    upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(state_layout, upstream_state, right, environment_is_fixed)
+                    if right_is_volume:
+                        upstream_burned_fraction, upstream_air_fraction = _upstream_species_fractions(state_layout, upstream_state, right, environment_is_fixed)
+                    else:
+                        upstream_burned_fraction, upstream_air_fraction = 0.0, 1.0
                     h_up = cp_up * temp_up
                 mdot_burned_kg_per_s = float(mdot_kg_per_s * upstream_burned_fraction)
                 mdot_air_kg_per_s = float(mdot_kg_per_s * upstream_air_fraction)
@@ -1108,18 +1173,18 @@ class SignalReconstructionService:
                 cls._ensure_float_column(columns, f'{conn_name}_mdot_unburned_kg_per_s', n_samples)[k] = mdot_unburned_kg_per_s
 
                 if conn_type == int(ConnectionType.SLOT):
-                    if int(vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot_kg_per_s > 0.0:
+                    if right_is_volume and int(vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot_kg_per_s > 0.0:
                         scav_transfer_in[right] += mdot_kg_per_s
                         scav_transfer_air_in[right] += max(mdot_air_kg_per_s, 0.0)
-                    elif int(vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot_kg_per_s < 0.0:
+                    elif left_is_volume and int(vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot_kg_per_s < 0.0:
                         scav_transfer_in[left] += -mdot_kg_per_s
                         scav_transfer_air_in[left] += max(-mdot_air_kg_per_s, 0.0)
-                    if int(vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot_kg_per_s > 0.0:
+                    if left_is_volume and int(vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot_kg_per_s > 0.0:
                         scav_exhaust_out[left] += mdot_kg_per_s
-                    elif int(vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot_kg_per_s < 0.0:
+                    elif right_is_volume and int(vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER and mdot_kg_per_s < 0.0:
                         scav_exhaust_out[right] += -mdot_kg_per_s
 
-                if int(vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER:
+                if left_is_volume and int(vol_matrix[left, VolumeCol.TYPE]) == VolumeType.CYLINDER:
                     if mdot_kg_per_s >= 0.0:
                         cyl_mdot_out[left] += mdot_kg_per_s
                         cyl_enthalpy_out[left] += mdot_kg_per_s * h_up
@@ -1128,7 +1193,7 @@ class SignalReconstructionService:
                         cyl_mdot_in[left] += -mdot_kg_per_s
                         cyl_enthalpy_in[left] += -mdot_kg_per_s * h_up
                         cyl_aeff_in[left] += aeff_reverse
-                if int(vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER:
+                if right_is_volume and int(vol_matrix[right, VolumeCol.TYPE]) == VolumeType.CYLINDER:
                     if mdot_kg_per_s >= 0.0:
                         cyl_mdot_in[right] += mdot_kg_per_s
                         cyl_enthalpy_in[right] += mdot_kg_per_s * h_up
@@ -1371,16 +1436,13 @@ class SignalReconstructionService:
                         )
                         hcci_enabled = hcci_ignition_delay_s > 0.0
                         two_stage = hcci_cool_ignition_delay_s > 0.0
-                        if hcci_enabled and int(compression_active_by_vol[i]) == 1 and combustion_soc_energy_J <= 0.0:
+                        if hcci_enabled and int(compression_active_by_vol[i]) == 1:
                             if two_stage and int(hcci_cool_done_by_vol[i]) == 0:
                                 hcci_cool_integral_by_vol[i] += dt_sample_s / max(hcci_cool_ignition_delay_s, 1.0e-12)
                                 if hcci_cool_integral_by_vol[i] >= 1.0:
-                                    hcci_cool_integral_by_vol[i] = 0.0
                                     hcci_cool_done_by_vol[i] = 1
                             else:
                                 hcci_integral_by_vol[i] += dt_sample_s / max(hcci_ignition_delay_s, 1.0e-12)
-                                if hcci_integral_by_vol[i] >= 1.0:
-                                    hcci_integral_by_vol[i] = 0.0
                         else:
                             hcci_integral_by_vol[i] = 0.0
                             hcci_cool_integral_by_vol[i] = 0.0
@@ -1426,6 +1488,8 @@ class SignalReconstructionService:
                 cls._ensure_float_column(columns, f'{name}_hcci_cool_ignition_delay_s', n_samples)[k] = float(hcci_cool_ignition_delay_s)
                 cls._ensure_float_column(columns, f'{name}_hcci_ignition_integral_0to1', n_samples)[k] = float(hcci_integral_0to1)
                 cls._ensure_float_column(columns, f'{name}_hcci_cool_ignition_integral_0to1', n_samples)[k] = float(hcci_cool_integral_0to1)
+                cls._ensure_float_column(columns, f'{name}_hcci_ignition_integral', n_samples)[k] = float(hcci_integral_0to1)
+                cls._ensure_float_column(columns, f'{name}_hcci_cool_ignition_integral', n_samples)[k] = float(hcci_cool_integral_0to1)
                 cls._ensure_float_column(columns, f'{name}_evaporation_sink_W', n_samples)[k] = float(evap_sink_w)
                 cls._ensure_float_column(columns, f'{name}_piston_work_W', n_samples)[k] = float(pdv_power)
                 if fp is not None and bool(getattr(fp, 'scavenging_enabled', False)):

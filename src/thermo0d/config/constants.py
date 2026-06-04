@@ -49,6 +49,11 @@ class FlowCoeffMode(IntEnum):
     TABLE = 2
 
 
+class EndpointKind(IntEnum):
+    VOLUME = 0
+    BOUNDARY = 1
+
+
 class HeatTransferModel(IntEnum):
     NONE = 0
     WOSCHNI = 1
@@ -152,6 +157,8 @@ class ConnCol(IntEnum):
     CD_TABLE_START = 22
     CD_TABLE_LEN = 23
     REF_FLOW_AREA = 24
+    FROM_KIND = 25
+    TO_KIND = 26
 
 
 class WallCol(IntEnum):

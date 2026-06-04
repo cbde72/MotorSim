@@ -52,6 +52,7 @@ class FreePistonModelData:
     load_power_target_W: float
     load_efficiency_0to1: float
     load_min_velocity_m_per_s: float
+    load_motor_assist_until_soc: bool
     load_assist_velocity_threshold_m_per_s: float
     load_assist_force_N: float
     load_target_margin_m: float
@@ -162,6 +163,7 @@ class FreePistonModelData:
     hcci_start_pressure_min_by_vol_Pa: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     hcci_max_ignition_delay_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     hcci_ignition_model_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    hcci_diagnostics_enabled_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
     hcci_burn_model_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
     hcci_two_stage_enabled_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
     hcci_activation_energy_by_vol_J_per_kg: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
@@ -177,6 +179,7 @@ class FreePistonModelData:
     hcci_cf_c_dt_by_vol: np.ndarray = field(default_factory=lambda: np.zeros((0, 6), dtype=np.float64))
     hcci_reference_pressure_by_vol_bar: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     hcci_reference_o2_by_vol_percent: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    hcci_tabulated_delay_tables_by_vol: tuple[object | None, ...] = field(default_factory=tuple)
     runtime_hcci_integral_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     runtime_hcci_last_update_time_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
     runtime_hcci_tau_by_vol_s: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
@@ -201,6 +204,8 @@ class PlotLayoutEntryOptions:
 
 @dataclass(slots=True)
 class PostprocessingOptions:
+    mode: str = "pipeline"
+    pipeline_config: str | None = None
     outdir: str | None = None
     auto_update_initial_conditions: bool = True
     csv_enabled: bool = True
@@ -274,6 +279,9 @@ class ModelBundle:
     environment_is_fixed: np.ndarray | None = None
     environment_pressures_pa: np.ndarray | None = None
     environment_temperatures_K: np.ndarray | None = None
+    boundary_names: list[str] = field(default_factory=list)
+    boundary_pressures_pa: np.ndarray | None = None
+    boundary_temperatures_K: np.ndarray | None = None
     combustion_fuel_mass_by_vol: np.ndarray | None = None
     combustion_afr_stoich_by_vol: np.ndarray | None = None
     combustion_lambda_target_by_vol: np.ndarray | None = None

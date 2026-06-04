@@ -1,0 +1,49 @@
+name: Pressure
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  font_size: 6
+  axis_label_size: 6
+  tick_label_size: 6
+  title_size: 6
+  figure_title_size: 6
+  grid_alpha: 0.3
+  default_line_width: 0.8
+  default_marker_size: 3.5
+figures:
+- title: p_t
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Pressure
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_p
+      title: Druck [bar]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: cylinder_1_p_Pa
+      label: Zylinder
+      axis_id: ax_p
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      unit_preset: raw
+    - signal_key: compressor_1_p_Pa
+      label: Bounce
+      axis_id: ax_p
+      color: '#111111'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      unit_preset: raw
+    - signal_key: receiver_1_p_Pa
+      label: Transfer
+      axis_id: ax_p
+      color: '#0000FF'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      unit_preset: raw

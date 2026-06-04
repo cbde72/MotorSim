@@ -55,6 +55,7 @@ def test_migrate_config_data_renames_and_defaults() -> None:
     assert "heat_transfer" not in migrated["preprocessing"]["features"]
     assert migrated["simulation"]["solver"]["kind"] == "rk4"
     assert migrated["postprocessing"]["csv_separator"] == ";"
+    assert migrated["postprocessing"]["mode"] == "pipeline"
     assert migrated["postprocessing"]["sampling"]["mode"] == "crank_angle"
     assert migrated["postprocessing"]["sampling"]["step_deg"] == 1.0
     assert migrated["preprocessing"]["volumes"][0]["combustion"]["angle_reference"] == "absolute"
@@ -73,6 +74,7 @@ simulation:
   solver:
     method: rk4
 postprocessing:
+  mode: legacy
   csv_path: results/out.csv
   csv_sep: ";"
   sampling:
@@ -94,6 +96,8 @@ postprocessing:
     assert "wall_heat: true" in text
     assert "kind: rk4" in text
     assert 'csv_separator: ";"' in text
+    assert "mode: pipeline" in text
+    assert "mode: legacy" not in text
     assert "mode: crank_angle" in text
     assert "step_deg: 1.0" in text
     assert "final_cycle_uniform_angle_export:" in text

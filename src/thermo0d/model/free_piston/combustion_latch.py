@@ -20,6 +20,50 @@ FUELING_VAPOR_INJECTOR = 2
 HCCI_IGNITION_GENERIC_LIVENGOOD_WU = 0
 HCCI_IGNITION_BECK_2003_1_ARRHENIUS = 1
 HCCI_IGNITION_BECK_2003_TWO_STAGE = 2
+HCCI_IGNITION_TABULATED_LIVENGOOD_WU = 3
+
+
+def _interp_axis_index_weight(axis: np.ndarray, value: float) -> tuple[int, int, float]:
+    n = int(axis.shape[0])
+    if n <= 1:
+        return 0, 0, 0.0
+    x = float(value)
+    if x <= float(axis[0]):
+        return 0, 0, 0.0
+    if x >= float(axis[n - 1]):
+        return n - 1, n - 1, 0.0
+    hi = int(np.searchsorted(axis, x, side='right'))
+    lo = max(hi - 1, 0)
+    span = max(float(axis[hi] - axis[lo]), 1.0e-30)
+    return lo, hi, (x - float(axis[lo])) / span
+
+
+def _tabulated_hcci_ignition_delay_s(table, *, temp_K: float, pressure_Pa: float, lam: float, residual_fraction: float) -> float:
+    if table is None:
+        return 1.0e9
+    temperature_axis = table["temperature_K"]
+    pressure_axis = table["pressure_bar"]
+    lambda_axis = table["lambda"]
+    egr_axis = table["egr_rate"]
+    delay_grid = table["delay_s"]
+    egr_value = float(residual_fraction)
+    if int(egr_axis.shape[0]) > 0 and float(egr_axis[-1]) > 1.5:
+        egr_value *= 100.0
+    indices = (
+        _interp_axis_index_weight(temperature_axis, float(temp_K)),
+        _interp_axis_index_weight(pressure_axis, float(pressure_Pa) * 1.0e-5),
+        _interp_axis_index_weight(lambda_axis, float(lam)),
+        _interp_axis_index_weight(egr_axis, egr_value),
+    )
+    value = 0.0
+    for i0, wi in ((indices[0][0], 1.0 - indices[0][2]), (indices[0][1], indices[0][2])):
+        for i1, wj in ((indices[1][0], 1.0 - indices[1][2]), (indices[1][1], indices[1][2])):
+            for i2, wk in ((indices[2][0], 1.0 - indices[2][2]), (indices[2][1], indices[2][2])):
+                for i3, wl in ((indices[3][0], 1.0 - indices[3][2]), (indices[3][1], indices[3][2])):
+                    weight = wi * wj * wk * wl
+                    if weight > 0.0:
+                        value += weight * float(delay_grid[i0, i1, i2, i3])
+    return max(float(value), 1.0e-9)
 
 
 def _hcci_charge_o2_percent(air_mass_kg: float, burned_mass_kg: float, reference_o2_percent: float) -> float:
@@ -75,6 +119,19 @@ def _hcci_ignition_delay_s(
 ) -> float:
     ignition_models = getattr(fp, 'hcci_ignition_model_by_vol', np.zeros(0, dtype=np.int64))
     ignition_model = int(ignition_models[cyl]) if cyl < int(getattr(ignition_models, 'shape', (0,))[0]) else HCCI_IGNITION_GENERIC_LIVENGOOD_WU
+    lam = lambda_from_air_and_fuel_mass(float(air_mass_kg), float(fuel_mass_kg), float(afr_stoich))
+    residual_fraction = max(min(float(burned_mass_kg) / max(float(mass_kg), 1.0e-18), 1.0), 0.0)
+    if ignition_model == HCCI_IGNITION_TABULATED_LIVENGOOD_WU:
+        tables = getattr(fp, 'hcci_tabulated_delay_tables_by_vol', ())
+        table = tables[cyl] if cyl < len(tables) else None
+        tau_s = _tabulated_hcci_ignition_delay_s(
+            table,
+            temp_K=float(temp_K),
+            pressure_Pa=float(pressure_Pa),
+            lam=lam,
+            residual_fraction=residual_fraction,
+        )
+        return tau_s
     if ignition_model in (HCCI_IGNITION_BECK_2003_1_ARRHENIUS, HCCI_IGNITION_BECK_2003_TWO_STAGE):
         if str(stage) == 'cool':
             activation_energy_J_per_kg = float(fp.hcci_cool_flame_activation_energy_by_vol_J_per_kg[cyl])
@@ -97,12 +154,10 @@ def _hcci_ignition_delay_s(
             burned_mass_kg=float(burned_mass_kg),
         )
     else:
-        lam = lambda_from_air_and_fuel_mass(float(air_mass_kg), float(fuel_mass_kg), float(afr_stoich))
         pressure_factor = (max(float(fp.hcci_reference_pressure_by_vol_Pa[cyl]), 1.0) / max(float(pressure_Pa), 1.0)) ** float(fp.hcci_pressure_exponent_by_vol[cyl])
         temp_factor = float(np.exp(float(fp.hcci_activation_temperature_by_vol_K[cyl]) / max(float(temp_K), 1.0)))
         lambda_factor = (max(lam, 1.0e-12) / max(float(fp.hcci_reference_lambda_by_vol[cyl]), 1.0e-12)) ** float(fp.hcci_lambda_slowdown_exponent_by_vol[cyl])
         tau_s = max(float(fp.hcci_tau_A_by_vol_s[cyl]) * pressure_factor * temp_factor * lambda_factor, 1.0e-9)
-    residual_fraction = max(min(float(burned_mass_kg) / max(float(mass_kg), 1.0e-18), 1.0), 0.0)
     residual_factor = 1.0 + (float(fp.hcci_residual_slowdown_factor_by_vol[cyl]) - 1.0) * residual_fraction
     return min(tau_s * residual_factor, float(fp.hcci_max_ignition_delay_by_vol_s[cyl]))
 

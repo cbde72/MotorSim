@@ -1,0 +1,344 @@
+name: Energiebilanz kumuliert
+style_sheet: ../plot_style_sheet.yaml
+style:
+  background_color: '#ffffff'
+  axes_facecolor: '#ffffff'
+  text_color: '#202020'
+  grid_color: '#d8d8d8'
+  legend_facecolor: '#ffffff'
+  legend_edgecolor: '#9aa0a6'
+  default_line_width: 1.8
+  default_marker_size: 4.5
+  font_size: 10
+  title_size: 12
+  grid_alpha: 0.65
+figures:
+- id: 593a5cc51220
+  title: Energiebilanz kumuliert
+  rows: 1
+  cols: 1
+  subplots:
+  - id: cb39a8fac308
+    title: ''
+    plot_type: line
+    x_signal: cylinder_theta_deg
+    x_title: Kurbelwinkel [deg]
+    x_unit_preset: raw
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: manual
+    x_min: 0.0
+    x_max: 720.0
+    y_axes:
+    - id: ax_energy
+      title: Energie [J]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: 655640f37366
+      signal_key: cylinder_delta_U_cycle_J
+      label: ΔU seit Zyklusstart
+      axis_id: ax_energy
+      visible: true
+      color: '#111111'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: 60b46a5ce3f9
+      signal_key: cylinder_added_energy_cycle_J
+      label: Q_add kumuliert
+      axis_id: ax_energy
+      visible: true
+      color: '#ff8c00'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: ae349e9ccb58
+      signal_key: cylinder_wall_heat_cycle_J
+      label: Q_wall kumuliert
+      axis_id: ax_energy
+      visible: true
+      color: '#7a7a7a'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: d89a7a51fdb0
+      signal_key: cylinder_enthalpy_net_cycle_J
+      label: H_net kumuliert
+      axis_id: ax_energy
+      visible: true
+      color: '#175cd3'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: f9619915e5d9
+      signal_key: cylinder_piston_work_cycle_J
+      label: W_pV kumuliert
+      axis_id: ax_energy
+      visible: true
+      color: '#12b76a'
+      line_style: '-'
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    - id: b8db969dc778
+      signal_key: cylinder_energy_balance_residual_J
+      label: Bilanzfehler
+      axis_id: ax_energy
+      visible: true
+      color: '#b42318'
+      line_style: --
+      marker: ''
+      line_width: 1.8
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+    events:
+    - id: 2082c0241e5e
+      x: 0.0
+      label: OT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 6efb2f7985e4
+      x: 160.0
+      label: EVO
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 98284cac1af7
+      x: 180.0
+      label: UT
+      color: '#667085'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 1418d9c1e520
+      x: 300.0
+      label: EVC
+      color: '#b42318'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 3fad14f782d4
+      x: 350.0
+      label: SOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: ff7b6232ee65
+      x: 360.0
+      label: OT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: db30e48adbf4
+      x: 370.0
+      label: IVO
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 00817deb2269
+      x: 405.0
+      label: EOC
+      color: '#f79009'
+      line_style: --
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: 4727889c2d8c
+      x: 510.0
+      label: IVC
+      color: '#175cd3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    - id: a8881e1dd8cb
+      x: 540.0
+      label: UT
+      color: '#98a2b3'
+      line_style: ':'
+      line_width: 1.0
+      alpha: 0.9
+      visible: true
+      show_label: true
+      source: manual
+      source_note: ''
+      locked: false
+      event_type: custom
+      label_rotation: 90.0
+      label_font_size: 7.0
+      label_bg_color: '#ffffff'
+      label_bg_alpha: 0.8
+      label_border_color: none
+      label_y: 0.98
+      label_ha: right
+      label_va: top
+    legend_visible: true
+    legend_position: best
+    show_grid: true

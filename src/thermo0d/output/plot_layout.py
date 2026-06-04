@@ -543,8 +543,28 @@ def _default_style_dict() -> dict[str, Any]:
     }
 
 
-def _normalized_style_dict(data: dict[str, Any]) -> dict[str, Any]:
+def _style_sheet_data(data: dict[str, Any], plot_path: Path) -> dict[str, Any]:
+    style_sheet = str(data.get("style_sheet", "") or data.get("stylesheet", "") or "").strip()
+    if not style_sheet:
+        return {}
+    path = Path(style_sheet)
+    if not path.is_absolute():
+        path = plot_path.parent / path
+    if not path.exists() or not path.is_file():
+        return {}
+    try:
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return {}
+    if isinstance(loaded, dict) and isinstance(loaded.get("style"), dict):
+        return dict(loaded["style"])
+    return dict(loaded) if isinstance(loaded, dict) else {}
+
+
+def _normalized_style_dict(data: dict[str, Any], plot_path: Path | None = None) -> dict[str, Any]:
     style = _default_style_dict()
+    if plot_path is not None:
+        style.update(_style_sheet_data(data, plot_path))
     if isinstance(data.get("style"), dict):
         style.update(data["style"])
     return style
@@ -594,6 +614,228 @@ def _align_xy(x_values: list[Any], y_values: list[Any]) -> tuple[list[float], li
         xs.append(xf)
         ys.append(yf)
     return xs, ys
+
+
+def _finite(row: dict[str, Any], key: str) -> float | None:
+    try:
+        value = float(row.get(key))
+    except Exception:
+        return None
+    return value if math.isfinite(value) else None
+
+
+def _column(rows: list[dict[str, Any]], key: str) -> list[float]:
+    values: list[float] = []
+    for row in rows:
+        value = _finite(row, key)
+        values.append(value if value is not None else float("nan"))
+    return values
+
+
+def _trapz(xs: list[float], ys: list[float], *, absolute: bool = False) -> float | None:
+    total = 0.0
+    used = False
+    for i in range(1, min(len(xs), len(ys))):
+        x0 = xs[i - 1]
+        x1 = xs[i]
+        y0 = ys[i - 1]
+        y1 = ys[i]
+        if not all(math.isfinite(value) for value in (x0, x1, y0, y1)):
+            continue
+        if x1 < x0:
+            continue
+        if absolute:
+            y0 = abs(y0)
+            y1 = abs(y1)
+        total += 0.5 * (y0 + y1) * (x1 - x0)
+        used = True
+    return total if used else None
+
+
+def _metric_imep(rows: list[dict[str, Any]], metric: dict[str, Any]) -> float | None:
+    cylinder = str(metric.get("cylinder", "") or "").strip()
+    p_key = str(metric.get("pressure_signal", "") or (f"{cylinder}_p_Pa" if cylinder else "")).strip()
+    v_key = str(metric.get("volume_signal", "") or (f"{cylinder}_V_m3" if cylinder else "")).strip()
+    if not p_key or not v_key:
+        return None
+    p_values = _column(rows, p_key)
+    v_values = _column(rows, v_key)
+    work_j = _trapz(v_values, p_values)
+    finite_v = [value for value in v_values if math.isfinite(value)]
+    swept_volume = max(finite_v) - min(finite_v) if finite_v else None
+    if work_j is None or swept_volume is None or swept_volume <= 1.0e-18:
+        return None
+    return work_j / swept_volume / 1.0e5
+
+
+def _metric_value(rows: list[dict[str, Any]], metric: dict[str, Any], subplot: dict[str, Any]) -> float | None:
+    kind = str(metric.get("kind", "") or "").lower().strip()
+    if kind == "imep":
+        value = _metric_imep(rows, metric)
+    else:
+        key = str(metric.get("signal_key", "") or "").strip()
+        if not key:
+            return None
+        values = _column(rows, key)
+        finite_values = [item for item in values if math.isfinite(item)]
+        if not finite_values:
+            return None
+        mode = str(metric.get("mode", "last") or "last").lower().strip()
+        if mode == "first":
+            value = finite_values[0]
+        elif mode == "min":
+            value = min(finite_values)
+        elif mode == "max":
+            value = max(finite_values)
+        elif mode == "mean":
+            value = sum(finite_values) / len(finite_values)
+        elif mode == "delta":
+            value = finite_values[-1] - finite_values[0]
+        elif mode == "integral":
+            x_key = str(metric.get("x_signal", "") or subplot.get("x_signal", "t_s") or "t_s")
+            value = _trapz(_column(rows, x_key), values, absolute=bool(metric.get("absolute", False)))
+        else:
+            value = finite_values[-1]
+    if value is None or not math.isfinite(value):
+        return None
+    if bool(metric.get("absolute", False)) and str(metric.get("mode", "") or "").lower() != "integral":
+        value = abs(value)
+    try:
+        value = value * float(metric.get("scale_factor", 1.0) or 1.0) + float(metric.get("offset", 0.0) or 0.0)
+    except Exception:
+        pass
+    return value if math.isfinite(value) else None
+
+
+def _format_metric_value(value: float | None, metric: dict[str, Any]) -> str:
+    unit = str(metric.get("unit", "") or "").strip()
+    try:
+        digits = int(metric.get("digits", 2) or 2)
+    except Exception:
+        digits = 2
+    if value is None or not math.isfinite(value):
+        return "n/a"
+    if bool(metric.get("scientific", False)):
+        return f"{value:.{max(0, digits)}e} {unit}".strip()
+    if abs(value) >= 1000.0 or (abs(value) < 0.01 and value != 0.0):
+        return f"{value:.{max(1, digits)}g} {unit}".strip()
+    return f"{value:.{max(0, digits)}f} {unit}".strip()
+
+
+def _readme_table_values(path: Path) -> dict[str, tuple[str, str]]:
+    values: dict[str, tuple[str, str]] = {}
+    if not path.exists() or not path.is_file():
+        return values
+    try:
+        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except Exception:
+        return values
+    for line in lines:
+        text = line.strip()
+        if not text.startswith("|") or text.count("|") < 3:
+            continue
+        cells = [cell.strip().strip("`") for cell in text.strip("|").split("|")]
+        if len(cells) < 3 or not cells[0] or set(cells[0]) <= {"-"}:
+            continue
+        key, value, unit = cells[0], cells[1], cells[2]
+        if key.lower() in {"kennwert", "metric", "signal", "name"}:
+            continue
+        values[key] = (value, unit)
+    return values
+
+
+def _readme_values_for_box(info: dict[str, Any], plot_path: Path, output_dir: Path) -> dict[str, tuple[str, str]]:
+    candidates: list[Path] = []
+    configured = str(info.get("readme_path", "") or info.get("path", "") or "").strip()
+    if configured:
+        raw = Path(configured)
+        candidates.append(raw if raw.is_absolute() else (plot_path.parent / raw))
+        candidates.append(raw if raw.is_absolute() else (output_dir / raw))
+    candidates.extend([
+        output_dir / "README.md",
+        output_dir.parent / "README.md",
+        plot_path.parent / "README.md",
+        Path.cwd() / "README.md",
+    ])
+    seen: set[Path] = set()
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+        except Exception:
+            resolved = candidate
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        values = _readme_table_values(resolved)
+        if values:
+            return values
+    return {}
+
+
+def _readme_text_box_text(info: dict[str, Any], readme_values: dict[str, tuple[str, str]]) -> str:
+    lines: list[str] = []
+    title = str(info.get("title", "") or "").strip()
+    if title:
+        lines.append(title)
+    metrics = info.get("metrics") if isinstance(info.get("metrics"), list) else []
+    for metric in metrics:
+        if not isinstance(metric, dict):
+            continue
+        key = str(metric.get("readme_key", "") or metric.get("key", "") or metric.get("signal_key", "") or "").strip()
+        if not key:
+            continue
+        label = str(metric.get("label", "") or key).strip()
+        value, unit = readme_values.get(key, ("n/a", str(metric.get("unit", "") or "").strip()))
+        unit = str(metric.get("unit", unit) if metric.get("unit", None) is not None else unit).strip()
+        separator = str(metric.get("separator", ": ") or ": ")
+        lines.append(f"{label}{separator}{value} {unit}".strip())
+    return "\n".join(lines)
+
+
+def _text_box_text(rows: list[dict[str, Any]], subplot: dict[str, Any], info: dict[str, Any], plot_path: Path, output_dir: Path) -> str:
+    if str(info.get("source", "") or "").lower().strip() == "readme":
+        return _readme_text_box_text(info, _readme_values_for_box(info, plot_path, output_dir))
+    lines: list[str] = []
+    title = str(info.get("title", "") or "").strip()
+    if title:
+        lines.append(title)
+    metrics = info.get("metrics") if isinstance(info.get("metrics"), list) else []
+    for metric in metrics:
+        if not isinstance(metric, dict):
+            continue
+        label = str(metric.get("label", "") or metric.get("signal_key", "") or metric.get("kind", "") or "").strip()
+        if not label:
+            continue
+        value = _metric_value(rows, metric, subplot)
+        separator = str(metric.get("separator", ": ") or ": ")
+        lines.append(f"{label}{separator}{_format_metric_value(value, metric)}")
+    return "\n".join(lines)
+
+
+def _draw_text_box(axis, subplot: dict[str, Any], rows: list[dict[str, Any]], plot_path: Path, output_dir: Path) -> None:
+    info = subplot.get("text_box")
+    if not isinstance(info, dict) or not bool(info.get("enabled", False)):
+        return
+    text = _text_box_text(rows, subplot, info, plot_path, output_dir)
+    if not text.strip():
+        return
+    axis.text(
+        float(info.get("x", 0.98) or 0.98),
+        float(info.get("y", 0.98) or 0.98),
+        text,
+        transform=axis.transAxes,
+        ha=str(info.get("ha", "right") or "right"),
+        va=str(info.get("va", "top") or "top"),
+        fontsize=float(info.get("font_size", 7.2) or 7.2),
+        linespacing=float(info.get("linespacing", 1.2) or 1.2),
+        bbox=dict(
+            boxstyle="square,pad=0.45",
+            facecolor=str(info.get("facecolor", "white") or "white"),
+            edgecolor=str(info.get("edgecolor", "black") or "black"),
+            linewidth=float(info.get("linewidth", 1.0) or 1.0),
+            alpha=float(info.get("alpha", 0.96) or 0.96),
+        ),
+    )
 
 
 
@@ -782,7 +1024,7 @@ def render_plot_project(export_rows: list[dict[str, Any]], plot_path: str | Path
     plot_config_text = f"Plot: {plot_path.name}"
     footer_text = "\n".join(part for part in (run_config_text, plot_config_text) if part)
     data = yaml.safe_load(plot_path.read_text(encoding="utf-8")) or {}
-    style = _normalized_style_dict(data)
+    style = _normalized_style_dict(data, plot_path)
     figures = data.get("figures") if isinstance(data.get("figures"), list) else []
     out_dir = Path(output_dir).resolve() if output_dir is not None else (plot_path.parent / "results" / "plots").resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -880,6 +1122,7 @@ def render_plot_project(export_rows: list[dict[str, Any]], plot_path: str | Path
                     loc=str(style.get("legend_position", "best") or "best"),
                     fontsize=float(style.get("tick_label_size", 8.0) or 8.0),
                 )
+            _draw_text_box(base_axis, subplot, export_rows, plot_path, out_dir)
             for y_axis in y_axes:
                 axis_id = str(y_axis.get("id", ""))
                 target_axis = axis_map.get(axis_id)
@@ -938,7 +1181,7 @@ def render_plot_project_with_frame_export(
     plot_config_text = f"Plot: {plot_path.name}"
     footer_text = "\n".join(part for part in (run_config_text, plot_config_text) if part)
     data = yaml.safe_load(plot_path.read_text(encoding="utf-8")) or {}
-    style = _normalized_style_dict(data)
+    style = _normalized_style_dict(data, plot_path)
     figures = data.get("figures") if isinstance(data.get("figures"), list) else []
     out_dir = Path(output_dir).resolve() if output_dir is not None else (plot_path.parent / "results" / "plots").resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1040,6 +1283,7 @@ def render_plot_project_with_frame_export(
                     loc=str(style.get("legend_position", "best") or "best"),
                     fontsize=float(style.get("tick_label_size", 8.0) or 8.0),
                 )
+            _draw_text_box(base_axis, subplot, export_rows, plot_path, out_dir)
             for y_axis in y_axes:
                 axis_id = str(y_axis.get("id", ""))
                 target_axis = axis_map.get(axis_id)

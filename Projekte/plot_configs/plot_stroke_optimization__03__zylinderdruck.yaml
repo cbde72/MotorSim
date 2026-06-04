@@ -1,0 +1,21 @@
+name: Zylinderdruck
+style_sheet: ../plot_style_sheet.yaml
+figures:
+- title: 'Mehrparameter-Analyse: Druck, Temperatur, Volumen'
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Zylinderdruck
+    x_signal: cylinder_0_theta_deg
+    x_title: Kurbelwinkel [°]
+    y_axes:
+    - id: p_ax
+      title: Druck [bar]
+      side: left
+    series:
+    - signal_key: cylinder_0_p_Pa
+      label: Druck
+      axis_id: p_ax
+      color: '#1f77b4'
+      line_style: '-'
+      scale_factor: 1.0e-05

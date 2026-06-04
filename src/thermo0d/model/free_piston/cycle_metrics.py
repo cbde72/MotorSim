@@ -71,6 +71,86 @@ def detect_turning_points(t_s: np.ndarray, x_m: np.ndarray, v_m_per_s: np.ndarra
     return out
 
 
+def _strict_velocity_sign(value: float, eps: float) -> int:
+    if abs(float(value)) <= eps:
+        return 0
+    return 1 if float(value) > 0.0 else -1
+
+
+def _has_strict_velocity_reversal(tp: TurningPoint, eps: float) -> bool:
+    before = _strict_velocity_sign(float(tp.v_before_m_per_s), eps)
+    after = _strict_velocity_sign(float(tp.v_after_m_per_s), eps)
+    return before != 0 and after != 0 and before != after
+
+
+def find_last_ut_ot_ut_turning_points(
+    t_s: np.ndarray,
+    x_m: np.ndarray,
+    v_m_per_s: np.ndarray,
+    *,
+    eps: float = 1.0e-10,
+    min_halfstroke_m: float = 1.0e-15,
+) -> tuple[TurningPoint, TurningPoint, TurningPoint] | None:
+    turning_points = detect_turning_points(t_s, x_m, v_m_per_s, eps=eps)
+    if len(turning_points) < 3:
+        return None
+    for i in range(len(turning_points) - 3, -1, -1):
+        a = turning_points[i]
+        b = turning_points[i + 1]
+        c = turning_points[i + 2]
+        if a.sample_index >= b.sample_index or b.sample_index >= c.sample_index:
+            continue
+        if not all(_has_strict_velocity_reversal(tp, eps) for tp in (a, b, c)):
+            continue
+        if not (float(a.x_m) > float(b.x_m) and float(c.x_m) > float(b.x_m)):
+            continue
+        if abs(float(a.x_m) - float(b.x_m)) <= min_halfstroke_m:
+            continue
+        if abs(float(c.x_m) - float(b.x_m)) <= min_halfstroke_m:
+            continue
+        return a, b, c
+    return None
+
+
+def count_ut_ot_ut_cycles(
+    t_s: np.ndarray,
+    x_m: np.ndarray,
+    v_m_per_s: np.ndarray,
+    *,
+    eps: float = 1.0e-10,
+    min_halfstroke_m: float = 1.0e-15,
+) -> int:
+    t_arr = np.asarray(t_s, dtype=np.float64)
+    turning_points = detect_turning_points(t_s, x_m, v_m_per_s, eps=eps)
+    count = 0
+    cycle_start_times: list[float] = []
+    for i in range(0, max(0, len(turning_points) - 2)):
+        a = turning_points[i]
+        b = turning_points[i + 1]
+        c = turning_points[i + 2]
+        if a.sample_index >= b.sample_index or b.sample_index >= c.sample_index:
+            continue
+        if not all(_has_strict_velocity_reversal(tp, eps) for tp in (a, b, c)):
+            continue
+        if not (float(a.x_m) > float(b.x_m) and float(c.x_m) > float(b.x_m)):
+            continue
+        if abs(float(a.x_m) - float(b.x_m)) <= min_halfstroke_m:
+            continue
+        if abs(float(c.x_m) - float(b.x_m)) <= min_halfstroke_m:
+            continue
+        count += 1
+        cycle_start_times.append(float(a.t_s))
+    if len(cycle_start_times) >= 2 and t_arr.size >= 2:
+        periods = np.diff(np.asarray(cycle_start_times, dtype=np.float64))
+        periods = periods[np.isfinite(periods) & (periods > 1.0e-15)]
+        if periods.size:
+            duration_s = float(np.nanmax(t_arr) - np.nanmin(t_arr))
+            estimated = int(round(duration_s / float(np.median(periods))))
+            if estimated > count:
+                count = estimated
+    return count
+
+
 def summarize_oscillation(t_s: np.ndarray, x_m: np.ndarray, v_m_per_s: np.ndarray) -> FreePistonOscillationSummary | None:
     t_arr = np.asarray(t_s, dtype=np.float64)
     x_arr = np.asarray(x_m, dtype=np.float64)

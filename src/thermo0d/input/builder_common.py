@@ -4,7 +4,7 @@ import math
 
 import numpy as np
 
-from thermo0d.config.constants import AngleDomain, AngleReference, ConnCol, ConnectionType, FlowCoeffMode, SlotOpenMode, VolumeCol, VolumeType
+from thermo0d.config.constants import AngleDomain, AngleReference, ConnCol, ConnectionType, EndpointKind, FlowCoeffMode, SlotOpenMode, VolumeCol, VolumeType
 from thermo0d.config.models import (
     CheckValveConnectionConfig,
     ConstantDischargeCoefficientsConfig,
@@ -80,6 +80,8 @@ def build_postprocessing_options(config) -> PostprocessingOptions:
         raise ValueError(f'Unsupported postprocessing sampling mode: {config.postprocessing.sampling.mode}')
 
     return PostprocessingOptions(
+        mode=str(getattr(config.postprocessing, 'mode', 'pipeline') or 'pipeline'),
+        pipeline_config=getattr(config.postprocessing, 'config', None),
         outdir=config.postprocessing.outdir,
         auto_update_initial_conditions=bool(config.postprocessing.auto_update_initial_conditions),
         csv_enabled=bool(config.postprocessing.csv_enabled),
@@ -127,6 +129,39 @@ def build_environment_buffers(n_volumes: int) -> tuple[np.ndarray, np.ndarray, n
     )
 
 
+def collect_environment_boundaries(config) -> tuple[list[str], np.ndarray, np.ndarray, dict[str, int]]:
+    boundary_names: list[str] = []
+    boundary_pressures_pa: list[float] = []
+    boundary_temperatures_K: list[float] = []
+    for env in getattr(config, "environment", []) or []:
+        boundary_names.append(str(env.name))
+        boundary_pressures_pa.append(float(env.pressure_Pa))
+        boundary_temperatures_K.append(float(env.temperature_K))
+    name_to_index = {name: i for i, name in enumerate(boundary_names)}
+    return (
+        boundary_names,
+        np.asarray(boundary_pressures_pa, dtype=np.float64),
+        np.asarray(boundary_temperatures_K, dtype=np.float64),
+        name_to_index,
+    )
+
+
+def split_dynamic_volumes_and_boundaries(config):
+    from thermo0d.config.models import EnvironmentVolumeConfig
+
+    dynamic_volumes = []
+    legacy_boundaries = []
+    explicit_names = {str(env.name) for env in getattr(config, "environment", []) or []}
+    for vol in config.volumes:
+        if isinstance(vol, EnvironmentVolumeConfig):
+            if str(vol.name) in explicit_names:
+                raise ValueError(f"Environment boundary {vol.name!r} is defined both in preprocessing.environment and preprocessing.volumes")
+            legacy_boundaries.append(vol)
+        else:
+            dynamic_volumes.append(vol)
+    return dynamic_volumes, legacy_boundaries
+
+
 def assign_state_from_mass_and_temperature(
     y_init: np.ndarray,
     *,
@@ -148,6 +183,7 @@ def build_connection_tables(
     vol_matrix: np.ndarray,
     kin_matrix: np.ndarray,
     name_to_index: dict[str, int],
+    boundary_name_to_index: dict[str, int] | None = None,
     allow_valves: bool = True,
     allow_slot_by_angle: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[str]]:
@@ -162,10 +198,30 @@ def build_connection_tables(
         store.append(data)
         return start, data.shape[0]
 
+    boundary_name_to_index = boundary_name_to_index or {}
+
+    def endpoint(name: str) -> tuple[int, int]:
+        if name in name_to_index:
+            return int(EndpointKind.VOLUME), int(name_to_index[name])
+        if name in boundary_name_to_index:
+            return int(EndpointKind.BOUNDARY), int(boundary_name_to_index[name])
+        raise KeyError(name)
+
+    def cylinder_side(from_kind: int, from_idx: int, to_kind: int, to_idx: int) -> int:
+        if from_kind == int(EndpointKind.VOLUME) and int(vol_matrix[from_idx, VolumeCol.TYPE]) == int(VolumeType.CYLINDER):
+            return from_idx
+        if to_kind == int(EndpointKind.VOLUME) and int(vol_matrix[to_idx, VolumeCol.TYPE]) == int(VolumeType.CYLINDER):
+            return to_idx
+        return -1
+
     for conn in config.connections:
         row = np.full((len(ConnCol),), -1.0, dtype=np.float64)
-        row[ConnCol.FROM_VOL] = name_to_index[conn.from_volume]
-        row[ConnCol.TO_VOL] = name_to_index[conn.to_volume]
+        from_kind, from_idx = endpoint(conn.from_volume)
+        to_kind, to_idx = endpoint(conn.to_volume)
+        row[ConnCol.FROM_VOL] = from_idx
+        row[ConnCol.TO_VOL] = to_idx
+        row[ConnCol.FROM_KIND] = from_kind
+        row[ConnCol.TO_KIND] = to_kind
 
         if isinstance(conn, ValveConnectionConfig):
             if not allow_valves:
@@ -188,9 +244,9 @@ def build_connection_tables(
             row[ConnCol.CD_REVERSE] = -1.0
             row[ConnCol.CD_TABLE_START] = -1.0
             row[ConnCol.CD_TABLE_LEN] = 0.0
-            from_idx = name_to_index[conn.from_volume]
-            to_idx = name_to_index[conn.to_volume]
-            cyl_idx = from_idx if int(vol_matrix[from_idx, VolumeCol.TYPE]) == VolumeType.CYLINDER else to_idx
+            cyl_idx = cylinder_side(from_kind, from_idx, to_kind, to_idx)
+            if cyl_idx < 0:
+                raise ValueError(f'Valve {conn.name} needs at least one cylinder side with kinematic reference data')
             kin_idx = int(vol_matrix[cyl_idx, VolumeCol.KIN_ROW])
             if kin_idx < 0:
                 raise ValueError(f'Valve {conn.name} needs at least one cylinder side with kinematic reference data')
@@ -223,8 +279,8 @@ def build_connection_tables(
             row[ConnCol.ALPHA_START] = -1.0
             row[ConnCol.ALPHA_LEN] = 0.0
 
-            cyl_idx = int(row[ConnCol.FROM_VOL]) if int(vol_matrix[int(row[ConnCol.FROM_VOL]), VolumeCol.TYPE]) == VolumeType.CYLINDER else int(row[ConnCol.TO_VOL])
-            if int(vol_matrix[cyl_idx, VolumeCol.TYPE]) != VolumeType.CYLINDER:
+            cyl_idx = cylinder_side(from_kind, from_idx, to_kind, to_idx)
+            if cyl_idx < 0:
                 raise ValueError(f'Slot {conn.name} needs at least one cylinder side')
             kin_idx = int(vol_matrix[cyl_idx, VolumeCol.KIN_ROW])
             open_distance = conn.resolved_distance_from_tdc_m

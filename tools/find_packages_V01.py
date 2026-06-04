@@ -3,6 +3,7 @@ import ast
 import yaml
 import importlib.metadata
 import subprocess
+#    npz_datei_pfad = r"Projekte/variants/results/free_piston_GenSet_V22/raw/run_raw.npz"
 
 # STRENGER STARTPFAD
 TARGET_PATH = r"C:\Users\cbuehring\Desktop\Daten\python\projekte\0_Motorsim"

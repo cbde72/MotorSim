@@ -632,6 +632,8 @@ class SubplotModel:
     series: list[SeriesModel] = field(default_factory=list)
     events: list[EventModel] = field(default_factory=list)
     y_lines: list[HorizontalLineModel] = field(default_factory=list)
+    text_box: dict[str, Any] = field(default_factory=dict)
+    info_box: dict[str, Any] = field(default_factory=dict)
     legend_visible: bool = True
     legend_position: str = "best"
     show_grid: bool = True
@@ -651,6 +653,7 @@ class ProjectModel:
     name: str = "Untitled Project"
     figures: list[FigureModel] = field(default_factory=lambda: [FigureModel()])
     style: StyleModel = field(default_factory=lambda: StyleModel.preset("Light Engineering"))
+    style_sheet: str = ""
     config_path: str = ""
     signals_path: str = ""
     preview_csv_path: str = ""
@@ -2553,7 +2556,24 @@ class PlotStyleEditor(QMainWindow):
         return asdict(self.project)
 
     def project_from_dict(self, data: dict[str, Any]) -> ProjectModel:
-        style = style_model_from_data(data.get("style", StyleModel.preset("Light Engineering").__dict__))
+        style_data: dict[str, Any] = {}
+        style_sheet = str(data.get("style_sheet", "") or data.get("stylesheet", "") or "").strip()
+        if style_sheet:
+            try:
+                base_path = Path(str(data.get("config_path", "") or "")).resolve().parent if data.get("config_path") else Path.cwd()
+                style_path = Path(style_sheet)
+                if not style_path.is_absolute():
+                    style_path = base_path / style_path
+                loaded_style = yaml.safe_load(style_path.read_text(encoding="utf-8")) or {}
+                if isinstance(loaded_style, dict) and isinstance(loaded_style.get("style"), dict):
+                    style_data.update(loaded_style["style"])
+                elif isinstance(loaded_style, dict):
+                    style_data.update(loaded_style)
+            except Exception:
+                pass
+        if isinstance(data.get("style"), dict):
+            style_data.update(data["style"])
+        style = style_model_from_data(style_data or StyleModel.preset("Light Engineering").__dict__)
         figures: list[FigureModel] = []
         for fig_data in data.get("figures", []):
             subplots: list[SubplotModel] = []
@@ -2580,6 +2600,8 @@ class PlotStyleEditor(QMainWindow):
                     series=series,
                     events=events,
                     y_lines=y_lines,
+                    text_box=copy.deepcopy(sp_data.get("text_box", {})) if isinstance(sp_data.get("text_box"), dict) else {},
+                    info_box=copy.deepcopy(sp_data.get("info_box", {})) if isinstance(sp_data.get("info_box"), dict) else {},
                     legend_visible=bool(sp_data.get("legend_visible", True)),
                     legend_position=sp_data.get("legend_position", "best"),
                     show_grid=bool(sp_data.get("show_grid", True)),
@@ -2595,6 +2617,7 @@ class PlotStyleEditor(QMainWindow):
             name=data.get("name", "Untitled Project"),
             figures=figures or [FigureModel()],
             style=style,
+            style_sheet=style_sheet,
             config_path=data.get("config_path", ""),
             signals_path=data.get("signals_path", ""),
             preview_csv_path=data.get("preview_csv_path", ""),
@@ -4821,6 +4844,7 @@ class PlotStyleEditor(QMainWindow):
             self.render_subplot_horizontal_lines(ax, subplot, axis_map)
             artist_targets.extend(self.render_regular_subplot(ax, subplot, axis_map, subplot_index))
             self.render_subplot_events(ax, subplot)
+            self.render_subplot_text_box(ax, subplot)
         self.preview_widget.set_interaction_targets(axes_to_subplot, artist_targets)
         if style.tight_layout:
             try:
@@ -4926,7 +4950,214 @@ class PlotStyleEditor(QMainWindow):
                 ha = str(getattr(event, "label_ha", "right") or "right")
                 va = str(getattr(event, "label_va", "top") or "top")
                 base_ax.text(x_plot, y_pos, label, rotation=rotation, transform=base_ax.get_xaxis_transform(), ha=ha, va=va, fontsize=fontsize, color=color,
-                             bbox={"facecolor": facecolor, "edgecolor": edgecolor, "alpha": bg_alpha, "pad": 0.6})
+                                 bbox={"facecolor": facecolor, "edgecolor": edgecolor, "alpha": bg_alpha, "pad": 0.6})
+
+    def _preview_column(self, signal_key: str) -> list[float]:
+        if not signal_key or not self.preview_csv.rows:
+            return []
+        values, _ = self.resolve_series_values(signal_key)
+        if values is None:
+            return []
+        out: list[float] = []
+        for value in values:
+            numeric = coerce_float(value)
+            out.append(float(numeric) if numeric is not None and math.isfinite(float(numeric)) else float("nan"))
+        return out
+
+    def _preview_trapz(self, xs: list[float], ys: list[float], *, absolute: bool = False) -> float | None:
+        total = 0.0
+        used = False
+        for idx in range(1, min(len(xs), len(ys))):
+            x0, x1 = xs[idx - 1], xs[idx]
+            y0, y1 = ys[idx - 1], ys[idx]
+            if not all(math.isfinite(value) for value in (x0, x1, y0, y1)):
+                continue
+            if x1 < x0:
+                continue
+            if absolute:
+                y0 = abs(y0)
+                y1 = abs(y1)
+            total += 0.5 * (y0 + y1) * (x1 - x0)
+            used = True
+        return total if used else None
+
+    def _preview_metric_imep(self, metric: dict[str, Any]) -> float | None:
+        cylinder = str(metric.get("cylinder", "") or "").strip()
+        p_key = str(metric.get("pressure_signal", "") or (f"{cylinder}_p_Pa" if cylinder else "")).strip()
+        v_key = str(metric.get("volume_signal", "") or (f"{cylinder}_V_m3" if cylinder else "")).strip()
+        if not p_key or not v_key:
+            return None
+        p_values = self._preview_column(p_key)
+        v_values = self._preview_column(v_key)
+        work_j = self._preview_trapz(v_values, p_values)
+        finite_v = [value for value in v_values if math.isfinite(value)]
+        swept = max(finite_v) - min(finite_v) if finite_v else None
+        if work_j is None or swept is None or swept <= 1.0e-18:
+            return None
+        return work_j / swept / 1.0e5
+
+    def _preview_metric_value(self, metric: dict[str, Any], subplot: SubplotModel) -> float | None:
+        if str(metric.get("kind", "") or "").lower().strip() == "imep":
+            value = self._preview_metric_imep(metric)
+        else:
+            key = str(metric.get("signal_key", "") or "").strip()
+            values = self._preview_column(key)
+            finite_values = [value for value in values if math.isfinite(value)]
+            if not finite_values:
+                return None
+            mode = str(metric.get("mode", "last") or "last").lower().strip()
+            if mode == "first":
+                value = finite_values[0]
+            elif mode == "min":
+                value = min(finite_values)
+            elif mode == "max":
+                value = max(finite_values)
+            elif mode == "mean":
+                value = sum(finite_values) / len(finite_values)
+            elif mode == "delta":
+                value = finite_values[-1] - finite_values[0]
+            elif mode == "integral":
+                x_key = str(metric.get("x_signal", "") or getattr(subplot, "x_signal", "t_s") or "t_s")
+                value = self._preview_trapz(self._preview_column(x_key), values, absolute=bool(metric.get("absolute", False)))
+            else:
+                value = finite_values[-1]
+        if value is None or not math.isfinite(value):
+            return None
+        if bool(metric.get("absolute", False)) and str(metric.get("mode", "") or "").lower() != "integral":
+            value = abs(value)
+        try:
+            value = value * float(metric.get("scale_factor", 1.0) or 1.0) + float(metric.get("offset", 0.0) or 0.0)
+        except Exception:
+            pass
+        return value if math.isfinite(value) else None
+
+    def _preview_format_metric(self, value: float | None, metric: dict[str, Any]) -> str:
+        unit = str(metric.get("unit", "") or "").strip()
+        try:
+            digits = int(metric.get("digits", 2) or 2)
+        except Exception:
+            digits = 2
+        if value is None or not math.isfinite(value):
+            return "n/a"
+        if bool(metric.get("scientific", False)):
+            return f"{value:.{max(0, digits)}e} {unit}".strip()
+        if abs(value) >= 1000.0 or (abs(value) < 0.01 and value != 0.0):
+            return f"{value:.{max(1, digits)}g} {unit}".strip()
+        return f"{value:.{max(0, digits)}f} {unit}".strip()
+
+    def _readme_table_values(self, path: Path) -> dict[str, tuple[str, str]]:
+        values: dict[str, tuple[str, str]] = {}
+        if not path.exists() or not path.is_file():
+            return values
+        try:
+            lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except Exception:
+            return values
+        for line in lines:
+            text = line.strip()
+            if not text.startswith("|") or text.count("|") < 3:
+                continue
+            cells = [cell.strip().strip("`") for cell in text.strip("|").split("|")]
+            if len(cells) < 3 or not cells[0] or set(cells[0]) <= {"-"}:
+                continue
+            key, value, unit = cells[0], cells[1], cells[2]
+            if key.lower() in {"kennwert", "metric", "signal", "name"}:
+                continue
+            values[key] = (value, unit)
+        return values
+
+    def _readme_values_for_text_box(self, info: dict[str, Any]) -> dict[str, tuple[str, str]]:
+        candidates: list[Path] = []
+        configured = str(info.get("readme_path", "") or info.get("path", "") or "").strip()
+        if configured:
+            raw = Path(configured)
+            candidates.append(raw if raw.is_absolute() else Path.cwd() / raw)
+            if self.project.preview_csv_path:
+                candidates.append(raw if raw.is_absolute() else Path(self.project.preview_csv_path).resolve().parent / raw)
+            if self.project.config_path:
+                candidates.append(raw if raw.is_absolute() else Path(self.project.config_path).resolve().parent / raw)
+        if self.project.preview_csv_path:
+            csv_path = Path(self.project.preview_csv_path).resolve()
+            candidates.extend([csv_path.parent / "README.md", csv_path.parent.parent / "README.md"])
+        if self.project.config_path:
+            project_path = Path(self.project.config_path).resolve()
+            candidates.extend([project_path.parent / "README.md", project_path.parent.parent / "README.md"])
+        candidates.append(Path.cwd() / "README.md")
+        seen: set[Path] = set()
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+            except Exception:
+                resolved = candidate
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            values = self._readme_table_values(resolved)
+            if values:
+                return values
+        return {}
+
+    def _readme_text_box_lines(self, info: dict[str, Any]) -> list[str]:
+        readme_values = self._readme_values_for_text_box(info)
+        lines: list[str] = []
+        title = str(info.get("title", "") or "").strip()
+        if title:
+            lines.append(title)
+        metrics = info.get("metrics") if isinstance(info.get("metrics"), list) else []
+        for metric in metrics:
+            if not isinstance(metric, dict):
+                continue
+            key = str(metric.get("readme_key", "") or metric.get("key", "") or metric.get("signal_key", "") or "").strip()
+            if not key:
+                continue
+            label = str(metric.get("label", "") or key).strip()
+            value, unit = readme_values.get(key, ("n/a", str(metric.get("unit", "") or "").strip()))
+            unit = str(metric.get("unit", unit) if metric.get("unit", None) is not None else unit).strip()
+            separator = str(metric.get("separator", ": ") or ": ")
+            lines.append(f"{label}{separator}{value} {unit}".strip())
+        return lines
+
+    def render_subplot_text_box(self, base_ax, subplot: SubplotModel) -> None:
+        info = getattr(subplot, "text_box", {}) or {}
+        if not isinstance(info, dict) or not bool(info.get("enabled", False)):
+            return
+        if str(info.get("source", "") or "").lower().strip() == "readme":
+            lines = self._readme_text_box_lines(info)
+        else:
+            lines = []
+            title = str(info.get("title", "") or "").strip()
+            if title:
+                lines.append(title)
+            metrics = info.get("metrics") if isinstance(info.get("metrics"), list) else []
+            for metric in metrics:
+                if not isinstance(metric, dict):
+                    continue
+                label = str(metric.get("label", "") or metric.get("signal_key", "") or metric.get("kind", "") or "").strip()
+                if not label:
+                    continue
+                separator = str(metric.get("separator", ": ") or ": ")
+                value = self._preview_metric_value(metric, subplot)
+                lines.append(f"{label}{separator}{self._preview_format_metric(value, metric)}")
+        text = "\n".join(lines)
+        if not text.strip():
+            return
+        base_ax.text(
+            float(info.get("x", 0.98) or 0.98),
+            float(info.get("y", 0.98) or 0.98),
+            text,
+            transform=base_ax.transAxes,
+            ha=str(info.get("ha", "right") or "right"),
+            va=str(info.get("va", "top") or "top"),
+            fontsize=float(info.get("font_size", max(7, self.project.style.font_size - 1)) or max(7, self.project.style.font_size - 1)),
+            linespacing=float(info.get("linespacing", 1.2) or 1.2),
+            bbox={
+                "boxstyle": "square,pad=0.45",
+                "facecolor": str(info.get("facecolor", self.project.style.axes_facecolor) or self.project.style.axes_facecolor),
+                "edgecolor": str(info.get("edgecolor", self.project.style.text_color) or self.project.style.text_color),
+                "linewidth": float(info.get("linewidth", 1.0) or 1.0),
+                "alpha": float(info.get("alpha", 0.96) or 0.96),
+            },
+        )
 
     def render_subplot_horizontal_lines(self, base_ax, subplot: SubplotModel, axis_map: dict[str, Any]) -> None:
         y_lines = [y_line for y_line in getattr(subplot, "y_lines", []) if getattr(y_line, "visible", True)]

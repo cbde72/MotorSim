@@ -1,0 +1,65 @@
+name: Spuelkorrektur im letzten Fenster
+style_sheet: ../../plot_style_sheet.yaml
+style:
+figures:
+- title: Last-Cycle Zoom - Overlap und Modellantwort
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Spuelkorrektur im letzten Fenster
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.88
+    x_max: 1.0
+    y_axes:
+    - id: ax_rate
+      title: Rate [g/s]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_frac
+      title: Anteil / Eta [-]
+      side: right
+      color: '#667085'
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 1.05
+    series:
+    - signal_key: cylinder_1_scavenging_burned_correction_kg_per_s
+      label: burned_correction
+      axis_id: ax_rate
+      color: '#027a48'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: cylinder_1_scavenging_transfer_in_kg_per_s
+      label: transfer_in
+      axis_id: ax_rate
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: cylinder_1_scavenging_exhaust_out_kg_per_s
+      label: exhaust_out
+      axis_id: ax_rate
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: cylinder_1_scavenging_short_circuit_fraction
+      label: short_circuit
+      axis_id: ax_frac
+      color: '#f79009'
+      line_style: --
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_1_scavenging_efficiency_0to1
+      label: eta_scav
+      axis_id: ax_frac
+      color: '#7a5af8'
+      line_style: --
+      scale_factor: 1.0
+      unit_preset: raw

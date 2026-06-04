@@ -1,0 +1,73 @@
+name: Luft, Restgas und gelatchte Luftmasse
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  font_size: 6
+  axis_label_size: 6
+  tick_label_size: 6
+  title_size: 6
+  figure_title_size: 6
+  grid_alpha: 0.3
+  default_line_width: 0.9
+  default_marker_size: 3.5
+figures:
+- title: Last-Cycle Zoom - Zusammensetzung und Peak
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Luft, Restgas und gelatchte Luftmasse
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.88
+    x_max: 1.0
+    y_axes:
+    - id: ax_mass
+      title: Masse [mg]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_frac
+      title: Anteil [-]
+      side: right
+      color: '#667085'
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 1.05
+    series:
+    - signal_key: cylinder_1_m_air_kg
+      label: m_air
+      axis_id: ax_mass
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: cylinder_1_m_burned_kg
+      label: m_burned
+      axis_id: ax_mass
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: free_piston_combustion_mass_latched_kg
+      label: latched air
+      axis_id: ax_mass
+      color: '#027a48'
+      line_style: --
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: cylinder_1_share_air_0to1
+      label: share_air
+      axis_id: ax_frac
+      color: '#12b76a'
+      line_style: --
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_1_share_burned_0to1
+      label: share_burned
+      axis_id: ax_frac
+      color: '#7a5af8'
+      line_style: --
+      scale_factor: 1.0
+      unit_preset: raw

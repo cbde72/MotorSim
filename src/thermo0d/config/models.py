@@ -184,6 +184,8 @@ class ConsoleOutputConfig(StrictBaseModel):
 
 
 class PostprocessingConfig(StrictBaseModel):
+    mode: Literal["pipeline"] = "pipeline"
+    config: StrictStr | None = None
     outdir: StrictStr | None = None
     auto_update_initial_conditions: StrictBool = True
     csv_enabled: StrictBool = True
@@ -207,6 +209,8 @@ class PostprocessingConfig(StrictBaseModel):
     def validate_values(self) -> "PostprocessingConfig":
         if self.outdir is not None and not self.outdir.strip():
             raise ValueError("outdir must not be empty when provided")
+        if self.config is not None and not self.config.strip():
+            raise ValueError("postprocessing.config must not be empty when provided")
         if len(self.csv_separator) != 1:
             raise ValueError("csv_separator must be a single character")
         if not self.csv_path.strip():
@@ -438,6 +442,7 @@ class VibeCombustionConfig(StrictBaseModel):
     slot_closed_threshold_m2: StrictFloat = 1.0e-9
     compression_velocity_threshold_m_per_s: StrictFloat = 0.02
     angle_reference: Literal["absolute", "compression_tdc", "gas_exchange_tdc"] = "compression_tdc"
+    hcci_diagnostics_ref: StrictStr | None = None
 
     @model_validator(mode="after")
     def validate_values(self) -> "VibeCombustionConfig":
@@ -565,6 +570,8 @@ class VibeCombustionConfig(StrictBaseModel):
             raise ValueError("slot_closed_threshold_m2 must be <= slot_open_threshold_m2")
         if self.compression_velocity_threshold_m_per_s < 0.0:
             raise ValueError("compression_velocity_threshold_m_per_s must be >= 0")
+        if self.hcci_diagnostics_ref is not None and not self.hcci_diagnostics_ref.strip():
+            raise ValueError("hcci_diagnostics_ref must not be empty when provided")
         if self.energy_coupling == "stroke_ratio":
             if self.stroke_reference_m is None or self.stroke_reference_m <= 0.0:
                 raise ValueError("stroke_reference_m must be > 0 when energy_coupling = 'stroke_ratio'")
@@ -577,7 +584,7 @@ class VibeCombustionConfig(StrictBaseModel):
 
 class HcciDieselCombustionConfig(StrictBaseModel):
     model: Literal["hcci_diesel"]
-    ignition_model: Literal["livengood_wu", "beck_2003_1_arrhenius", "beck_2003_two_stage"] = "livengood_wu"
+    ignition_model: Literal["livengood_wu", "beck_2003_1_arrhenius", "beck_2003_two_stage", "tabulated_livengood_wu"] = "livengood_wu"
     burn_model: Literal["wiebe_autoignition", "vibe-beck"] = "wiebe_autoignition"
     duration_mode: Literal["time"] = "time"
     duration_s: StrictFloat | None = None
@@ -598,6 +605,7 @@ class HcciDieselCombustionConfig(StrictBaseModel):
     tau_activation_energy_J_per_kg: StrictFloat | None = None
     tau_reference_pressure_Pa: StrictFloat = 1000000.0
     tau_reference_lambda: StrictFloat = 1.4
+    ignition_delay_table_npz: StrictStr | None = None
     lambda_slowdown_exponent: StrictFloat = 0.7
     residual_slowdown_factor: StrictFloat = 1.5
     beck_c1_s: StrictFloat = 1.0e-5
@@ -668,6 +676,11 @@ class HcciDieselCombustionConfig(StrictBaseModel):
             raise ValueError("tau_reference_pressure_Pa must be > 0")
         if self.tau_reference_lambda <= 0.0:
             raise ValueError("tau_reference_lambda must be > 0")
+        if self.ignition_model == "tabulated_livengood_wu":
+            if self.ignition_delay_table_npz is None or not self.ignition_delay_table_npz.strip():
+                raise ValueError("ignition_delay_table_npz is required when ignition_model='tabulated_livengood_wu'")
+        elif self.ignition_delay_table_npz is not None and not self.ignition_delay_table_npz.strip():
+            raise ValueError("ignition_delay_table_npz must not be empty when provided")
         if self.lambda_slowdown_exponent < 0.0:
             raise ValueError("lambda_slowdown_exponent must be >= 0")
         if self.residual_slowdown_factor < 1.0:
@@ -897,6 +910,20 @@ class EnvironmentVolumeConfig(StrictBaseModel):
 
     @model_validator(mode="after")
     def validate_state(self) -> "EnvironmentVolumeConfig":
+        if self.pressure_Pa <= 0.0:
+            raise ValueError("pressure_Pa must be > 0")
+        if self.temperature_K <= 0.0:
+            raise ValueError("temperature_K must be > 0")
+        return self
+
+
+class EnvironmentBoundaryConfig(StrictBaseModel):
+    name: StrictStr
+    pressure_Pa: StrictFloat
+    temperature_K: StrictFloat
+
+    @model_validator(mode="after")
+    def validate_state(self) -> "EnvironmentBoundaryConfig":
         if self.pressure_Pa <= 0.0:
             raise ValueError("pressure_Pa must be > 0")
         if self.temperature_K <= 0.0:
@@ -1212,6 +1239,8 @@ class FreePistonLoadConfig(StrictBaseModel):
     power_target_W: StrictFloat | None = None
     efficiency_0to1: StrictFloat | None = None
     min_velocity_m_per_s: StrictFloat | None = None
+    motor_assist_enabled: StrictBool = False
+    motor_assist_until_soc: StrictBool = True
     assist_velocity_threshold_m_per_s: StrictFloat | None = None
     assist_force_N: StrictFloat | None = None
     target_margin_m: StrictFloat | None = None
@@ -1237,6 +1266,11 @@ class FreePistonLoadConfig(StrictBaseModel):
             raise ValueError("assist_velocity_threshold_m_per_s must be > 0")
         if self.assist_force_N is not None and self.assist_force_N < 0.0:
             raise ValueError("assist_force_N must be >= 0")
+        if self.motor_assist_enabled:
+            if self.assist_velocity_threshold_m_per_s is None or self.assist_velocity_threshold_m_per_s <= 0.0:
+                raise ValueError("motor_assist_enabled requires assist_velocity_threshold_m_per_s > 0")
+            if self.assist_force_N is None or self.assist_force_N <= 0.0:
+                raise ValueError("motor_assist_enabled requires assist_force_N > 0")
         if self.target_margin_m is not None and self.target_margin_m < 0.0:
             raise ValueError("target_margin_m must be >= 0")
         if self.hard_margin_m is not None and self.hard_margin_m < 0.0:
@@ -1385,6 +1419,7 @@ class PreprocessingConfig(StrictBaseModel):
     features: FeatureToggleConfig
     engine: EngineConfig
     submodels: SubmodelLibraryConfig = Field(default_factory=SubmodelLibraryConfig)
+    environment: list[EnvironmentBoundaryConfig] = Field(default_factory=list)
     volumes: list[VolumeConfig]
     connections: list[ConnectionConfig]
 
@@ -1402,9 +1437,15 @@ class RootConfig(StrictBaseModel):
 
     @model_validator(mode="after")
     def validate_topology(self) -> "RootConfig":
-        names = [v.name for v in self.preprocessing.volumes]
-        if len(names) != len(set(names)):
+        volume_names = [v.name for v in self.preprocessing.volumes]
+        environment_names = [env.name for env in self.preprocessing.environment]
+        names = volume_names + environment_names
+        if len(volume_names) != len(set(volume_names)):
             raise ValueError("Volume names must be unique")
+        if len(environment_names) != len(set(environment_names)):
+            raise ValueError("Environment boundary names must be unique")
+        if len(names) != len(set(names)):
+            raise ValueError("Volume and environment boundary names must be distinct")
         known = set(names)
         conn_names = [c.name for c in self.preprocessing.connections]
         if len(conn_names) != len(set(conn_names)):
@@ -1473,6 +1514,10 @@ class RootConfig(StrictBaseModel):
     @property
     def volumes(self) -> list[VolumeConfig]:
         return self.preprocessing.volumes
+
+    @property
+    def environment(self) -> list[EnvironmentBoundaryConfig]:
+        return self.preprocessing.environment
 
     @property
     def connections(self) -> list[ConnectionConfig]:

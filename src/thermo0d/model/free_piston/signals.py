@@ -18,6 +18,8 @@ def free_piston_signal_names(prefix: str = 'free_piston') -> list[str]:
         f'{root}_generator_damping_eff_Ns_per_m',
         f'{root}_generator_force_base_N',
         f'{root}_generator_force_power_N',
+        f'{root}_generator_assist_force_N',
+        f'{root}_generator_assist_torque_Nm',
         f'{root}_generator_force_stop_N',
         f'{root}_generator_distance_to_stop_m',
         f'{root}_generator_midstroke_weight',

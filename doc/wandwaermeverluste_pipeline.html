@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wandwaermeverluste: Berechnung, CSV und pV-Textfeld</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fa;
+      --paper: #ffffff;
+      --ink: #17212b;
+      --muted: #5d6875;
+      --line: #d8dee8;
+      --accent: #176b77;
+      --accent-soft: #e4f4f5;
+      --warn: #fff6de;
+      --warn-line: #d9a93d;
+      --code: #eef2f6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.58;
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 38px 22px 70px;
+    }
+
+    header {
+      padding: 30px 0 24px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2rem, 5vw, 3rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 38px 0 14px;
+      font-size: 1.45rem;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 1.08rem;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    ul,
+    ol {
+      margin: 0 0 16px 1.4rem;
+      padding: 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      padding: 0.12rem 0.28rem;
+      border-radius: 4px;
+      background: var(--code);
+      font-family: Consolas, "SFMono-Regular", Menlo, monospace;
+      font-size: 0.94em;
+    }
+
+    pre {
+      overflow: auto;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f9fbfd;
+      font-family: Consolas, "SFMono-Regular", Menlo, monospace;
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 22px;
+      background: var(--paper);
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #edf3f7;
+      font-weight: 650;
+    }
+
+    .lead {
+      max-width: 880px;
+      color: var(--muted);
+      font-size: 1.08rem;
+    }
+
+    .box {
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--accent);
+      border-radius: 8px;
+      background: var(--paper);
+      padding: 16px 18px;
+      margin: 18px 0;
+    }
+
+    .warn {
+      border-left-color: var(--warn-line);
+      background: var(--warn);
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+      margin: 16px 0 22px;
+    }
+
+    .step {
+      min-height: 116px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      padding: 14px;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--accent);
+    }
+
+    math {
+      font-size: 1.06rem;
+    }
+
+    .formula {
+      overflow-x: auto;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      margin: 12px 0 18px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Berechnung der Wandwaermeverluste</h1>
+    <p class="lead">
+      Diese Beschreibung verfolgt den kompletten Datenweg der Wandwaerme: von der
+      Eingabe in der YAML-Konfiguration ueber Woschni und das optionale
+      Wandtemperaturmodell bis zur CSV-Ausgabe und zum Textfeld im eingebauten
+      Free-Piston-pV-Diagramm.
+    </p>
+  </header>
+
+  <section>
+    <h2>1. Gesamtueberblick</h2>
+    <div class="flow">
+      <div class="step">
+        <strong>Konfiguration</strong>
+        <code>features.wall_heat</code>, <code>wall_heat</code> und optional
+        <code>wall_temperature</code> legen fest, ob und wie Wandwaerme gerechnet wird.
+      </div>
+      <div class="step">
+        <strong>Builder</strong>
+        Die YAML-Werte werden in schnelle numerische Matrizen und Zustandsindizes
+        fuer den Integrator umgesetzt.
+      </div>
+      <div class="step">
+        <strong>RHS</strong>
+        Pro Zeitschritt wird der Waermeuebergangskoeffizient berechnet und der
+        Wandwaermestrom in die Energiebilanz geschrieben.
+      </div>
+      <div class="step">
+        <strong>Rekonstruktion</strong>
+        Aus dem gespeicherten Zustand entstehen Signale wie
+        <code>cylinder_1_wall_heat_W</code> und Zonensignale.
+      </div>
+      <div class="step">
+        <strong>CSV</strong>
+        Die momentanen Leistungen und daraus integrierte Zyklusenergien werden
+        optional gefiltert exportiert.
+      </div>
+      <div class="step">
+        <strong>pV-Textfeld</strong>
+        Im Plot wird aus den Leistungsdaten eine positive Verlustgroesse fuer
+        den letzten UT-OT-UT-Zyklus gebildet.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2. Eingabe in der Konfiguration</h2>
+    <p>
+      Die Wandwaerme wird global ueber die Feature-Flags eingeschaltet. Ohne
+      <code>features.wall_heat: true</code> wird im RHS kein Wandwaermestrom in die
+      Energiegleichung eingetragen.
+    </p>
+    <pre><code>features:
+  wall_heat: true
+
+submodels:
+  volumes:
+    cylinder_free_piston:
+      type: cylinder
+      wall_temperature:
+        ref: cycle_average_wall
+      wall_heat:
+        ref: woschni_promo_wall</code></pre>
+
+    <h3>2.1 Woschni-Wandwaerme</h3>
+    <p>
+      Das Submodell <code>wall_heat</code> definiert den Waermeuebergang auf der
+      Gasseite. Die wichtigsten Werte sind das Modell, die Variante, die effektive
+      Wandflaeche und die statische Wandtemperatur als Fallback.
+    </p>
+    <pre><code>wall_heat:
+  woschni_promo_wall:
+    model: woschni
+    variant: promo
+    wall_temperature_K: 450.0
+    wall_area_m2: 0.03
+    multiplier: 15</code></pre>
+
+    <h3>2.2 Optionales Wandtemperaturmodell</h3>
+    <p>
+      Das optionale Submodell <code>wall_temperature</code> ersetzt die einfache
+      konstante Wandtemperatur durch drei Bauteilzonen: Buchse
+      (<code>cylinder</code>), Kopf (<code>head</code>) und Kolben
+      (<code>piston</code>). Jede Zone besitzt eine Starttemperatur, eine
+      Kuehlmediumtemperatur, Materialleitfaehigkeit, Wanddicke und Flaeche.
+    </p>
+    <pre><code>wall_temperature:
+  cycle_average_wall:
+    model: cycle_average
+    relaxation: 0.3
+    cylinder:
+      initial_temperature_K: 340.0
+      coolant_temperature_K: 300.0
+      lambda_W_per_mK: 50.0
+      wall_thickness_m: 0.006
+      area_m2: 0.020541
+    head:
+      initial_temperature_K: 323.0
+      coolant_temperature_K: 300.0
+      lambda_W_per_mK: 160.0
+      wall_thickness_m: 0.010
+      area_m2: 0.002875
+    piston:
+      initial_temperature_K: 330.0
+      coolant_temperature_K: 300.0
+      lambda_W_per_mK: 160.0
+      wall_thickness_m: 0.012
+      area_m2: 0.002875</code></pre>
+
+    <div class="box">
+      <p>
+        <strong>Wichtig:</strong> Das Wandtemperaturmodell liefert die
+        Bauteiltemperaturen. Woschni liefert weiterhin den gasseitigen
+        Waermeuebergangskoeffizienten. Erst beide zusammen ergeben den
+        momentanen Wandwaermestrom.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. Umsetzung im Builder</h2>
+    <p>
+      Beim Einlesen der Konfiguration erzeugen die Builder die internen Tabellen.
+      Fuer die Wandtemperatur entstehen drei Datenstrukturen:
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Interne Struktur</th>
+          <th>Zweck</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>wall_temperature_state_index_by_vol</code></td>
+          <td>Zeigt pro Volumen und Zone auf den Zustandseintrag der Wandtemperatur.</td>
+        </tr>
+        <tr>
+          <td><code>wall_temperature_average_state_index_by_vol</code></td>
+          <td>Speichert Zustandsindizes fuer zyklusgemittelte Werte <code>alpha_avg</code> und <code>T_alpha_avg</code>.</td>
+        </tr>
+        <tr>
+          <td><code>wall_temperature_params_by_vol</code></td>
+          <td>Enthaelt Flaeche, Waermeleitwert, Kuehltemperatur, Relaxation und Aktivierungsflag pro Zone.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      Der Waermeleitwert der Zone wird aus Konfigurationseintraegen gebildet:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <mi>G</mi>
+          <mo>=</mo>
+          <mfrac>
+            <mi>&lambda;</mi>
+            <mi>s</mi>
+          </mfrac>
+        </mrow>
+      </math>
+    </div>
+    <p>
+      Dabei ist <code>G</code> der flaechenbezogene Leitwert in
+      W/(m² K), <code>lambda_W_per_mK</code> die Waermeleitfaehigkeit und
+      <code>wall_thickness_m</code> die effektive Wanddicke.
+    </p>
+  </section>
+
+  <section>
+    <h2>4. Momentaner Wandwaermestrom im RHS</h2>
+    <p>
+      Im RHS wird fuer jeden Zeitschritt zuerst der aktuelle Gaszustand bestimmt:
+      Druck, Temperatur, Masse, Volumen, Hubgeschwindigkeit und Winkel. Daraus
+      berechnet Woschni den momentanen Waermeuebergangskoeffizienten.
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <mi>&alpha;</mi>
+          <mo>=</mo>
+          <mi>f</mi>
+          <mo>(</mo>
+          <mi>p</mi>
+          <mo>,</mo>
+          <msub><mi>T</mi><mi>gas</mi></msub>
+          <mo>,</mo>
+          <mi>w</mi>
+          <mo>,</mo>
+          <mi>D</mi>
+          <mo>,</mo>
+          <mi>V</mi>
+          <mo>,</mo>
+          <mi>&theta;</mi>
+          <mo>)</mo>
+        </mrow>
+      </math>
+    </div>
+    <p>
+      Die konkrete Woschni-Variante liegt in
+      <code>src/thermo0d/physics/heat_transfer.py</code>. Der Rueckgabewert
+      <code>htc</code> ist der Waermeuebergangskoeffizient in W/(m² K).
+    </p>
+
+    <h3>4.1 Vorzeichenkonvention</h3>
+    <p>
+      Der Code verwendet fuer den Wandwaermestrom die folgende Konvention:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mover><mi>Q</mi><mo>.</mo></mover><mi>wall</mi></msub>
+          <mo>=</mo>
+          <mi>&alpha;</mi>
+          <mo>&InvisibleTimes;</mo>
+          <mi>A</mi>
+          <mo>&InvisibleTimes;</mo>
+          <mo>(</mo>
+          <msub><mi>T</mi><mi>wall</mi></msub>
+          <mo>-</mo>
+          <msub><mi>T</mi><mi>gas</mi></msub>
+          <mo>)</mo>
+        </mrow>
+      </math>
+    </div>
+    <p>
+      Daraus folgt: Ist das Gas heisser als die Wand, wird
+      <code>wall_heat_W</code> negativ. Negative Wandwaerme bedeutet also
+      Waermeverlust des Gases an die Wand. Positive Wandwaerme bedeutet
+      Rueckwaermung vom Bauteil ins Gas.
+    </p>
+
+    <h3>4.2 Verwendung der drei Wandzonen</h3>
+    <p>
+      Wenn <code>wall_temperature</code> aktiv ist, wird im RHS nicht die konstante
+      Wandtemperatur aus <code>wall_heat.wall_temperature_K</code> verwendet,
+      sondern eine flaechengewichtete effektive Wandtemperatur:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mi>T</mi><mi>wall,eff</mi></msub>
+          <mo>=</mo>
+          <mfrac>
+            <mrow>
+              <munder><mo>&sum;</mo><mi>z</mi></munder>
+              <msub><mi>A</mi><mi>z</mi></msub>
+              <mo>&InvisibleTimes;</mo>
+              <msub><mi>T</mi><mrow><mi>wall</mi><mo>,</mo><mi>z</mi></mrow></msub>
+            </mrow>
+            <mrow>
+              <munder><mo>&sum;</mo><mi>z</mi></munder>
+              <msub><mi>A</mi><mi>z</mi></msub>
+            </mrow>
+          </mfrac>
+        </mrow>
+      </math>
+    </div>
+    <p>
+      Die Energiebilanz des Gases erhaelt dann den Summenwert ueber die effektive
+      Wandflaeche. In der Rekonstruktion werden die Zonen wieder einzeln
+      ausgewiesen.
+    </p>
+  </section>
+
+  <section>
+    <h2>5. Automatische Wandtemperatur pro Zyklus</h2>
+    <p>
+      Das Wandtemperaturmodell arbeitet nicht bei jedem RHS-Aufruf als
+      kontinuierliche Differentialgleichung. Stattdessen wird genau an
+      Zyklusgrenzen aktualisiert. Beim Free-Piston-Modell ist der relevante
+      Zyklus UT-OT-UT.
+    </p>
+    <p>
+      Innerhalb eines Zyklus werden <code>alpha</code> und
+      <code>Tgas * alpha</code> zeitlich integriert:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <mover><mi>&alpha;</mi><mo>&OverBar;</mo></mover>
+          <mo>=</mo>
+          <mfrac>
+            <mn>1</mn>
+            <msub><mi>t</mi><mi>cycle</mi></msub>
+          </mfrac>
+          <msubsup><mo>&int;</mo><mn>0</mn><msub><mi>t</mi><mi>cycle</mi></msub></msubsup>
+          <mi>&alpha;</mi>
+          <mo>(</mo><mi>t</mi><mo>)</mo>
+          <mo>&DifferentialD;</mo><mi>t</mi>
+        </mrow>
+      </math>
+    </div>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <mover>
+            <mrow>
+              <msub><mi>T</mi><mi>gas</mi></msub>
+              <mi>&alpha;</mi>
+            </mrow>
+            <mo>&OverBar;</mo>
+          </mover>
+          <mo>=</mo>
+          <mfrac>
+            <mn>1</mn>
+            <msub><mi>t</mi><mi>cycle</mi></msub>
+          </mfrac>
+          <msubsup><mo>&int;</mo><mn>0</mn><msub><mi>t</mi><mi>cycle</mi></msub></msubsup>
+          <msub><mi>T</mi><mi>gas</mi></msub>
+          <mo>(</mo><mi>t</mi><mo>)</mo>
+          <mi>&alpha;</mi>
+          <mo>(</mo><mi>t</mi><mo>)</mo>
+          <mo>&DifferentialD;</mo><mi>t</mi>
+        </mrow>
+      </math>
+    </div>
+    <p>
+      Fuer jede Zone wird danach die stationaere Gleichgewichtstemperatur
+      berechnet:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mi>T</mi><mrow><mi>wall</mi><mo>,</mo><mi>target</mi></mrow></msub>
+          <mo>=</mo>
+          <mfrac>
+            <mrow>
+              <mover>
+                <mrow>
+                  <msub><mi>T</mi><mi>gas</mi></msub>
+                  <mi>&alpha;</mi>
+                </mrow>
+                <mo>&OverBar;</mo>
+              </mover>
+              <mo>+</mo>
+              <mi>G</mi>
+              <mo>&InvisibleTimes;</mo>
+              <msub><mi>T</mi><mi>coolant</mi></msub>
+            </mrow>
+            <mrow>
+              <mover><mi>&alpha;</mi><mo>&OverBar;</mo></mover>
+              <mo>+</mo>
+              <mi>G</mi>
+            </mrow>
+          </mfrac>
+        </mrow>
+      </math>
+    </div>
+    <p>
+      Anschliessend wird mit <code>relaxation</code> nur ein Anteil der Differenz
+      uebernommen:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mi>T</mi><mrow><mi>wall</mi><mo>,</mo><mi>new</mi></mrow></msub>
+          <mo>=</mo>
+          <msub><mi>T</mi><mrow><mi>wall</mi><mo>,</mo><mi>old</mi></mrow></msub>
+          <mo>+</mo>
+          <mi>r</mi>
+          <mo>&InvisibleTimes;</mo>
+          <mo>(</mo>
+          <msub><mi>T</mi><mrow><mi>wall</mi><mo>,</mo><mi>target</mi></mrow></msub>
+          <mo>-</mo>
+          <msub><mi>T</mi><mrow><mi>wall</mi><mo>,</mo><mi>old</mi></mrow></msub>
+          <mo>)</mo>
+        </mrow>
+      </math>
+    </div>
+  </section>
+
+  <section>
+    <h2>6. Rekonstruktion der Ausgabesignale</h2>
+    <p>
+      Nach der Integration erzeugt
+      <code>src/thermo0d/output/reconstruction.py</code> die Signale fuer Plot und
+      CSV. Bei aktivem Wandtemperaturmodell werden folgende Groessen pro Zylinder
+      rekonstruiert:
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Signal</th>
+          <th>Bedeutung</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>cylinder_1_wall_heat_W</code></td>
+          <td>Momentaner gesamter Wandwaermestrom. Negativ bedeutet Verlust des Gases.</td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_heat_zones_sum_W</code></td>
+          <td>Summe der drei Zonensignale, wenn das Wandtemperaturmodell aktiv ist.</td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_cylinder_heat_W</code></td>
+          <td>Wandwaermestrom ueber die Buchse bzw. Zylinderlaufbahn.</td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_head_heat_W</code></td>
+          <td>Wandwaermestrom ueber den Zylinderkopf.</td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_piston_heat_W</code></td>
+          <td>Wandwaermestrom ueber den Kolben.</td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_temperature_K</code></td>
+          <td>Flaechengewichtete effektive Wandtemperatur, kein zusaetzliches Bauteil.</td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_cylinder_temperature_K</code></td>
+          <td>Temperatur der Buchsen-/Zylinderzone.</td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_head_temperature_K</code></td>
+          <td>Temperatur der Kopfzone.</td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_piston_temperature_K</code></td>
+          <td>Temperatur der Kolbenzone.</td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_*_heat_share_0to1</code></td>
+          <td>Anteil einer Zone am momentanen Summen-Wandwaermestrom.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      Fuer die Zonen gilt:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mover><mi>Q</mi><mo>.</mo></mover><mi>z</mi></msub>
+          <mo>=</mo>
+          <mi>&alpha;</mi>
+          <mo>&InvisibleTimes;</mo>
+          <msub><mi>A</mi><mi>z</mi></msub>
+          <mo>&InvisibleTimes;</mo>
+          <mo>(</mo>
+          <msub><mi>T</mi><mrow><mi>wall</mi><mo>,</mo><mi>z</mi></mrow></msub>
+          <mo>-</mo>
+          <msub><mi>T</mi><mi>gas</mi></msub>
+          <mo>)</mo>
+        </mrow>
+      </math>
+    </div>
+    <p>
+      Die Summe der Zonen ist:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mover><mi>Q</mi><mo>.</mo></mover><mi>wall,sum</mi></msub>
+          <mo>=</mo>
+          <munder><mo>&sum;</mo><mi>z</mi></munder>
+          <msub><mover><mi>Q</mi><mo>.</mo></mover><mi>z</mi></msub>
+        </mrow>
+      </math>
+    </div>
+  </section>
+
+  <section>
+    <h2>7. CSV-Ausgabe</h2>
+    <p>
+      Die CSV-Ausgabe wird in <code>src/thermo0d/output/service.py</code> erzeugt.
+      Zuerst werden die rekonstruierten Momentansignale gesammelt. Danach werden
+      fuer Leistungsfelder mit Endung <code>_W</code> zusaetzliche Zyklusintegrale
+      gebildet.
+    </p>
+    <p>
+      Fuer Wandwaerme sind die wichtigsten Integrale:
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Momentansignal</th>
+          <th>Zyklusintegral in der CSV</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>cylinder_1_wall_heat_W</code></td>
+          <td><code>cylinder_1_wall_heat_cycle_J</code></td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_heat_zones_sum_W</code></td>
+          <td><code>cylinder_1_wall_heat_zones_sum_cycle_J</code></td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_cylinder_heat_W</code></td>
+          <td><code>cylinder_1_wall_cylinder_heat_cycle_J</code></td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_head_heat_W</code></td>
+          <td><code>cylinder_1_wall_head_heat_cycle_J</code></td>
+        </tr>
+        <tr>
+          <td><code>cylinder_1_wall_piston_heat_W</code></td>
+          <td><code>cylinder_1_wall_piston_heat_cycle_J</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      Die Integration ist trapezfoermig ueber die Zeit:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mi>Q</mi><mi>cycle</mi></msub>
+          <mo>=</mo>
+          <msubsup><mo>&int;</mo><msub><mi>t</mi><mn>0</mn></msub><msub><mi>t</mi><mn>1</mn></msub></msubsup>
+          <msub><mover><mi>Q</mi><mo>.</mo></mover><mi>wall</mi></msub>
+          <mo>(</mo><mi>t</mi><mo>)</mo>
+          <mo>&DifferentialD;</mo><mi>t</mi>
+        </mrow>
+      </math>
+    </div>
+    <div class="box warn">
+      <p>
+        <strong>Vorzeichen in der CSV:</strong> Die CSV-Zyklusintegrale sind
+        vorzeichenbehaftet. Ein negativer Wert in
+        <code>cylinder_1_wall_heat_cycle_J</code> bedeutet: netto hat das Gas
+        Energie an die Wand verloren. Ein positiver Wert bedeutet: netto ging
+        Energie von der Wand ins Gas.
+      </p>
+    </div>
+
+    <h3>7.1 Signal-Auswahl fuer die CSV</h3>
+    <p>
+      Wenn <code>csv_export_mode</code> auf <code>selected</code> oder
+      <code>auto</code> mit vorhandener Layout-Datei steht, bestimmt
+      <code>thermo0d_signal_export_layout.csv</code>, welche Spalten geschrieben
+      werden. Wird ein abgeleitetes Zyklussignal angefordert, fuegt der Export
+      intern das benoetigte Quellsignal hinzu, damit das Integral berechnet werden
+      kann.
+    </p>
+    <pre><code>postprocessing:
+  csv_export_layout: thermo0d_signal_export_layout.csv
+  csv_export_mode: selected
+  csv_export_missing_layout: warn_all
+  csv_export_unknown_signals: warn_empty</code></pre>
+  </section>
+
+  <section>
+    <h2>8. pV-Diagramm-Textfeld</h2>
+    <p>
+      Das eingebaute Free-Piston-pV-Diagramm betrachtet den letzten vollstaendigen
+      UT-OT-UT-Zyklus. Die Grenzen werden aus dem Vorzeichenwechsel der
+      Kolbengeschwindigkeit bestimmt:
+    </p>
+    <ul>
+      <li><strong>UT:</strong> Geschwindigkeit wechselt von positiv nach null/negativ.</li>
+      <li><strong>OT:</strong> Geschwindigkeit wechselt von negativ nach null/positiv.</li>
+      <li>Ausgegeben wird der letzte Abschnitt <code>UT -> OT -> UT</code>.</li>
+    </ul>
+
+    <p>
+      Fuer das Textfeld wird nicht einfach der Betrag des Netto-Integrals
+      verwendet. Das waere zu niedrig, wenn die Wand zeitweise Energie an das Gas
+      zurueckgibt. Stattdessen wird die Verlustleistung getrennt gebildet:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mover><mi>Q</mi><mo>.</mo></mover><mi>loss</mi></msub>
+          <mo>(</mo><mi>t</mi><mo>)</mo>
+          <mo>=</mo>
+          <mo>max</mo>
+          <mo>(</mo>
+          <mo>-</mo>
+          <msub><mover><mi>Q</mi><mo>.</mo></mover><mi>wall</mi></msub>
+          <mo>(</mo><mi>t</mi><mo>)</mo>
+          <mo>,</mo>
+          <mn>0</mn>
+          <mo>)</mo>
+        </mrow>
+      </math>
+    </div>
+    <p>
+      Anschliessend wird ueber den UT-OT-UT-Zyklus integriert:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mi>Q</mi><mi>loss</mi></msub>
+          <mo>=</mo>
+          <msubsup><mo>&int;</mo><msub><mi>t</mi><mi>UT1</mi></msub><msub><mi>t</mi><mi>UT2</mi></msub></msubsup>
+          <msub><mover><mi>Q</mi><mo>.</mo></mover><mi>loss</mi></msub>
+          <mo>(</mo><mi>t</mi><mo>)</mo>
+          <mo>&DifferentialD;</mo><mi>t</mi>
+        </mrow>
+      </math>
+    </div>
+    <p>
+      Wenn Zonensignale vorhanden sind, wird diese Verlustintegration zuerst fuer
+      jede Zone separat gemacht und danach summiert:
+    </p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow>
+          <msub><mi>Q</mi><mi>loss,total</mi></msub>
+          <mo>=</mo>
+          <munder><mo>&sum;</mo><mi>z</mi></munder>
+          <msubsup><mo>&int;</mo><msub><mi>t</mi><mi>UT1</mi></msub><msub><mi>t</mi><mi>UT2</mi></msub></msubsup>
+          <mo>max</mo>
+          <mo>(</mo>
+          <mo>-</mo>
+          <msub><mover><mi>Q</mi><mo>.</mo></mover><mi>z</mi></msub>
+          <mo>(</mo><mi>t</mi><mo>)</mo>
+          <mo>,</mo>
+          <mn>0</mn>
+          <mo>)</mo>
+          <mo>&DifferentialD;</mo><mi>t</mi>
+        </mrow>
+      </math>
+    </div>
+
+    <p>
+      Das pV-Textfeld nutzt diese Reihenfolge:
+    </p>
+    <ol>
+      <li>Verwende <code>wall_cylinder_heat_W</code>, <code>wall_head_heat_W</code> und <code>wall_piston_heat_W</code>, wenn vorhanden.</li>
+      <li>Wenn keine Zonensignale vorhanden sind, verwende <code>wall_heat_W</code> oder <code>wall_heat_zones_sum_W</code>.</li>
+      <li>Wenn keine Leistungsdaten auswertbar sind, verwende als Fallback die vorhandenen Zyklusintegrale.</li>
+      <li>Zeige <code>Wandwaermeverluste</code> als positive Verlustenergie in Joule an.</li>
+    </ol>
+
+    <div class="box">
+      <p>
+        Deshalb kann der Wert im pV-Textfeld groesser sein als der Betrag von
+        <code>cylinder_1_wall_heat_cycle_J</code> in der CSV. Das ist beabsichtigt:
+        Die CSV-Spalte ist eine Netto-Energiebilanz, das pV-Textfeld ist eine
+        positive Verlustsumme.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>9. Welche Werte sollte man vergleichen?</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Fragestellung</th>
+          <th>Passendes Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Wie gross ist der momentane Wandwaermestrom?</td>
+          <td><code>cylinder_1_wall_heat_W</code></td>
+        </tr>
+        <tr>
+          <td>Welche Zone verursacht den Verlust?</td>
+          <td><code>cylinder_1_wall_cylinder_heat_W</code>, <code>..._head_heat_W</code>, <code>..._piston_heat_W</code></td>
+        </tr>
+        <tr>
+          <td>Wie gross ist die Netto-Wandenergie im CSV-Zyklus?</td>
+          <td><code>cylinder_1_wall_heat_cycle_J</code> oder <code>cylinder_1_wall_heat_zones_sum_cycle_J</code></td>
+        </tr>
+        <tr>
+          <td>Wie gross ist der positive Verlust im pV-Plot?</td>
+          <td>Textfeld <code>Wandwaermeverluste</code></td>
+        </tr>
+        <tr>
+          <td>Welche Wandtemperatur sieht das aequivalente Modell?</td>
+          <td><code>cylinder_1_wall_temperature_K</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>10. Relevante Implementierungsstellen</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Datei</th>
+          <th>Rolle</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>src/thermo0d/config/models.py</code></td>
+          <td>Schema fuer <code>wall_heat</code>, <code>wall_temperature</code> und CSV-Exportoptionen.</td>
+        </tr>
+        <tr>
+          <td><code>src/thermo0d/model/free_piston/builder.py</code></td>
+          <td>Aufbau der Free-Piston-Matrizen und Wandtemperatur-Zustandsindizes.</td>
+        </tr>
+        <tr>
+          <td><code>src/thermo0d/physics/heat_transfer.py</code></td>
+          <td>Woschni-Varianten und Berechnung von <code>htc</code> sowie <code>wall_heat_W</code>.</td>
+        </tr>
+        <tr>
+          <td><code>src/thermo0d/model/wall_temperature.py</code></td>
+          <td>Zyklusmittelung und automatische Aktualisierung der drei Wandtemperaturzonen.</td>
+        </tr>
+        <tr>
+          <td><code>src/thermo0d/output/reconstruction.py</code></td>
+          <td>Erzeugt Momentansignale und Zonensignale fuer Ausgabe und Plot.</td>
+        </tr>
+        <tr>
+          <td><code>src/thermo0d/output/service.py</code></td>
+          <td>Schreibt CSV-Dateien, filtert Layouts und integriert Zyklusgroessen.</td>
+        </tr>
+        <tr>
+          <td><code>src/thermo0d/output/plots.py</code></td>
+          <td>Berechnet das pV-Textfeld fuer den letzten UT-OT-UT-Zyklus.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <p class="muted">
+      Stand: Beschreibung passend zur aktuellen Implementierung mit
+      <code>wall_temperature.model: cycle_average</code>, Woschni-Wandwaerme,
+      CSV-Exportlayout und Free-Piston-pV-Textfeld.
+    </p>
+  </footer>
+</main>
+</body>
+</html>

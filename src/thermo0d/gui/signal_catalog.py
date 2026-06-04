@@ -84,6 +84,8 @@ _FREE_PISTON_SPECS: list[tuple[str, str, str, str, str]] = [
     ("free_piston_generator_damping_eff_Ns_per_m", "Ns/m", "c_eff", "free_piston", "Effektive Generator-Dämpfung"),
     ("free_piston_generator_force_base_N", "N", "F_gen,base", "free_piston", "Generator-Grundkraft"),
     ("free_piston_generator_force_power_N", "N", "F_gen,P", "free_piston", "Generator-Leistungskraft"),
+    ("free_piston_generator_assist_force_N", "N", "F_assist", "free_piston", "Anschleppkraft"),
+    ("free_piston_generator_assist_torque_Nm", "Nm", "M_assist", "free_piston", "Anschleppmoment"),
     ("free_piston_generator_force_stop_N", "N", "F_gen,stop", "free_piston", "Generator-Schutzkraft"),
     ("free_piston_generator_distance_to_stop_m", "m", "d_stop", "free_piston", "Abstand zum aktiven Endanschlag"),
     ("free_piston_generator_midstroke_weight", "-", "w_mid", "free_piston", "Midstroke-Gewichtung"),

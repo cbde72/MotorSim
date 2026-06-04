@@ -364,6 +364,9 @@ simulation:
     rtol: 1.0e-05                                                                                                                                                             # Relative Solver-Toleranz.
     atol: 1.0e-07                                                                                                                                                             # Absolute Solver-Toleranz.
 postprocessing:
+  mode: pipeline
+  config: postprocessing.yaml
+
   auto_update_initial_conditions: false                                                                                                                                        # Schreibt Startwerte aus letztem Lauf zurueck.
   csv_enabled: true                                                                                                                                                           # Aktiviert Haupt-CSV-Ausgabe.
   csv_path: results/free_piston_GenSet_V20.csv                                                                                                                                # Pfad der Haupt-CSV relativ zum Projekt.
@@ -372,6 +375,16 @@ postprocessing:
   csv_export_mode: all                   # auto | all | selected                                                                                                                                                 # auto nutzt vorhandenes Layout, all exportiert alles, selected erzwingt Layout.
   csv_export_missing_layout: warn_all         # warn_all | fail                                                                                                                                # Verhalten, wenn selected aktiv ist und kein Layout gefunden wird.
   csv_export_unknown_signals: warn_empty      # warn_empty | fail                                                                                                                                # Verhalten bei Layout-Signalen, die im Ergebnis nicht existieren.
+
+
+
+  rhs_derivatives_export:
+    enabled: true
+    # optional:
+    path: results/free_piston_GenSet_V20_RHS.csv
+  
+  
+  
   excel_enabled: false                                                                                                                                                        # Aktiviert Excel-Ausgabe.
   excel_path: results/free_piston_GenSet_V20.xlsx                                                                                                                             # Pfad der Excel-Datei relativ zum Projekt.
   sampling:

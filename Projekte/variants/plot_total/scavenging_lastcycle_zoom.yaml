@@ -1,0 +1,56 @@
+name: Slot-Overlap im letzten Fenster
+style_sheet: ../../plot_style_sheet.yaml
+style:
+figures:
+- title: Last-Cycle Zoom - Overlap und Modellantwort
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Slot-Overlap im letzten Fenster
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.88
+    x_max: 1.0
+    y_axes:
+    - id: ax_flow
+      title: Massenstrom [g/s]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_area
+      title: A_eff [mm2]
+      side: right
+      color: '#667085'
+      limit_mode: auto
+    series:
+    - signal_key: transfer_slot_1_mdot_kg_per_s
+      label: transfer mdot
+      axis_id: ax_flow
+      color: '#175cd3'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_1_mdot_kg_per_s
+      label: exhaust mdot
+      axis_id: ax_flow
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: transfer_slot_1_A_eff_forward_m2
+      label: transfer A_eff
+      axis_id: ax_area
+      color: '#98a2b3'
+      line_style: --
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_1_A_eff_forward_m2
+      label: exhaust A_eff
+      axis_id: ax_area
+      color: '#7a5af8'
+      line_style: --
+      scale_factor: 1000000.0
+      unit_preset: raw

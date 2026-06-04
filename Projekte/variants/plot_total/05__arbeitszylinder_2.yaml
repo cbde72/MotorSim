@@ -1,0 +1,29 @@
+name: Arbeitszylinder 2
+style_sheet: ../../plot_style_sheet.yaml
+style:
+figures:
+- title: pV
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Arbeitszylinder 2
+    plot_type: line
+    x_signal: cylinder_2_V_m3
+    x_title: Volumen [cm³]
+    x_scale_factor: 1000000.0
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_p_2
+      title: Druck [bar]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: cylinder_2_p_Pa
+      label: Arbeitszylinder 2
+      axis_id: ax_p_2
+      color: '#111111'
+      line_style: '-'
+      line_width: 1.0
+      scale_factor: 1.0e-05
+      unit_preset: raw
