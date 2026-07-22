@@ -690,6 +690,36 @@ class PipelinePostprocessingService:
             path = self.config_path.parent / path
         return path.resolve()
 
+    def _service_with_fresh_config_bundle(self) -> "PipelinePostprocessingService":
+        """Use an unmutated config bundle for derived postprocessing signals."""
+        if not self.config_path.is_file():
+            return self
+        try:
+            from thermo0d.input.config_loader import ConfigLoader
+            from thermo0d.input.model_builder import build_model_bundle
+
+            config = ConfigLoader.load(self.config_path)
+            bundle = build_model_bundle(config, self.config_path)
+            live_state_names = _state_names(self.bundle)
+            fresh_state_names = _state_names(bundle)
+            if live_state_names and fresh_state_names and live_state_names != fresh_state_names:
+                ConsoleArtifactReporter.print_status(
+                    "pipeline:bundle",
+                    "warn",
+                    reason="state-layout-mismatch; using live bundle for postprocessing",
+                )
+                return self
+            if getattr(bundle, "postprocessing", None) is not None:
+                bundle.postprocessing.outdir = str(self.result_dir)
+            return PipelinePostprocessingService(bundle, self.config_path, result_dir=self.result_dir)
+        except Exception as exc:
+            ConsoleArtifactReporter.print_status(
+                "pipeline:bundle",
+                "warn",
+                reason=f"fresh-config-load-failed: {exc}",
+            )
+            return self
+
     def _resolve_pipeline_output(self, path_text: str) -> Path:
         path = Path(str(path_text).strip() or "signals.csv")
         if path.is_absolute():
@@ -1391,11 +1421,12 @@ class PipelinePostprocessingService:
         total_started = perf_counter()
         cfg_path = self._pipeline_config_path()
         cfg = load_pipeline_config(cfg_path)
+        processing = self._service_with_fresh_config_bundle()
         ConsoleProgressReporter.print("Postprocessing pipeline: starte schlanke Ausgabeaufbereitung")
-        plot_layout_entries = self._prepare_plot_layouts(cfg)
+        plot_layout_entries = processing._prepare_plot_layouts(cfg)
         plot_signal_keys: set[str] = set()
         for _entry, layout_path in plot_layout_entries:
-            plot_signal_keys.update(self._plot_layout_signal_keys(layout_path))
+            plot_signal_keys.update(processing._plot_layout_signal_keys(layout_path))
 
         raw_path: str | None = None
         if cfg.raw.enabled:
@@ -1417,37 +1448,37 @@ class PipelinePostprocessingService:
 
         started = perf_counter()
         signal_started = started
-        columns, specs = self._raw_columns(t, y, cycle_indices)
-        selected = self._selected_keys(cfg)
+        columns, specs = processing._raw_columns(t, y, cycle_indices)
+        selected = processing._selected_keys(cfg)
         generation_selected = list(dict.fromkeys([*selected, *sorted(plot_signal_keys)]))
         include_kinds = {str(kind).strip() for kind in cfg.signals.include_kinds if str(kind).strip()}
-        derivative_requested = self._needed_derivative_indices(generation_selected, include_kinds)
-        self._add_derivative_columns(columns, specs, t, y, derivative_requested)
+        derivative_requested = processing._needed_derivative_indices(generation_selected, include_kinds)
+        processing._add_derivative_columns(columns, specs, t, y, derivative_requested)
         if cfg.reconstruction.enabled:
-            requested = self._needed_reconstructed_keys(generation_selected, include_kinds | {SIGNAL_RECONSTRUCTED})
+            requested = processing._needed_reconstructed_keys(generation_selected, include_kinds | {SIGNAL_RECONSTRUCTED})
             if cfg.reconstruction.only_selected:
                 requested = {key for key in requested if key not in columns}
-            self._add_reconstructed_columns(columns, specs, t, y, cycle_indices, requested)
+            processing._add_reconstructed_columns(columns, specs, t, y, cycle_indices, requested)
         if cfg.integrals.enabled and SIGNAL_INTEGRAL in include_kinds:
-            self._add_integral_columns(columns, specs, generation_selected, cfg)
+            processing._add_integral_columns(columns, specs, generation_selected, cfg)
 
         results_csv_path: str | None = None
         if cfg.results.enabled:
             started = perf_counter()
-            result_keys = self._generated_result_keys(columns, selected)
-            results_csv_path = self._write_results_csv(self._resolve_pipeline_output(cfg.results.path), result_keys, columns, specs, cfg)
+            result_keys = processing._generated_result_keys(columns, selected)
+            results_csv_path = processing._write_results_csv(processing._resolve_pipeline_output(cfg.results.path), result_keys, columns, specs, cfg)
             timings["pipeline:results"] = perf_counter() - started
             if results_csv_path:
                 ConsoleArtifactReporter.print_path_status("pipeline:results", results_csv_path, elapsed_s=timings["pipeline:results"])
 
-        keys, selected_columns, selected_specs = self._filter_selected_columns(columns, specs, selected, cfg)
+        keys, selected_columns, selected_specs = processing._filter_selected_columns(columns, specs, selected, cfg)
         timings["pipeline:signals"] = perf_counter() - signal_started
         ConsoleTimingReporter.print("pipeline:signals", timings["pipeline:signals"], rows=int(t.shape[0]), signals=len(keys))
 
         csv_path: str | None = None
         if cfg.csv.enabled:
             started = perf_counter()
-            csv_path = self._write_csv(self._resolve_pipeline_output(cfg.csv.path), keys, selected_columns, selected_specs, cfg)
+            csv_path = processing._write_csv(processing._resolve_pipeline_output(cfg.csv.path), keys, selected_columns, selected_specs, cfg)
             timings["pipeline:csv"] = perf_counter() - started
             if csv_path:
                 ConsoleArtifactReporter.print_path_status("pipeline:csv", csv_path, elapsed_s=timings["pipeline:csv"])
@@ -1457,7 +1488,7 @@ class PipelinePostprocessingService:
         last_ut_ot_ut_csv_path: str | None = None
         if cfg.last_ut_ot_ut.enabled:
             started = perf_counter()
-            last_ut_ot_ut_csv_path = self._write_last_ut_ot_ut_csv(
+            last_ut_ot_ut_csv_path = processing._write_last_ut_ot_ut_csv(
                 cfg,
                 csv_path=csv_path,
                 keys=keys,
@@ -1475,7 +1506,7 @@ class PipelinePostprocessingService:
         summary_markdown_path: str | None = None
         if cfg.summary.enabled:
             started = perf_counter()
-            summary_path, summary_text_path, summary_markdown_path = self._write_summary(
+            summary_path, summary_text_path, summary_markdown_path = processing._write_summary(
                 cfg,
                 cfg_path=cfg_path,
                 raw_path=raw_path,
@@ -1497,7 +1528,7 @@ class PipelinePostprocessingService:
         plot_layout_paths: list[str] = []
         if plot_layout_entries:
             started = perf_counter()
-            generated_plot_paths, plot_layout_paths = self._render_plots(
+            generated_plot_paths, plot_layout_paths = processing._render_plots(
                 cfg,
                 layout_entries=plot_layout_entries,
                 columns=columns,

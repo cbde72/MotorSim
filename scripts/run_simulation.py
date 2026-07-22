@@ -24,7 +24,7 @@ SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
         '--continue-on-error',
     ],
     'free_piston_v25': [
-        '--config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V27.yaml'),
+        '--config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V32.yaml'),
         '--project', str(Path(DEFAULT_PROJECT)),
     ],
 }

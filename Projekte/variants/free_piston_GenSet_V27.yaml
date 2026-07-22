@@ -364,7 +364,7 @@ simulation:
   dt_s: 1.0e-05                                                                                                                                                               # Integrationszeitschritt in s.
   total_cycles: 3                                                                                                                                                             # Anzahl simulierter Zyklen.
   save_last_cycles: 2                                                                                                                                                         # Anzahl zu speichernder letzter Zyklen.
-  simulationtime: 2.2                                                                                                                                                         # Simulationsdauer in s.
+  simulationtime: 0.2                                                                                                                                                         # Simulationsdauer in s.
   solver:
     kind: rk4                                                                                                                                                                 # Numerischer Integrator.
     rtol: 1.0e-05                                                                                                                                                             # Relative Solver-Toleranz.

@@ -173,10 +173,11 @@ preprocessing:
         slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
         compression_velocity_threshold_m_per_s: 0.02                                                                                                                          # Mindest-Kompressionsgeschwindigkeit fuer Latch.
         angle_reference: absolute                                                                                                                                             # Winkelbezug des Teilmodells.
-        hcci_diagnostics_ref: hcci_diesel_default                                                                                                                             # Optional: HCCI-Zuendverzug/Integral nur als Diagnose fuer den Vibe-Brennverlauf.
+        hcci_diagnostics_ref: hcci_diesel_default #hcci_diesel_beck_2003 #hcci_diesel_default                                                                                                                             # Optional: HCCI-Zuendverzug/Integral nur als Diagnose fuer den Vibe-Brennverlauf.
       hcci_diesel_default:
         model: hcci_diesel                                                                                                                                                    # Auswahl des jeweiligen Teilmodells.
-        ignition_model: livengood_wu                                                                                                                                          # Selbstzuendungsmodell fuer HCCI.
+        ignition:
+          ref: ignition_livengood_default                                                                                                                                     # Eigenes Zuendverzugs-Submodell fuer HCCI.
         burn_model: wiebe_autoignition                                                                                                                                        # Brennverlaufsmodell nach Autoignition.
         duration_mode: time                                                                                                                                                   # Bezugsart der Brenndauer.
         duration_ms: 1.2                                                                                                                                                      # Brenndauer in Millisekunden.
@@ -190,28 +191,37 @@ preprocessing:
         slot_open_threshold_m2: 1.0e-07                                                                                                                                       # Flaechenschwelle fuer Schlitz offen.
         slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
         compression_velocity_threshold_m_per_s: 0.02                                                                                                                          # Mindest-Kompressionsgeschwindigkeit fuer Latch.
+      hcci_diesel_beck_2003:
+        model: hcci_diesel                                                                                                                                                    # Auswahl des jeweiligen Teilmodells.
+        ignition:
+          ref: ignition_beck_2003                                                                                                                                             # Eigenes Zuendverzugs-Submodell fuer HCCI.
+        burn_model: vibe-beck
+        duration_ms: 1.2                                                                                                                                                      # Brenndauer in Millisekunden.
+        lambda_target: 2.4                                                                                                                                                    # Ziel-Luftverhaeltnis Lambda.
+        lhv_J_per_kg: 43000000.0                                                                                                                                              # Unterer Heizwert des Kraftstoffs.
+        slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
+    ignition:
+      ignition_livengood_default:
+        model: livengood_wu                                                                                                                                                   # Selbstzuendungsmodell fuer HCCI.
         tau_A_s: 2.5e-06                                                                                                                                                      # Vorzeitfaktor der HCCI-Zuendverzugszeit.
         tau_pressure_exponent: 1.2                                                                                                                                            # Druckexponent der HCCI-Zuendverzugszeit.
-        tau_activation_temperature_K: 5000.0                                                                                                                                 # Aktivierungstemperatur des HCCI-Zuendmodells.
+        tau_activation_temperature_K: 5000.0                                                                                                                                  # Aktivierungstemperatur des HCCI-Zuendmodells.
         tau_reference_pressure_Pa: 1000000.0                                                                                                                                  # Referenzdruck fuer HCCI-Zuendverzug.
         tau_reference_lambda: 1.4                                                                                                                                             # Referenz-Lambda fuer HCCI-Zuendverzug.
         lambda_slowdown_exponent: 0.7                                                                                                                                         # Lambda-Abmagerungsfaktor fuer HCCI-Verzug.
         residual_slowdown_factor: 1.5                                                                                                                                         # Verlangsamung durch Restgasanteil.
         start_temperature_min_K: 580.0                                                                                                                                        # Mindesttemperatur fuer HCCI-SOC.
-        start_pressure_min_Pa: 500000.0                                                                                                                                      # Mindestdruck fuer HCCI-SOC.
-        max_ignition_delay_s: 0.002                                                                                                                                            # Maximal erlaubter HCCI-Zuendverzug.
-      hcci_diesel_beck_2003:
-        model: hcci_diesel                                                                                                                                                    # Auswahl des jeweiligen Teilmodells.
-        ignition_model: beck_2003_two_stage                                                                                                                                   # Zweistufiges Beck-Zuendmodell mit Cool Flame und Hot Flame.
-        burn_model: vibe-beck
-        cool_flame_burn_model: vibe-beck_CF                                                                                                                                        # Vibe-Beck-Brennverlaufsmodell nach Autoignition.
-        duration_ms: 1.2                                                                                                                                                      # Brenndauer in Millisekunden.
-        lambda_target: 2.4                                                                                                                                                    # Ziel-Luftverhaeltnis Lambda.
-        lhv_J_per_kg: 43000000.0                                                                                                                                              # Unterer Heizwert des Kraftstoffs.
-        slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
+        start_pressure_min_Pa: 500000.0                                                                                                                                       # Mindestdruck fuer HCCI-SOC.
+        max_ignition_delay_s: 0.002                                                                                                                                           # Maximal erlaubter HCCI-Zuendverzug.
+        accumulation_start_mode: piston_distance_from_tdc                                                                                                                     # Startfenster fuer HCCI-Zuendverzug/Livengood-Wu-Akkumulation.
+        accumulation_start_distance_from_tdc_mm: 30.0                                                                                                                         # Starte Akkumulation erst ab diesem Abstand vor OT.
+        accumulation_end_mode: combustion_end                                                                                                                                 # Beende Diagnose/Akkumulation nach Brennende.
+      ignition_beck_2003:
+        model: beck_2003_two_stage                                                                                                                                            # Zweistufiges Beck-Zuendmodell mit Cool Flame und Hot Flame.
+        cool_flame_burn_model: vibe-beck_CF                                                                                                                                   # Vibe-Beck-Brennverlaufsmodell nach Autoignition.
         beck_cf_fuel_name: Diesel 2                                                                                                                                           # Kraftstoffname nach Beck Tabelle 6.2 fuer das Cool-Flame-Modell.
         start_temperature_min_K: 592.0                                                                                                                                        # Mindesttemperatur fuer HCCI-SOC.
-        start_pressure_min_Pa: 50000.0                                                                                                                                       # Mindestdruck fuer HCCI-SOC.
+        start_pressure_min_Pa: 50000.0                                                                                                                                        # Mindestdruck fuer HCCI-SOC.
         max_ignition_delay_s: 0.002                                                                                                                                           # Maximal erlaubter HCCI-Zuendverzug.
     connections:
       compressor_in_check_valve:

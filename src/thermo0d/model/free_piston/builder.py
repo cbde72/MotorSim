@@ -3,10 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+from pydantic import TypeAdapter
 
 from thermo0d.compute.jacobian import build_rhs_jacobian_sparsity, greedy_color_columns
 from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, CombStartMode, CombustionModel, ConnCol, ConnectionType, CycleType, EvapCol, HeatTransferModel, VolumeCol, VolumeType, WallCol, WallRefCol, WallTemperatureCol, WallTemperatureZone
-from thermo0d.config.models import BounceChamberVolumeConfig, CycleAverageWallTemperatureConfig, CylinderVolumeConfig, DisabledSubmodelConfig, HcciDieselCombustionConfig, PlenumVolumeConfig, VibeCombustionConfig, WoschniHeatTransferConfig
+from thermo0d.config.models import BounceChamberVolumeConfig, CycleAverageWallTemperatureConfig, CylinderVolumeConfig, DisabledSubmodelConfig, HcciDieselCombustionConfig, IgnitionConfig, PlenumVolumeConfig, VibeCombustionConfig, WoschniHeatTransferConfig
 from thermo0d.core.model_bundle import FreePistonModelData, ModelBundle
 from thermo0d.model.free_piston.combustion_latch import bootstrap_free_piston_combustion_latch
 from thermo0d.core.state_layout import StateLayout
@@ -145,6 +146,45 @@ def _resolve_table_path(builder, table_path: str) -> Path:
     if candidate.is_absolute():
         return candidate
     return Path(builder.config_dir, candidate)
+
+
+def _hcci_ignition_cfg(hcci_cfg):
+    return getattr(hcci_cfg, "ignition", None) or hcci_cfg
+
+
+def _hcci_ignition_model_name(hcci_cfg) -> str:
+    ignition_cfg = _hcci_ignition_cfg(hcci_cfg)
+    return str(getattr(ignition_cfg, "model", getattr(hcci_cfg, "ignition_model", "livengood_wu")) or "livengood_wu")
+
+
+def _hcci_ignition_value(hcci_cfg, name: str, default=None):
+    ignition_cfg = _hcci_ignition_cfg(hcci_cfg)
+    if hasattr(ignition_cfg, name):
+        return getattr(ignition_cfg, name)
+    return getattr(hcci_cfg, name, default)
+
+
+def _validate_hcci_diesel_with_ignition_ref(builder, raw_hcci_cfg: dict) -> HcciDieselCombustionConfig:
+    data = dict(raw_hcci_cfg)
+    ignition_cfg = data.get("ignition")
+    if isinstance(ignition_cfg, dict) and ("ref" in ignition_cfg or "reference" in ignition_cfg):
+        ref_name = str(ignition_cfg.get("ref", ignition_cfg.get("reference")))
+        ignition_library = getattr(getattr(getattr(builder.config, "preprocessing", None), "submodels", None), "ignition", {}) or {}
+        raw_ignition = ignition_library.get(ref_name)
+        if raw_ignition is None:
+            raise ValueError(f"hcci_diesel ignition references unknown ignition submodel {ref_name!r}")
+        merged = dict(raw_ignition)
+        merged.update({k: v for k, v in ignition_cfg.items() if k not in ("ref", "reference")})
+        data["ignition"] = merged
+    return HcciDieselCombustionConfig.model_validate(data)
+
+
+def _validate_ignition_ref(builder, ref_name: str):
+    ignition_library = getattr(getattr(getattr(builder.config, "preprocessing", None), "submodels", None), "ignition", {}) or {}
+    raw_ignition = ignition_library.get(ref_name)
+    if raw_ignition is None:
+        return None
+    return TypeAdapter(IgnitionConfig).validate_python(dict(raw_ignition))
 
 
 def _initial_cylinder_burned_fraction_0to1(fp, cylinder_vol: CylinderVolumeConfig | None = None) -> float:
@@ -650,6 +690,9 @@ def build_free_piston_bundle(builder) -> ModelBundle:
     hcci_start_temperature_min_by_vol_K = np.zeros(n_vol, dtype=np.float64)
     hcci_start_pressure_min_by_vol_Pa = np.zeros(n_vol, dtype=np.float64)
     hcci_max_ignition_delay_by_vol_s = np.zeros(n_vol, dtype=np.float64)
+    hcci_accumulation_start_mode_by_vol = np.zeros(n_vol, dtype=np.int64)
+    hcci_accumulation_start_distance_from_tdc_by_vol_m = np.zeros(n_vol, dtype=np.float64)
+    hcci_accumulation_end_mode_by_vol = np.zeros(n_vol, dtype=np.int64)
     hcci_ignition_model_by_vol = np.zeros(n_vol, dtype=np.int64)
     hcci_diagnostics_enabled_by_vol = np.zeros(n_vol, dtype=np.int64)
     hcci_burn_model_by_vol = np.zeros(n_vol, dtype=np.int64)
@@ -947,31 +990,42 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         hcci_delay_cfg = combustion_cfg_local if is_hcci_diesel else None
         if not is_hcci_diesel and isinstance(combustion_cfg_local, VibeCombustionConfig) and combustion_cfg_local.hcci_diagnostics_ref is not None:
             ref_name = str(combustion_cfg_local.hcci_diagnostics_ref)
-            combustion_library = getattr(getattr(getattr(builder.config, 'preprocessing', None), 'submodels', None), 'combustion', {}) or {}
-            raw_hcci_cfg = combustion_library.get(ref_name)
-            if raw_hcci_cfg is None:
-                raise ValueError(f"vibe combustion hcci_diagnostics_ref references unknown combustion submodel {ref_name!r}")
-            hcci_delay_cfg = HcciDieselCombustionConfig.model_validate(raw_hcci_cfg)
+            hcci_delay_cfg = _validate_ignition_ref(builder, ref_name)
+            if hcci_delay_cfg is None:
+                combustion_library = getattr(getattr(getattr(builder.config, 'preprocessing', None), 'submodels', None), 'combustion', {}) or {}
+                raw_hcci_cfg = combustion_library.get(ref_name)
+                if raw_hcci_cfg is None:
+                    raise ValueError(f"vibe combustion hcci_diagnostics_ref references unknown ignition or combustion submodel {ref_name!r}")
+                hcci_delay_cfg = _validate_hcci_diesel_with_ignition_ref(builder, raw_hcci_cfg)
             hcci_diagnostics_enabled_by_vol[int(cyl_i)] = 1
         if hcci_delay_cfg is not None:
             if is_hcci_diesel:
                 hcci_enabled_by_vol[int(cyl_i)] = 1
                 hcci_diagnostics_enabled_by_vol[int(cyl_i)] = 1
-            ign_model_str = hcci_delay_cfg.ignition_model
+            ign_model_str = _hcci_ignition_model_name(hcci_delay_cfg)
             if ign_model_str in ("beck_2003_1_arrhenius", "beck_2003_two_stage"):
-                hcci_tau_A_by_vol_s[int(cyl_i)] = float(hcci_delay_cfg.beck_c1_s)
-                hcci_pressure_exponent_by_vol[int(cyl_i)] = float(hcci_delay_cfg.beck_c2)
+                hcci_tau_A_by_vol_s[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "beck_c1_s", 1.0e-5))
+                hcci_pressure_exponent_by_vol[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "beck_c2", -1.2))
             else:
-                hcci_tau_A_by_vol_s[int(cyl_i)] = float(hcci_delay_cfg.tau_A_s)
-                hcci_pressure_exponent_by_vol[int(cyl_i)] = float(hcci_delay_cfg.tau_pressure_exponent)
-            hcci_activation_temperature_by_vol_K[int(cyl_i)] = float(hcci_delay_cfg.tau_activation_temperature_K)
-            hcci_reference_pressure_by_vol_Pa[int(cyl_i)] = float(hcci_delay_cfg.tau_reference_pressure_Pa)
-            hcci_reference_lambda_by_vol[int(cyl_i)] = float(hcci_delay_cfg.tau_reference_lambda)
-            hcci_lambda_slowdown_exponent_by_vol[int(cyl_i)] = float(hcci_delay_cfg.lambda_slowdown_exponent)
-            hcci_residual_slowdown_factor_by_vol[int(cyl_i)] = float(hcci_delay_cfg.residual_slowdown_factor)
-            hcci_start_temperature_min_by_vol_K[int(cyl_i)] = float(hcci_delay_cfg.start_temperature_min_K)
-            hcci_start_pressure_min_by_vol_Pa[int(cyl_i)] = float(hcci_delay_cfg.start_pressure_min_Pa)
-            hcci_max_ignition_delay_by_vol_s[int(cyl_i)] = float(hcci_delay_cfg.max_ignition_delay_s)
+                hcci_tau_A_by_vol_s[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "tau_A_s", 2.5e-6))
+                hcci_pressure_exponent_by_vol[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "tau_pressure_exponent", 1.2))
+            hcci_activation_temperature_by_vol_K[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "tau_activation_temperature_K", 15000.0))
+            hcci_reference_pressure_by_vol_Pa[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "tau_reference_pressure_Pa", 1000000.0))
+            hcci_reference_lambda_by_vol[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "tau_reference_lambda", 1.4))
+            hcci_lambda_slowdown_exponent_by_vol[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "lambda_slowdown_exponent", 0.7))
+            hcci_residual_slowdown_factor_by_vol[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "residual_slowdown_factor", 1.5))
+            hcci_start_temperature_min_by_vol_K[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "start_temperature_min_K", 780.0))
+            hcci_start_pressure_min_by_vol_Pa[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "start_pressure_min_Pa", 2000000.0))
+            hcci_max_ignition_delay_by_vol_s[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "max_ignition_delay_s", 0.02))
+            accumulation_start_mode = str(_hcci_ignition_value(hcci_delay_cfg, "accumulation_start_mode", "compression"))
+            hcci_accumulation_start_mode_by_vol[int(cyl_i)] = 1 if accumulation_start_mode == "piston_distance_from_tdc" else 0
+            accumulation_start_m = _hcci_ignition_value(hcci_delay_cfg, "accumulation_start_distance_from_tdc_m", None)
+            accumulation_start_mm = _hcci_ignition_value(hcci_delay_cfg, "accumulation_start_distance_from_tdc_mm", None)
+            if accumulation_start_m is not None:
+                hcci_accumulation_start_distance_from_tdc_by_vol_m[int(cyl_i)] = float(accumulation_start_m)
+            elif accumulation_start_mm is not None:
+                hcci_accumulation_start_distance_from_tdc_by_vol_m[int(cyl_i)] = float(accumulation_start_mm) * 1.0e-3
+            hcci_accumulation_end_mode_by_vol[int(cyl_i)] = 1 if str(_hcci_ignition_value(hcci_delay_cfg, "accumulation_end_mode", "none")) == "combustion_end" else 0
 
             if ign_model_str == "beck_2003_1_arrhenius":
                 hcci_ignition_model_by_vol[int(cyl_i)] = 1
@@ -981,26 +1035,27 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             elif ign_model_str == "tabulated_livengood_wu":
                 hcci_ignition_model_by_vol[int(cyl_i)] = 3
                 hcci_tabulated_delay_tables_by_vol[int(cyl_i)] = _load_hcci_ignition_delay_table(
-                    _resolve_table_path(builder, str(hcci_delay_cfg.ignition_delay_table_npz))
+                    _resolve_table_path(builder, str(_hcci_ignition_value(hcci_delay_cfg, "ignition_delay_table_npz")))
                 )
 
-            if hcci_delay_cfg.burn_model == "vibe-beck":
+            if getattr(hcci_delay_cfg, "burn_model", "") == "vibe-beck":
                 hcci_burn_model_by_vol[int(cyl_i)] = 1
 
-            hcci_reference_pressure_by_vol_bar[int(cyl_i)] = float(hcci_delay_cfg.beck_reference_pressure_bar)
-            hcci_reference_o2_by_vol_percent[int(cyl_i)] = float(hcci_delay_cfg.beck_reference_o2_percent)
-            hcci_cool_flame_energy_fraction_by_vol[int(cyl_i)] = float(hcci_delay_cfg.cool_flame_energy_fraction)
-            hcci_cool_flame_duration_by_vol_s[int(cyl_i)] = float(hcci_delay_cfg.cool_flame_duration_ms) * 1.0e-3
-            cool_flame_burn_model = str(hcci_delay_cfg.cool_flame_burn_model)
+            hcci_reference_pressure_by_vol_bar[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "beck_reference_pressure_bar", 1.0))
+            hcci_reference_o2_by_vol_percent[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "beck_reference_o2_percent", 20.94))
+            hcci_cool_flame_energy_fraction_by_vol[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "cool_flame_energy_fraction", 0.08))
+            hcci_cool_flame_duration_by_vol_s[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "cool_flame_duration_ms", 0.3409)) * 1.0e-3
+            cool_flame_burn_model = str(_hcci_ignition_value(hcci_delay_cfg, "cool_flame_burn_model", "gamma"))
             hcci_cool_flame_burn_model_by_vol[int(cyl_i)] = 1 if cool_flame_burn_model in ("vibe-beck_CF", "vibe-beck") else 0
-            hcci_cool_flame_a_by_vol[int(cyl_i)] = float(hcci_delay_cfg.cool_flame_a)
-            cool_flame_m = 1.7 if cool_flame_burn_model == "vibe-beck_CF" else float(hcci_delay_cfg.cool_flame_m)
+            hcci_cool_flame_a_by_vol[int(cyl_i)] = float(_hcci_ignition_value(hcci_delay_cfg, "cool_flame_a", 6.9))
+            cool_flame_m = 1.7 if cool_flame_burn_model == "vibe-beck_CF" else float(_hcci_ignition_value(hcci_delay_cfg, "cool_flame_m", 2.0))
             hcci_cool_flame_m_by_vol[int(cyl_i)] = float(cool_flame_m)
             hcci_cool_flame_shape_m_by_vol[int(cyl_i)] = float(cool_flame_m)
 
-            beck_params = beck_cool_flame_fuel_parameters(hcci_delay_cfg.beck_cf_fuel_name)
+            beck_params = beck_cool_flame_fuel_parameters(str(_hcci_ignition_value(hcci_delay_cfg, "beck_cf_fuel_name", "Diesel 2")))
             hcci_cool_flame_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(beck_params.cool_flame_activation_energy_J_per_kg)
-            hf_ea = hcci_delay_cfg.tau_activation_energy_J_per_kg if hcci_delay_cfg.tau_activation_energy_J_per_kg is not None else beck_params.hot_flame_activation_energy_J_per_kg
+            tau_activation_energy = _hcci_ignition_value(hcci_delay_cfg, "tau_activation_energy_J_per_kg", None)
+            hf_ea = tau_activation_energy if tau_activation_energy is not None else beck_params.hot_flame_activation_energy_J_per_kg
             hcci_hot_flame_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(hf_ea)
             hcci_activation_energy_by_vol_J_per_kg[int(cyl_i)] = float(hf_ea)
 
@@ -1207,6 +1262,9 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         hcci_start_temperature_min_by_vol_K=hcci_start_temperature_min_by_vol_K,
         hcci_start_pressure_min_by_vol_Pa=hcci_start_pressure_min_by_vol_Pa,
         hcci_max_ignition_delay_by_vol_s=hcci_max_ignition_delay_by_vol_s,
+        hcci_accumulation_start_mode_by_vol=hcci_accumulation_start_mode_by_vol,
+        hcci_accumulation_start_distance_from_tdc_by_vol_m=hcci_accumulation_start_distance_from_tdc_by_vol_m,
+        hcci_accumulation_end_mode_by_vol=hcci_accumulation_end_mode_by_vol,
         hcci_ignition_model_by_vol=hcci_ignition_model_by_vol,
         hcci_diagnostics_enabled_by_vol=hcci_diagnostics_enabled_by_vol,
         hcci_burn_model_by_vol=hcci_burn_model_by_vol,

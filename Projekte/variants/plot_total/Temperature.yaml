@@ -15,9 +15,9 @@ figures:
       title: Temperature [K]
       side: left
       color: '#111111'
-      limit_mode: auto
-      y_min: -1.0
-      y_max: 11.0
+      limit_mode: manual
+      y_min: .0
+      y_max: 3000.0
     series:
     - signal_key: cylinder_1_T_K
       label: cylinder

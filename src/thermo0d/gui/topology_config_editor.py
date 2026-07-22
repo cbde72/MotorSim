@@ -106,6 +106,77 @@ def _merge_defaults_inplace(target: dict[str, Any], defaults: dict[str, Any]) ->
             _merge_defaults_inplace(target[key], value)
 
 
+def _fill_ref_types_for_editor_inplace(state: dict[str, Any]) -> None:
+    preprocessing = state.get("preprocessing")
+    if not isinstance(preprocessing, dict):
+        return
+    submodels = preprocessing.get("submodels")
+    if not isinstance(submodels, dict):
+        return
+
+    def _merged_ref(item: dict[str, Any], library: dict[str, Any]) -> dict[str, Any]:
+        ref_name = str(item.get("ref", "") or "").strip()
+        ref_model = library.get(ref_name) if ref_name else None
+        if not isinstance(ref_model, dict):
+            return item
+        merged = _deepcopy_jsonable(ref_model)
+        _merge_defaults_inplace(item, merged)
+        return item
+
+    def _merge_nested_submodel(item: dict[str, Any], key: str) -> None:
+        value = item.get(key)
+        library = submodels.get(key)
+        if not isinstance(value, dict) or not isinstance(library, dict):
+            return
+        ref_name = str(value.get("ref", "") or "").strip()
+        ref_model = library.get(ref_name) if ref_name else None
+        if isinstance(ref_model, dict):
+            _merge_defaults_inplace(value, _deepcopy_jsonable(ref_model))
+
+    def _split_legacy_ignition(item: dict[str, Any]) -> None:
+        combustion = item.get("combustion")
+        if not isinstance(combustion, dict) or combustion.get("model") != "hcci_diesel" or isinstance(combustion.get("ignition"), dict):
+            return
+        ignition_keys = {
+            "ignition_model", "ignition_delay_table_npz", "tau_A_s", "tau_pressure_exponent",
+            "tau_activation_temperature_K", "tau_activation_energy_J_per_kg", "tau_reference_pressure_Pa",
+            "tau_reference_lambda", "lambda_slowdown_exponent", "residual_slowdown_factor",
+            "beck_c1_s", "beck_c2", "beck_reference_pressure_bar", "beck_reference_o2_percent",
+            "beck_cf_fuel_name", "cool_flame_enabled", "cool_flame_burn_model",
+            "cool_flame_energy_fraction", "cool_flame_duration_ms", "cool_flame_a", "cool_flame_m",
+            "start_temperature_min_K", "start_pressure_min_Pa", "max_ignition_delay_s",
+            "accumulation_start_mode", "accumulation_start_distance_from_tdc_m",
+            "accumulation_start_distance_from_tdc_mm", "accumulation_end_mode",
+        }
+        ignition: dict[str, Any] = {"model": combustion.get("ignition_model", "livengood_wu")}
+        for key in ignition_keys:
+            if key == "ignition_model":
+                continue
+            if key in combustion:
+                ignition[key] = combustion.get(key)
+        combustion["ignition"] = ignition
+
+    def _fill_group(items_key: str, library_key: str) -> None:
+        items = preprocessing.get(items_key)
+        library = submodels.get(library_key)
+        if not isinstance(items, list) or not isinstance(library, dict):
+            return
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            _merged_ref(item, library)
+            if items_key == "volumes":
+                for nested_key in ("wall_heat", "wall_temperature", "combustion", "evaporation"):
+                    _merge_nested_submodel(item, nested_key)
+                _merge_nested_submodel(item.get("combustion", {}) if isinstance(item.get("combustion"), dict) else {}, "ignition")
+                _split_legacy_ignition(item)
+            if items_key == "connections":
+                _merge_nested_submodel(item, "discharge_coefficients")
+
+    _fill_group("volumes", "volumes")
+    _fill_group("connections", "connections")
+
+
 def _format_yaml_value(value: Any) -> str:
     if value is None or value == "":
         return ""
@@ -185,6 +256,19 @@ def _sanitize_mode_dependent_fields_inplace(state: dict[str, Any]) -> None:
             continue
         combustion = vol.get("combustion")
         if not isinstance(combustion, dict) or combustion.get("model") != "vibe":
+            if isinstance(combustion, dict) and combustion.get("model") == "hcci_diesel" and isinstance(combustion.get("ignition"), dict):
+                for key in (
+                    "ignition_model", "ignition_delay_table_npz", "tau_A_s", "tau_pressure_exponent",
+                    "tau_activation_temperature_K", "tau_activation_energy_J_per_kg", "tau_reference_pressure_Pa",
+                    "tau_reference_lambda", "lambda_slowdown_exponent", "residual_slowdown_factor",
+                    "beck_c1_s", "beck_c2", "beck_reference_pressure_bar", "beck_reference_o2_percent",
+                    "beck_cf_fuel_name", "cool_flame_enabled", "cool_flame_burn_model",
+                    "cool_flame_energy_fraction", "cool_flame_duration_ms", "cool_flame_a", "cool_flame_m",
+                    "start_temperature_min_K", "start_pressure_min_Pa", "max_ignition_delay_s",
+                    "accumulation_start_mode", "accumulation_start_distance_from_tdc_m",
+                    "accumulation_start_distance_from_tdc_mm", "accumulation_end_mode",
+                ):
+                    combustion.pop(key, None)
             continue
         start_mode = combustion.get("start_mode")
         if start_mode == "angle":
@@ -493,11 +577,14 @@ class TopologyGraphicsView(QGraphicsView):
 
 
 class PaletteTree(QTreeWidget):
+    add_requested = Signal(str)
+
     def __init__(self):
         super().__init__()
         self.setHeaderHidden(True)
         self.setDragEnabled(True)
         self.setSelectionMode(QTreeWidget.SelectionMode.SingleSelection)
+        self.itemDoubleClicked.connect(self._on_item_double_clicked)
         self._build()
         self.expandAll()
 
@@ -539,6 +626,11 @@ class PaletteTree(QTreeWidget):
         drag.setMimeData(mime)
         drag.exec(Qt.DropAction.CopyAction)
 
+    def _on_item_double_clicked(self, item: QTreeWidgetItem, column: int) -> None:
+        payload = item.data(0, Qt.ItemDataRole.UserRole)
+        if payload:
+            self.add_requested.emit(str(payload.get("item_type", "")))
+
 
 class NodeListPanel(QWidget):
     selection_requested = Signal(str)
@@ -552,6 +644,7 @@ class NodeListPanel(QWidget):
         layout.setSpacing(8)
 
         self.search_edit = QLineEdit()
+        self.search_edit.setClearButtonEnabled(True)
         self.search_edit.setPlaceholderText("Elemente filtern …")
         self.search_edit.textChanged.connect(self._rebuild)
         layout.addWidget(self.search_edit)
@@ -568,6 +661,7 @@ class NodeListPanel(QWidget):
             ("+ Rueck", "check_valve"),
         ):
             btn = QPushButton(text_label)
+            btn.setToolTip(f"{item_type} in der aktuellen Ansicht einfuegen")
             btn.clicked.connect(lambda _=False, t=item_type: self.add_requested.emit(t))
             quick.addWidget(btn)
         layout.addLayout(quick)
@@ -635,6 +729,202 @@ class NodeListPanel(QWidget):
             self.selection_requested.emit(model_id)
 
 
+class ProblemPanel(QWidget):
+    selection_requested = Signal(str)
+
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        self.summary_label = QLabel("Keine Probleme")
+        self.summary_label.setStyleSheet("font-weight:700;color:#86efac;")
+        layout.addWidget(self.summary_label)
+
+        self.list_widget = QListWidget()
+        self.list_widget.itemActivated.connect(self._activate_item)
+        self.list_widget.itemDoubleClicked.connect(self._activate_item)
+        layout.addWidget(self.list_widget)
+
+        hint = QLabel("Doppelklick springt zum betroffenen Element.")
+        hint.setStyleSheet("color:#94a3b8;")
+        layout.addWidget(hint)
+
+    def refresh(self, problems: list[dict[str, str]]) -> None:
+        self.list_widget.clear()
+        if not problems:
+            self.summary_label.setText("Keine Probleme")
+            self.summary_label.setStyleSheet("font-weight:700;color:#86efac;")
+            return
+        errors = sum(1 for p in problems if p.get("severity") == "Fehler")
+        warnings = len(problems) - errors
+        parts = []
+        if errors:
+            parts.append(f"{errors} Fehler")
+        if warnings:
+            parts.append(f"{warnings} Hinweise")
+        self.summary_label.setText(", ".join(parts))
+        self.summary_label.setStyleSheet("font-weight:700;color:#fbbf24;")
+        for problem in problems:
+            item = QListWidgetItem(f"{problem.get('severity', 'Hinweis')}: {problem.get('text', '')}")
+            item.setData(Qt.ItemDataRole.UserRole, problem.get("model_id", ""))
+            item.setToolTip(problem.get("detail", problem.get("text", "")))
+            self.list_widget.addItem(item)
+
+    def _activate_current(self) -> None:
+        item = self.list_widget.currentItem()
+        if item is None:
+            return
+        self._activate_item(item)
+
+    def _activate_item(self, item: QListWidgetItem) -> None:
+        model_id = str(item.data(Qt.ItemDataRole.UserRole) or "")
+        if model_id:
+            self.selection_requested.emit(model_id)
+
+
+SUBMODEL_LIBRARY_TYPES = ("wall_heat", "wall_temperature", "combustion", "ignition", "evaporation")
+SUBMODEL_LABELS = {
+    "wall_heat": "Wandwaerme",
+    "wall_temperature": "Wandtemperatur",
+    "combustion": "Verbrennung",
+    "ignition": "Zuendung",
+    "evaporation": "Verdampfung",
+}
+
+
+class SubmodelLibraryPanel(QWidget):
+    selection_requested = Signal(str, str)
+    add_requested = Signal(str)
+    apply_requested = Signal(str, str)
+    delete_requested = Signal(str, str)
+
+    def __init__(self):
+        super().__init__()
+        self._records: list[dict[str, str]] = []
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        self.search_edit = QLineEdit()
+        self.search_edit.setClearButtonEnabled(True)
+        self.search_edit.setPlaceholderText("Submodelle filtern ...")
+        self.search_edit.textChanged.connect(self._rebuild)
+        layout.addWidget(self.search_edit)
+
+        quick = QHBoxLayout()
+        for label, submodel_type in (
+            ("+ Ww", "wall_heat"),
+            ("+ Wt", "wall_temperature"),
+            ("+ Verbr", "combustion"),
+            ("+ Zuend", "ignition"),
+            ("+ Verd", "evaporation"),
+        ):
+            btn = QPushButton(label)
+            btn.setToolTip(f"{SUBMODEL_LABELS[submodel_type]}-Submodell anlegen")
+            btn.clicked.connect(lambda _=False, t=submodel_type: self.add_requested.emit(t))
+            quick.addWidget(btn)
+        layout.addLayout(quick)
+
+        self.list_widget = QListWidget()
+        self.list_widget.itemSelectionChanged.connect(self._on_selection_changed)
+        self.list_widget.itemDoubleClicked.connect(self._on_item_activated)
+        layout.addWidget(self.list_widget)
+
+        buttons = QHBoxLayout()
+        self.apply_button = QPushButton("Auf Volumen anwenden")
+        self.apply_button.clicked.connect(self._apply_current)
+        buttons.addWidget(self.apply_button)
+        self.delete_button = QPushButton("Loeschen")
+        self.delete_button.clicked.connect(self._delete_current)
+        buttons.addWidget(self.delete_button)
+        layout.addLayout(buttons)
+
+        self.info_label = QLabel("0 Submodelle")
+        self.info_label.setStyleSheet("color:#94a3b8;")
+        layout.addWidget(self.info_label)
+
+    def refresh(self, submodels: dict[str, Any], selected: tuple[str, str] | None = None) -> None:
+        self._records = []
+        for submodel_type in SUBMODEL_LIBRARY_TYPES:
+            group = submodels.get(submodel_type, {})
+            if not isinstance(group, dict):
+                continue
+            for name, data in group.items():
+                model_kind = ""
+                if isinstance(data, dict):
+                    model_kind = str(data.get("model", data.get("type", "")) or "")
+                self._records.append({
+                    "type": submodel_type,
+                    "name": str(name),
+                    "label": SUBMODEL_LABELS.get(submodel_type, submodel_type),
+                    "model": model_kind,
+                })
+        self._rebuild()
+        if selected is not None:
+            self.select_id(selected[0], selected[1])
+
+    def _rebuild(self) -> None:
+        filter_text = self.search_edit.text().strip().lower()
+        current = self.current_id()
+        self.list_widget.blockSignals(True)
+        self.list_widget.clear()
+        visible_count = 0
+        for record in self._records:
+            hay = f"{record['type']} {record['label']} {record['name']} {record['model']}".lower()
+            if filter_text and filter_text not in hay:
+                continue
+            suffix = f" ({record['model']})" if record["model"] else ""
+            item = QListWidgetItem(f"[{record['label']}] {record['name']}{suffix}")
+            item.setData(Qt.ItemDataRole.UserRole, (record["type"], record["name"]))
+            self.list_widget.addItem(item)
+            visible_count += 1
+        self.list_widget.blockSignals(False)
+        self.info_label.setText(f"{visible_count} / {len(self._records)} Submodelle")
+        if current is not None:
+            self.select_id(current[0], current[1])
+
+    def current_id(self) -> tuple[str, str] | None:
+        item = self.list_widget.currentItem()
+        if item is None:
+            return None
+        data = item.data(Qt.ItemDataRole.UserRole)
+        if isinstance(data, tuple) and len(data) == 2:
+            return str(data[0]), str(data[1])
+        return None
+
+    def select_id(self, submodel_type: str, name: str) -> None:
+        self.list_widget.blockSignals(True)
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(data, tuple) and data == (submodel_type, name):
+                self.list_widget.setCurrentItem(item)
+                break
+        self.list_widget.blockSignals(False)
+
+    def _on_selection_changed(self) -> None:
+        current = self.current_id()
+        if current is not None:
+            self.selection_requested.emit(current[0], current[1])
+
+    def _on_item_activated(self, item: QListWidgetItem) -> None:
+        data = item.data(Qt.ItemDataRole.UserRole)
+        if isinstance(data, tuple) and len(data) == 2:
+            self.selection_requested.emit(str(data[0]), str(data[1]))
+
+    def _apply_current(self) -> None:
+        current = self.current_id()
+        if current is not None:
+            self.apply_requested.emit(current[0], current[1])
+
+    def _delete_current(self) -> None:
+        current = self.current_id()
+        if current is not None:
+            self.delete_requested.emit(current[0], current[1])
+
+
 class PropertyPanel(QWidget):
     value_changed = Signal(str, object)
 
@@ -644,6 +934,10 @@ class PropertyPanel(QWidget):
         self._data: dict[str, Any] | None = None
         self._widgets: dict[str, QWidget] = {}
         self._row_containers: dict[str, QWidget] = {}
+        self._row_labels: dict[str, QWidget] = {}
+        self._row_forms: dict[str, QFormLayout] = {}
+        self._tab_forms: dict[str, QFormLayout] = {}
+        self._submodel_refs: dict[str, list[str]] = {}
         self._updating = False
 
         self.layout_main = QVBoxLayout(self)
@@ -653,15 +947,8 @@ class PropertyPanel(QWidget):
         self.title_label.setStyleSheet("font-weight:700;font-size:14px;")
         self.layout_main.addWidget(self.title_label)
 
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll_frame = QWidget()
-        self.form = QFormLayout(self.scroll_frame)
-        self.form.setContentsMargins(8, 8, 8, 8)
-        self.form.setSpacing(8)
-        self.form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        self.scroll.setWidget(self.scroll_frame)
-        self.layout_main.addWidget(self.scroll)
+        self.tabs = QTabWidget()
+        self.layout_main.addWidget(self.tabs)
         self.empty_label = QLabel("Kein Element ausgewählt.")
         self.empty_label.setStyleSheet("color:#94a3b8;")
         self.layout_main.addWidget(self.empty_label)
@@ -672,14 +959,48 @@ class PropertyPanel(QWidget):
         self.schema_label.hide()
 
     def clear_fields(self) -> None:
-        while self.form.rowCount() > 0:
-            self.form.removeRow(0)
+        self.tabs.clear()
         self._widgets.clear()
         self._row_containers.clear()
+        self._row_labels.clear()
+        self._row_forms.clear()
+        self._tab_forms.clear()
 
-    def set_payload(self, title: str, payload: dict[str, Any] | None, data: dict[str, Any] | None, volume_names: list[str]):
+    def _ensure_tab_form(self, tab_name: str) -> QFormLayout:
+        name = tab_name or "Allgemein"
+        if name in self._tab_forms:
+            return self._tab_forms[name]
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        frame = QWidget()
+        form = QFormLayout(frame)
+        form.setContentsMargins(8, 8, 8, 8)
+        form.setSpacing(8)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        scroll.setWidget(frame)
+        self.tabs.addTab(scroll, name)
+        self._tab_forms[name] = form
+        return form
+
+    def _tab_name_for_key(self, key: str) -> str:
+        if key == "name" or key.startswith(("initial_", "kinematics.", "fixed_volume_", "pressure_", "temperature_")):
+            return "Allgemein"
+        if key.startswith("combustion.ignition."):
+            return "Ignition"
+        if key.startswith("combustion."):
+            return "Combustion"
+        if key.startswith(("wall_heat.", "wall_temperature.")):
+            return "Waerme"
+        if key.startswith("evaporation."):
+            return "Evaporation"
+        if key in {"from_volume", "to_volume"} or key.startswith(("opening_", "distance_", "width_", "height_", "discharge_", "area_", "diameter_", "cracking_", "lift_", "alpha_", "lash_", "source_", "piston_", "entrance_", "open_", "full_", "number_", "forward_", "reverse_")):
+            return "Verbindung"
+        return "Sonstiges"
+
+    def set_payload(self, title: str, payload: dict[str, Any] | None, data: dict[str, Any] | None, volume_names: list[str], submodel_refs: dict[str, list[str]] | None = None):
         self._payload = payload
         self._data = data
+        self._submodel_refs = submodel_refs or {}
         self.title_label.setText(title)
         self.clear_fields()
         if payload is None or data is None:
@@ -727,14 +1048,21 @@ class PropertyPanel(QWidget):
             key = spec.get("key")
             if not key or self._get_value(key) is not None:
                 continue
+            if "visible_if" in spec and not self._visible_if_matches(spec["visible_if"]):
+                continue
             if "default" in spec:
-                self._set_value(key, spec["default"])
+                default = spec["default"]
+                if str(key).endswith(".duration_mode") and self._get_value("combustion.model") == "hcci_diesel":
+                    default = "time"
+                self._set_value(key, default)
 
     def _field_specs(self, payload: dict[str, Any], data: dict[str, Any], volume_names: list[str]) -> list[dict[str, Any]]:
         kind = payload.get("kind")
         item_type = payload.get("type")
         if kind == "root":
             return self._root_specs(data)
+        if kind == "submodel":
+            return self._with_remaining_specs(self._submodel_library_specs(str(item_type), data), data)
         if item_type == "cylinder":
             return self._with_remaining_specs(self._cylinder_specs(data), data)
         if item_type == "plenum":
@@ -753,11 +1081,68 @@ class PropertyPanel(QWidget):
             return self._with_remaining_specs(self._check_valve_specs(data, volume_names), data)
         return []
 
+    def _submodel_library_specs(self, submodel_type: str, data: dict[str, Any]) -> list[dict[str, Any]]:
+        if submodel_type == "wall_heat":
+            return self._direct_submodel_specs("wall_heat")
+        if submodel_type == "wall_temperature":
+            return self._direct_submodel_specs("wall_temperature")
+        if submodel_type == "combustion":
+            return self._direct_submodel_specs("combustion", include_angle_reference=True)
+        if submodel_type == "ignition":
+            return self._direct_submodel_specs("ignition")
+        if submodel_type == "evaporation":
+            return self._direct_submodel_specs("evaporation", include_angle_reference=True)
+        return []
+
+    def _volume_submodel_specs(self, prefix: str, include_angle_reference: bool = False) -> list[dict[str, Any]]:
+        refs = self._submodel_refs.get(prefix, [])
+        specs: list[dict[str, Any]] = []
+        if refs:
+            specs.append(self._meta_spec(f"{prefix}.ref", type="choice", choices=["", *refs], label=f"{SUBMODEL_LABELS.get(prefix, prefix)} ref", tab=self._tab_name_for_key(f"{prefix}.ref")))
+        submodel_specs = self._submodel_specs(prefix, include_angle_reference=include_angle_reference)
+        if prefix == "combustion":
+            diagnostics_refs = sorted({*self._submodel_refs.get("ignition", []), *self._submodel_refs.get("combustion", [])})
+            if diagnostics_refs:
+                for spec in submodel_specs:
+                    if spec.get("key") == "combustion.hcci_diagnostics_ref":
+                        spec["type"] = "choice"
+                        spec["choices"] = ["", *diagnostics_refs]
+                        break
+        return specs + submodel_specs
+
+    def _direct_submodel_specs(self, prefix: str, include_angle_reference: bool = False) -> list[dict[str, Any]]:
+        direct_specs: list[dict[str, Any]] = []
+        marker = f"{prefix}."
+        for spec in self._submodel_specs(prefix, include_angle_reference=include_angle_reference):
+            key = str(spec.get("key", ""))
+            if not key.startswith(marker):
+                continue
+            direct = dict(spec)
+            direct["key"] = key[len(marker):]
+            if "visible_if" in direct:
+                direct["visible_if"] = self._strip_visible_if_prefix(direct["visible_if"], marker)
+            direct_specs.append(direct)
+        return direct_specs
+
+    def _strip_visible_if_prefix(self, condition: Any, marker: str) -> Any:
+        if isinstance(condition, tuple) and len(condition) == 2 and isinstance(condition[0], str):
+            dep_key = condition[0]
+            if dep_key.startswith(marker):
+                dep_key = dep_key[len(marker):]
+            return dep_key, condition[1]
+        if isinstance(condition, list):
+            return [self._strip_visible_if_prefix(item, marker) for item in condition]
+        if isinstance(condition, dict):
+            return {key: self._strip_visible_if_prefix(value, marker) if isinstance(value, (tuple, list, dict)) else value for key, value in condition.items()}
+        return condition
+
     def _with_remaining_specs(self, specs: list[dict[str, Any]], data: dict[str, Any]) -> list[dict[str, Any]]:
         existing = {str(spec.get("key", "")) for spec in specs}
         result = list(specs)
         for key, value in self._iter_editable_leaf_values(data):
             if key in existing:
+                continue
+            if key.startswith("combustion."):
                 continue
             result.append(self._meta_spec(key, label=key, type=self._kind_for_value(value)))
             existing.add(key)
@@ -881,39 +1266,65 @@ class PropertyPanel(QWidget):
             ]
         if prefix.endswith("combustion"):
             specs = [
-                self._meta_spec(f"{prefix}.model"),
-                self._meta_spec(f"{prefix}.start_mode"),
-                self._meta_spec(f"{prefix}.start_deg"),
-                self._meta_spec(f"{prefix}.start_hub_m"),
-                self._meta_spec(f"{prefix}.hign_m"),
-                self._meta_spec(f"{prefix}.hign_mm"),
-                self._meta_spec(f"{prefix}.duration_mode"),
-                self._meta_spec(f"{prefix}.duration_deg"),
-                self._meta_spec(f"{prefix}.duration_hub_m"),
-                self._meta_spec(f"{prefix}.duration_s"),
-                self._meta_spec(f"{prefix}.duration_ms"),
-                self._meta_spec(f"{prefix}.a"),
-                self._meta_spec(f"{prefix}.m"),
-                self._meta_spec(f"{prefix}.fuel_mass_per_cycle_kg"),
-                self._meta_spec(f"{prefix}.lhv_J_per_kg"),
-                self._meta_spec(f"{prefix}.added_energy_per_cycle_J"),
-                self._meta_spec(f"{prefix}.energy_coupling"),
-                self._meta_spec(f"{prefix}.stroke_reference_m"),
-                self._meta_spec(f"{prefix}.stroke_exponent"),
-                self._meta_spec(f"{prefix}.ignition_model"),
-                self._meta_spec(f"{prefix}.burn_model"),
-                self._meta_spec(f"{prefix}.beck_c1_s"),
-                self._meta_spec(f"{prefix}.beck_c2"),
-                self._meta_spec(f"{prefix}.beck_reference_pressure_bar"),
-                self._meta_spec(f"{prefix}.beck_reference_o2_percent"),
-                self._meta_spec(f"{prefix}.beck_cf_fuel_name"),
-                self._meta_spec(f"{prefix}.tau_activation_energy_J_per_kg"),
-                self._meta_spec(f"{prefix}.cool_flame_enabled"),
-                self._meta_spec(f"{prefix}.cool_flame_energy_fraction"),
-                self._meta_spec(f"{prefix}.cool_flame_duration_ms"),
+                self._meta_spec(f"{prefix}.model", tab="Combustion"),
+                self._meta_spec(f"{prefix}.start_mode", tab="Combustion"),
+                self._meta_spec(f"{prefix}.start_deg", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.start_mode", "angle")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.start_hub_m", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.start_mode", "compression_hub")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.hign_m", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.start_mode", "hign_position")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.hign_mm", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.start_mode", "hign_position")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.duration_mode", visible_if=(f"{prefix}.model", ("vibe", "hcci_diesel")), tab="Combustion"),
+                self._meta_spec(f"{prefix}.duration_deg", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.duration_mode", "angle")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.duration_hub_m", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.duration_mode", "compression_hub")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.duration_s", visible_if=(f"{prefix}.duration_mode", "time"), tab="Combustion"),
+                self._meta_spec(f"{prefix}.duration_ms", visible_if=(f"{prefix}.duration_mode", "time"), tab="Combustion"),
+                self._meta_spec(f"{prefix}.a", visible_if=(f"{prefix}.model", ("vibe", "hcci_diesel")), tab="Combustion"),
+                self._meta_spec(f"{prefix}.m", visible_if=(f"{prefix}.model", ("vibe", "hcci_diesel")), tab="Combustion"),
+                self._meta_spec(f"{prefix}.fueling_mode", type="choice", choices=["fixed_energy", "lambda_from_cylinder_mass_at_slot_close", "lambda_from_cylinder_air_at_slot_close_vapor_injector"], visible_if=(f"{prefix}.model", "vibe"), tab="Combustion"),
+                self._meta_spec(f"{prefix}.fuel_mass_per_cycle_kg", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.fueling_mode", "fixed_energy")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.added_energy_per_cycle_J", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.fueling_mode", "fixed_energy")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.lambda_target", visible_if={"any": [(f"{prefix}.model", "hcci_diesel"), [(f"{prefix}.model", "vibe"), (f"{prefix}.fueling_mode", ("lambda_from_cylinder_mass_at_slot_close", "lambda_from_cylinder_air_at_slot_close_vapor_injector"))]]}, tab="Combustion"),
+                self._meta_spec(f"{prefix}.lhv_J_per_kg", visible_if=(f"{prefix}.model", ("vibe", "hcci_diesel")), tab="Combustion"),
+                self._meta_spec(f"{prefix}.afr_stoich_kg_air_per_kg_fuel", visible_if=(f"{prefix}.model", ("vibe", "hcci_diesel")), tab="Combustion"),
+                self._meta_spec(f"{prefix}.combustion_efficiency_0to1", visible_if=(f"{prefix}.model", ("vibe", "hcci_diesel")), tab="Combustion"),
+                self._meta_spec(f"{prefix}.injection_duration_s", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.fueling_mode", "lambda_from_cylinder_air_at_slot_close_vapor_injector")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.injection_duration_ms", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.fueling_mode", "lambda_from_cylinder_air_at_slot_close_vapor_injector")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.energy_coupling", visible_if=(f"{prefix}.model", "vibe"), tab="Combustion"),
+                self._meta_spec(f"{prefix}.stroke_reference_m", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.energy_coupling", "stroke_ratio")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.stroke_exponent", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.energy_coupling", "stroke_ratio")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.slot_open_threshold_m2", visible_if=(f"{prefix}.model", ("vibe", "hcci_diesel")), tab="Combustion"),
+                self._meta_spec(f"{prefix}.slot_closed_threshold_m2", visible_if=(f"{prefix}.model", ("vibe", "hcci_diesel")), tab="Combustion"),
+                self._meta_spec(f"{prefix}.compression_velocity_threshold_m_per_s", visible_if=(f"{prefix}.model", ("vibe", "hcci_diesel")), tab="Combustion"),
+                self._meta_spec(f"{prefix}.hcci_diagnostics_ref", visible_if=(f"{prefix}.model", "vibe"), tab="Combustion"),
+                self._meta_spec(f"{prefix}.burn_model", visible_if=(f"{prefix}.model", "hcci_diesel"), tab="Combustion"),
+                self._meta_spec(f"{prefix}.ignition.model", visible_if=(f"{prefix}.model", "hcci_diesel"), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.ignition_delay_table_npz", visible_if=(f"{prefix}.ignition.model", "tabulated_livengood_wu"), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.tau_A_s", visible_if=(f"{prefix}.ignition.model", ("livengood_wu", "tabulated_livengood_wu")), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.tau_pressure_exponent", visible_if=(f"{prefix}.ignition.model", ("livengood_wu", "tabulated_livengood_wu")), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.tau_activation_temperature_K", visible_if=(f"{prefix}.ignition.model", ("livengood_wu", "tabulated_livengood_wu", "beck_2003_1_arrhenius", "beck_2003_two_stage")), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.tau_activation_energy_J_per_kg", visible_if=(f"{prefix}.ignition.model", ("livengood_wu", "tabulated_livengood_wu", "beck_2003_1_arrhenius", "beck_2003_two_stage")), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.tau_reference_pressure_Pa", visible_if=(f"{prefix}.ignition.model", ("livengood_wu", "tabulated_livengood_wu", "beck_2003_1_arrhenius", "beck_2003_two_stage")), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.tau_reference_lambda", visible_if=(f"{prefix}.ignition.model", ("livengood_wu", "tabulated_livengood_wu", "beck_2003_1_arrhenius", "beck_2003_two_stage")), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.lambda_slowdown_exponent", visible_if=(f"{prefix}.model", "hcci_diesel"), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.residual_slowdown_factor", visible_if=(f"{prefix}.model", "hcci_diesel"), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.beck_c1_s", visible_if=(f"{prefix}.ignition.model", ("beck_2003_1_arrhenius", "beck_2003_two_stage")), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.beck_c2", visible_if=(f"{prefix}.ignition.model", ("beck_2003_1_arrhenius", "beck_2003_two_stage")), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.beck_reference_pressure_bar", visible_if=(f"{prefix}.ignition.model", ("beck_2003_1_arrhenius", "beck_2003_two_stage")), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.beck_reference_o2_percent", visible_if=(f"{prefix}.ignition.model", ("beck_2003_1_arrhenius", "beck_2003_two_stage")), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.beck_cf_fuel_name", visible_if=(f"{prefix}.ignition.model", "beck_2003_two_stage"), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.cool_flame_enabled", visible_if=(f"{prefix}.ignition.model", "beck_2003_two_stage"), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.cool_flame_burn_model", visible_if=[(f"{prefix}.ignition.model", "beck_2003_two_stage"), (f"{prefix}.ignition.cool_flame_enabled", True)], tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.cool_flame_energy_fraction", visible_if=[(f"{prefix}.ignition.model", "beck_2003_two_stage"), (f"{prefix}.ignition.cool_flame_enabled", True)], tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.cool_flame_duration_ms", visible_if=[(f"{prefix}.ignition.model", "beck_2003_two_stage"), (f"{prefix}.ignition.cool_flame_enabled", True)], tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.start_temperature_min_K", visible_if=(f"{prefix}.model", "hcci_diesel"), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.start_pressure_min_Pa", visible_if=(f"{prefix}.model", "hcci_diesel"), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.max_ignition_delay_s", visible_if=(f"{prefix}.model", "hcci_diesel"), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.accumulation_start_mode", visible_if=(f"{prefix}.model", "hcci_diesel"), tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.accumulation_start_distance_from_tdc_mm", visible_if=[(f"{prefix}.model", "hcci_diesel"), (f"{prefix}.ignition.accumulation_start_mode", "piston_distance_from_tdc")], tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.accumulation_start_distance_from_tdc_m", visible_if=[(f"{prefix}.model", "hcci_diesel"), (f"{prefix}.ignition.accumulation_start_mode", "piston_distance_from_tdc")], tab="Ignition"),
+                self._meta_spec(f"{prefix}.ignition.accumulation_end_mode", visible_if=(f"{prefix}.model", "hcci_diesel"), tab="Ignition"),
             ]
             if include_angle_reference:
-                specs.append(self._meta_spec(f"{prefix}.angle_reference", choices=list(ANGLE_REFERENCES)))
+                specs.append(self._meta_spec(f"{prefix}.angle_reference", choices=list(ANGLE_REFERENCES), visible_if=(f"{prefix}.model", "vibe"), tab="Combustion"))
             return specs
         specs = [
             self._meta_spec(f"{prefix}.model"),
@@ -940,10 +1351,10 @@ class PropertyPanel(QWidget):
             self._meta_spec("kinematics.compression_ratio"),
             self._meta_spec("kinematics.phase_deg"),
         ]
-        specs += self._submodel_specs("wall_heat")
-        specs += self._submodel_specs("wall_temperature")
-        specs += self._submodel_specs("combustion", include_angle_reference=True)
-        specs += self._submodel_specs("evaporation", include_angle_reference=True)
+        specs += self._volume_submodel_specs("wall_heat")
+        specs += self._volume_submodel_specs("wall_temperature")
+        specs += self._volume_submodel_specs("combustion", include_angle_reference=True)
+        specs += self._volume_submodel_specs("evaporation", include_angle_reference=True)
         return specs
 
     def _plenum_specs(self, data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -956,10 +1367,10 @@ class PropertyPanel(QWidget):
             self._meta_spec("initial_burned_mass_percent"),
             self._meta_spec("fixed_volume_m3"),
         ]
-        specs += self._submodel_specs("wall_heat")
-        specs += self._submodel_specs("wall_temperature")
-        specs += self._submodel_specs("combustion", include_angle_reference=True)
-        specs += self._submodel_specs("evaporation", include_angle_reference=True)
+        specs += self._volume_submodel_specs("wall_heat")
+        specs += self._volume_submodel_specs("wall_temperature")
+        specs += self._volume_submodel_specs("combustion", include_angle_reference=True)
+        specs += self._volume_submodel_specs("evaporation", include_angle_reference=True)
         return specs
 
     def _environment_specs(self, data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1056,7 +1467,7 @@ class PropertyPanel(QWidget):
         label = QLabel(label_text)
         if hint:
             label.setToolTip(hint.tooltip())
-        if spec["type"] == "choice":
+        if spec["type"] in {"choice", "enum"}:
             widget = QComboBox()
             widget.addItems([str(v) for v in spec.get("choices", [])])
             value = self._get_value(key)
@@ -1103,7 +1514,10 @@ class PropertyPanel(QWidget):
         if container_tip:
             container.setToolTip(container_tip)
         self._row_containers[key] = container
-        self.form.addRow(label, container)
+        self._row_labels[key] = label
+        form = self._ensure_tab_form(str(spec.get("tab", "") or self._tab_name_for_key(key)))
+        self._row_forms[key] = form
+        form.addRow(label, container)
 
     def _get_value(self, dotted_key: str) -> Any:
         if self._data is None:
@@ -1175,12 +1589,17 @@ class PropertyPanel(QWidget):
         if self._updating or self._data is None:
             return
         self._set_value(key, value)
+        if key == "combustion.model" and value == "hcci_diesel":
+            self._set_value("combustion.duration_mode", "time")
+            if self._get_value("combustion.ignition.model") is None:
+                legacy_model = self._get_value("combustion.ignition_model")
+                self._set_value("combustion.ignition.model", legacy_model or "livengood_wu")
+        if key == "combustion.model" and value == "vibe" and self._get_value("combustion.duration_mode") is None:
+            self._set_value("combustion.duration_mode", "angle")
         self._apply_dynamic_visibility()
         self.value_changed.emit(key, value)
 
     def _apply_dynamic_visibility(self) -> None:
-        for i in range(self.form.rowCount()):
-            pass
         for key, container in self._row_containers.items():
             visible = True
             spec = None
@@ -1192,12 +1611,31 @@ class PropertyPanel(QWidget):
                         spec = s
                         break
             if spec and "visible_if" in spec:
-                dep_key, dep_value = spec["visible_if"]
-                visible = self._get_value(dep_key) == dep_value
+                visible = self._visible_if_matches(spec["visible_if"])
             container.setVisible(visible)
-            label_item = self.form.itemAt(self.form.getWidgetPosition(container)[0], QFormLayout.ItemRole.LabelRole)
-            if label_item and label_item.widget():
-                label_item.widget().setVisible(visible)
+            label = self._row_labels.get(key)
+            if label is not None:
+                label.setVisible(visible)
+
+    def _visible_if_matches(self, condition: Any) -> bool:
+        if not condition:
+            return True
+        if isinstance(condition, tuple) and len(condition) == 2 and isinstance(condition[0], str):
+            dep_key, dep_value = condition
+            current = self._get_value(dep_key)
+            if isinstance(dep_value, (list, tuple, set)):
+                return current in dep_value
+            return current == dep_value
+        if isinstance(condition, list):
+            return all(self._visible_if_matches(item) for item in condition)
+        if isinstance(condition, dict):
+            if "any" in condition:
+                items = condition.get("any")
+                return isinstance(items, list) and any(self._visible_if_matches(item) for item in items)
+            if "all" in condition:
+                items = condition.get("all")
+                return isinstance(items, list) and all(self._visible_if_matches(item) for item in items)
+        return True
 
 
 class TopologyConfigEditor(QMainWindow):
@@ -1211,6 +1649,8 @@ class TopologyConfigEditor(QMainWindow):
         self.edge_visuals: list[EdgeVisual] = []
         self.connect_mode = False
         self.connect_steps: dict[str, str | None] = {"conn": None, "from": None, "to": None}
+        self.last_selected_volume_id: str | None = None
+        self.active_submodel_selection: tuple[str, str] | None = None
 
         self.setWindowTitle("Thermo0D Topology Config Editor")
         self.resize(1680, 980)
@@ -1270,6 +1710,7 @@ class TopologyConfigEditor(QMainWindow):
             self.status.addPermanentWidget(label)
 
         self.palette_tree = PaletteTree()
+        self.palette_tree.add_requested.connect(self.create_item_at_view_center)
         left_dock = QDockWidget("Bauteil-Bibliothek")
         self.dock_palette = left_dock
         left_dock.setWidget(self.palette_tree)
@@ -1285,6 +1726,18 @@ class TopologyConfigEditor(QMainWindow):
         node_dock.setObjectName("dock_nodes")
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, node_dock)
         self.tabifyDockWidget(self.dock_palette, self.dock_nodes)
+
+        self.submodel_library = SubmodelLibraryPanel()
+        self.submodel_library.selection_requested.connect(self.select_submodel)
+        self.submodel_library.add_requested.connect(self.create_submodel)
+        self.submodel_library.apply_requested.connect(self.apply_submodel_to_selection)
+        self.submodel_library.delete_requested.connect(self.delete_submodel)
+        submodel_dock = QDockWidget("Submodelle")
+        self.dock_submodels = submodel_dock
+        submodel_dock.setWidget(self.submodel_library)
+        submodel_dock.setObjectName("dock_submodels")
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, submodel_dock)
+        self.tabifyDockWidget(self.dock_nodes, self.dock_submodels)
 
         self.scene = TopologyScene(self)
         self.scene.selection_payload_changed.connect(self._on_scene_selection_changed)
@@ -1307,6 +1760,15 @@ class TopologyConfigEditor(QMainWindow):
         yaml_dock.setWidget(self.yaml_preview)
         yaml_dock.setObjectName("dock_yaml")
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, yaml_dock)
+
+        self.problem_panel = ProblemPanel()
+        self.problem_panel.selection_requested.connect(self.select_model_in_scene)
+        problem_dock = QDockWidget("Pruefung")
+        self.dock_problems = problem_dock
+        problem_dock.setWidget(self.problem_panel)
+        problem_dock.setObjectName("dock_problems")
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, problem_dock)
+        self.tabifyDockWidget(self.dock_yaml, self.dock_problems)
 
     def _build_actions(self) -> None:
         menu_file = self.menuBar().addMenu("Datei")
@@ -1332,6 +1794,9 @@ class TopologyConfigEditor(QMainWindow):
         self.act_rename = QAction("Umbenennen", self)
         self.act_rename.setShortcut("F2")
         self.act_rename.triggered.connect(self.rename_selected_item)
+        self.act_duplicate = QAction("Duplizieren", self)
+        self.act_duplicate.setShortcut("Ctrl+D")
+        self.act_duplicate.triggered.connect(self.duplicate_selected_item)
         self.act_zoom_in = QAction("Zoom +", self)
         self.act_zoom_in.setShortcut("Ctrl++")
         self.act_zoom_in.triggered.connect(self.view.zoom_in)
@@ -1345,6 +1810,12 @@ class TopologyConfigEditor(QMainWindow):
         self.act_fit_view.triggered.connect(self.view.fit_all)
         self.act_center_selection = QAction("Auf Auswahl zentrieren", self)
         self.act_center_selection.triggered.connect(self.view.center_on_selection)
+        self.act_auto_layout = QAction("Automatisch anordnen", self)
+        self.act_auto_layout.setShortcut("Ctrl+L")
+        self.act_auto_layout.triggered.connect(self.auto_arrange)
+        self.act_cancel_connection = QAction("Verbindung abbrechen", self)
+        self.act_cancel_connection.setShortcut("Esc")
+        self.act_cancel_connection.triggered.connect(self.cancel_connection_assignment)
         self.act_project_settings = QAction("Projekt wählen", self)
         self.act_project_settings.triggered.connect(self.select_project_root)
         self.act_reset_layout = QAction("Layout zurücksetzen", self)
@@ -1361,14 +1832,14 @@ class TopologyConfigEditor(QMainWindow):
         menu_file.addAction(act_quit)
 
         tb.addSeparator()
-        for act in (self.act_delete, self.act_rename):
+        for act in (self.act_delete, self.act_rename, self.act_duplicate):
             menu_file.addAction(act)
             tb.addAction(act)
 
-        for dock in (self.dock_palette, self.dock_nodes, self.dock_properties, self.dock_yaml):
+        for dock in (self.dock_palette, self.dock_nodes, self.dock_submodels, self.dock_properties, self.dock_yaml, self.dock_problems):
             menu_view.addAction(dock.toggleViewAction())
         menu_view.addSeparator()
-        for act in (self.act_zoom_in, self.act_zoom_out, self.act_zoom_reset, self.act_fit_view, self.act_center_selection, self.act_project_settings):
+        for act in (self.act_zoom_in, self.act_zoom_out, self.act_zoom_reset, self.act_fit_view, self.act_center_selection, self.act_auto_layout, self.act_cancel_connection, self.act_project_settings):
             menu_view.addAction(act)
 
         menu_layout.addAction(self.act_save_layout)
@@ -1385,7 +1856,11 @@ class TopologyConfigEditor(QMainWindow):
             menu_style.addAction(act)
             self.style_actions.append(act)
 
-        info = QLabel("Strg-Klick: Drossel → FROM-Volumen → TO-Volumen")
+        tb.addSeparator()
+        for act in (self.act_fit_view, self.act_auto_layout, self.act_project_settings):
+            tb.addAction(act)
+
+        info = QLabel("Tipp: Drossel waehlen, dann Strg-Klick auf FROM- und TO-Volumen. Esc bricht ab.")
         info.setStyleSheet("color:#94a3b8;padding-left:8px;")
         tb.addWidget(info)
     def _apply_saved_style(self) -> None:
@@ -1446,13 +1921,19 @@ class TopologyConfigEditor(QMainWindow):
     def reset_layout(self, announce: bool = True) -> None:
         self.removeDockWidget(self.dock_palette)
         self.removeDockWidget(self.dock_nodes)
+        self.removeDockWidget(self.dock_submodels)
         self.removeDockWidget(self.dock_properties)
         self.removeDockWidget(self.dock_yaml)
+        self.removeDockWidget(self.dock_problems)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.dock_palette)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.dock_nodes)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.dock_submodels)
         self.tabifyDockWidget(self.dock_palette, self.dock_nodes)
+        self.tabifyDockWidget(self.dock_nodes, self.dock_submodels)
         self.addDockWidget(Qt.RightDockWidgetArea, self.dock_properties)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.dock_yaml)
+        self.addDockWidget(Qt.BottomDockWidgetArea, self.dock_problems)
+        self.tabifyDockWidget(self.dock_yaml, self.dock_problems)
         self.resize(1680, 980)
         self.view.fit_all()
         if announce:
@@ -1489,6 +1970,85 @@ class TopologyConfigEditor(QMainWindow):
         selected = self.scene.selectedItems()
         if selected and isinstance(selected[0], DiagramNodeItem):
             self.rename_item_dialog(selected[0].model_id)
+
+    def duplicate_selected_item(self) -> None:
+        selected = self.scene.selectedItems()
+        if selected and isinstance(selected[0], DiagramNodeItem):
+            self._duplicate_model(selected[0].model_id)
+
+    def cancel_connection_assignment(self) -> None:
+        if not self.connect_steps.get("conn"):
+            return
+        self.connect_steps = {"conn": None, "from": None, "to": None}
+        self.status.showMessage("Verbindung abgebrochen.", 2500)
+
+    def auto_arrange(self) -> None:
+        volumes = self.state["preprocessing"]["volumes"]
+        connections = self.state["preprocessing"]["connections"]
+        for index, model in enumerate(volumes):
+            node = self.node_items.get(model.get("name", ""))
+            if node is not None:
+                node.setPos(QPointF(-320.0, -160.0 + index * 120.0))
+        for index, model in enumerate(connections):
+            node = self.node_items.get(model.get("name", ""))
+            if node is not None:
+                node.setPos(QPointF(120.0, -160.0 + index * 105.0))
+        self._sync_all()
+        self.view.fit_all()
+        self.status.showMessage("Topologie automatisch angeordnet.", 2500)
+
+    def _topology_problems(self) -> list[dict[str, str]]:
+        problems: list[dict[str, str]] = []
+        volumes = self.state["preprocessing"]["volumes"]
+        connections = self.state["preprocessing"]["connections"]
+        names: dict[str, int] = {}
+        for model in [*volumes, *connections]:
+            name = str(model.get("name", "")).strip()
+            if not name:
+                problems.append({"severity": "Fehler", "model_id": "", "text": "Ein Element hat keinen Namen."})
+                continue
+            names[name] = names.get(name, 0) + 1
+        for name, count in names.items():
+            if count > 1:
+                problems.append({"severity": "Fehler", "model_id": name, "text": f"Name mehrfach vergeben: {name}"})
+        volume_names = {str(v.get("name", "")) for v in volumes}
+        if not volumes:
+            problems.append({"severity": "Hinweis", "model_id": "", "text": "Noch keine Volumen angelegt."})
+        for conn in connections:
+            conn_id = str(conn.get("name", ""))
+            src = str(conn.get("from_volume", "") or "")
+            dst = str(conn.get("to_volume", "") or "")
+            if not src:
+                problems.append({"severity": "Fehler", "model_id": conn_id, "text": f"{conn_id}: FROM-Volumen fehlt."})
+            elif src not in volume_names:
+                problems.append({"severity": "Fehler", "model_id": conn_id, "text": f"{conn_id}: FROM-Volumen existiert nicht: {src}"})
+            if not dst:
+                problems.append({"severity": "Fehler", "model_id": conn_id, "text": f"{conn_id}: TO-Volumen fehlt."})
+            elif dst not in volume_names:
+                problems.append({"severity": "Fehler", "model_id": conn_id, "text": f"{conn_id}: TO-Volumen existiert nicht: {dst}"})
+            if src and dst and src == dst:
+                problems.append({"severity": "Hinweis", "model_id": conn_id, "text": f"{conn_id}: FROM und TO sind identisch."})
+        connected = {str(c.get("from_volume", "") or "") for c in connections} | {str(c.get("to_volume", "") or "") for c in connections}
+        for vol in volumes:
+            name = str(vol.get("name", ""))
+            if name and name not in connected:
+                problems.append({"severity": "Hinweis", "model_id": name, "text": f"{name}: noch nicht verbunden."})
+            for submodel_type in SUBMODEL_LIBRARY_TYPES:
+                sub = vol.get(submodel_type)
+                if not isinstance(sub, dict):
+                    continue
+                ref = str(sub.get("ref", "") or "")
+                if ref and ref not in self._submodels_state().get(submodel_type, {}):
+                    label = SUBMODEL_LABELS.get(submodel_type, submodel_type)
+                    problems.append({"severity": "Fehler", "model_id": name, "text": f"{name}: {label}-ref existiert nicht: {ref}"})
+            combustion = vol.get("combustion")
+            if isinstance(combustion, dict):
+                diag_ref = str(combustion.get("hcci_diagnostics_ref", "") or "")
+                if diag_ref:
+                    submodels = self._submodels_state()
+                    if diag_ref not in submodels.get("ignition", {}) and diag_ref not in submodels.get("combustion", {}):
+                        problems.append({"severity": "Fehler", "model_id": name, "text": f"{name}: HCCI-Diagnose-ref existiert nicht: {diag_ref}"})
+        return problems
 
     def _rename_model(self, old: str, new: str) -> None:
         model = self._find_model(old)
@@ -1621,7 +2181,8 @@ class TopologyConfigEditor(QMainWindow):
 
     def select_project_root(self) -> None:
         self.scene.clearSelection()
-        self.properties.set_payload("Projekt", {"kind": "root"}, self.state, self._volume_names())
+        self.active_submodel_selection = None
+        self.properties.set_payload("Projekt", {"kind": "root"}, self.state, self._volume_names(), self._submodel_ref_choices())
         self.status.showMessage("Projekteigenschaften aktiv.", 2500)
 
     def create_item_at_view_center(self, item_type: str) -> None:
@@ -1662,6 +2223,7 @@ class TopologyConfigEditor(QMainWindow):
                 "gas_properties": {"cp_J_per_kgK": 1005.0, "cv_J_per_kgK": 718.0, "R_J_per_kgK": 287.0, "thermo_model": "constant"},
                 "features": {"mass_flow": True, "wall_heat": False, "combustion": False, "evaporation": False, "pv_work": True},
                 "engine": {"cycle_type": "4t", "speed_rpm": 3000.0},
+                "submodels": {key: {} for key in SUBMODEL_LIBRARY_TYPES},
                 "volumes": [],
                 "connections": [],
             },
@@ -1744,8 +2306,10 @@ class TopologyConfigEditor(QMainWindow):
         self.state["preprocessing"].setdefault("gas_properties", {"cp_J_per_kgK": 1005.0, "cv_J_per_kgK": 718.0, "R_J_per_kgK": 287.0, "thermo_model": "constant"})
         self.state["preprocessing"].setdefault("features", {"mass_flow": True, "wall_heat": False, "combustion": False, "evaporation": False, "pv_work": True})
         self.state["preprocessing"].setdefault("engine", {"cycle_type": "4t", "speed_rpm": 3000.0})
+        self._submodels_state()
         self.state["preprocessing"].setdefault("volumes", [])
         self.state["preprocessing"].setdefault("connections", [])
+        _fill_ref_types_for_editor_inplace(self.state)
         self.state.setdefault("simulation", self._new_default_state()["simulation"])
         self.state.setdefault("postprocessing", self._new_default_state()["postprocessing"])
         _merge_defaults_inplace(self.state["simulation"], self._new_default_state()["simulation"])
@@ -1974,24 +2538,216 @@ class TopologyConfigEditor(QMainWindow):
     def _volume_names(self) -> list[str]:
         return [v["name"] for v in self.state["preprocessing"]["volumes"]]
 
+    def _submodel_ref_choices(self) -> dict[str, list[str]]:
+        submodels = self._submodels_state()
+        result: dict[str, list[str]] = {}
+        for submodel_type in SUBMODEL_LIBRARY_TYPES:
+            group = submodels.get(submodel_type, {})
+            result[submodel_type] = sorted(str(name) for name in group) if isinstance(group, dict) else []
+        return result
+
+    def _submodels_state(self) -> dict[str, Any]:
+        preprocessing = self.state.setdefault("preprocessing", {})
+        submodels = preprocessing.setdefault("submodels", {})
+        if not isinstance(submodels, dict):
+            submodels = {}
+            preprocessing["submodels"] = submodels
+        for submodel_type in SUBMODEL_LIBRARY_TYPES:
+            group = submodels.setdefault(submodel_type, {})
+            if not isinstance(group, dict):
+                submodels[submodel_type] = {}
+        return submodels
+
+    def _unique_submodel_name(self, submodel_type: str) -> str:
+        prefix = {
+            "wall_heat": "wall_heat",
+            "wall_temperature": "wall_temperature",
+            "combustion": "combustion",
+            "evaporation": "evaporation",
+        }.get(submodel_type, "submodel")
+        group = self._submodels_state().setdefault(submodel_type, {})
+        idx = 1
+        while f"{prefix}_{idx}" in group:
+            idx += 1
+        return f"{prefix}_{idx}"
+
+    def _default_submodel_payload(self, submodel_type: str) -> dict[str, Any]:
+        if submodel_type == "wall_heat":
+            return {
+                "model": "woschni",
+                "variant": "legacy",
+                "wall_temperature_K": 450.0,
+                "wall_area_m2": 0.02,
+                "multiplier": 1.0,
+                "dp_mode": "off",
+                "reference_state_mode": "none",
+                "phase_mode": "legacy",
+                "c1": 2.28,
+                "c2": 0.00324,
+                "c3": 0.0,
+            }
+        if submodel_type == "wall_temperature":
+            return {
+                "model": "cycle_average",
+                "relaxation": 0.3,
+                "cylinder": {"initial_temperature_K": 430.0, "coolant_temperature_K": 360.0, "lambda_W_per_mK": 45.0, "wall_thickness_m": 0.006, "area_m2": 0.018},
+                "head": {"initial_temperature_K": 470.0, "coolant_temperature_K": 370.0, "lambda_W_per_mK": 160.0, "wall_thickness_m": 0.010, "area_m2": 0.008},
+                "piston": {"initial_temperature_K": 500.0, "coolant_temperature_K": 390.0, "lambda_W_per_mK": 160.0, "wall_thickness_m": 0.012, "area_m2": 0.006},
+            }
+        if submodel_type == "combustion":
+            return {
+                "model": "vibe",
+                "start_mode": "angle",
+                "start_deg": 350.0,
+                "duration_mode": "angle",
+                "duration_deg": 40.0,
+                "a": 6.9,
+                "m": 2.0,
+                "fueling_mode": "fixed_energy",
+                "added_energy_per_cycle_J": 400.0,
+                "angle_reference": "absolute",
+            }
+        if submodel_type == "ignition":
+            return {
+                "model": "beck_2003_1_arrhenius",
+                "beck_c1_s": 1.0e-5,
+                "beck_c2": -1.2,
+                "beck_reference_pressure_bar": 1.0,
+                "beck_reference_o2_percent": 20.94,
+                "tau_activation_temperature_K": 15000.0,
+                "tau_reference_pressure_Pa": 1000000.0,
+                "tau_reference_lambda": 1.4,
+                "lambda_slowdown_exponent": 0.7,
+                "residual_slowdown_factor": 1.5,
+                "start_temperature_min_K": 780.0,
+                "start_pressure_min_Pa": 2000000.0,
+                "max_ignition_delay_s": 0.02,
+                "accumulation_start_mode": "compression",
+                "accumulation_end_mode": "none",
+            }
+        if submodel_type == "evaporation":
+            return {
+                "model": "simple",
+                "start_deg": 300.0,
+                "duration_deg": 30.0,
+                "evaporated_mass_per_cycle_kg": 1.0e-5,
+                "latent_heat_J_per_kg": 2.5e5,
+                "angle_reference": "absolute",
+            }
+        return {"model": "none"}
+
+    def create_submodel(self, submodel_type: str) -> None:
+        if submodel_type not in SUBMODEL_LIBRARY_TYPES:
+            return
+        default_name = self._unique_submodel_name(submodel_type)
+        name, ok = get_text(self, f"{SUBMODEL_LABELS[submodel_type]} anlegen", "Name:", text=default_name)
+        if not ok:
+            return
+        name = name.strip()
+        if not name:
+            return
+        group = self._submodels_state().setdefault(submodel_type, {})
+        if name in group:
+            show_warning(self, "Submodell anlegen", f"Ein Submodell mit dem Namen '{name}' existiert bereits.")
+            return
+        group[name] = self._default_submodel_payload(submodel_type)
+        self.select_submodel(submodel_type, name)
+        self._sync_all(selected_submodel=(submodel_type, name))
+        self.status.showMessage(f"Submodell angelegt: {name}", 3000)
+
+    def select_submodel(self, submodel_type: str, name: str) -> None:
+        group = self._submodels_state().get(submodel_type, {})
+        if not isinstance(group, dict):
+            return
+        data = group.get(name)
+        if not isinstance(data, dict):
+            return
+        self.scene.clearSelection()
+        self.active_submodel_selection = (submodel_type, name)
+        title = f"{SUBMODEL_LABELS.get(submodel_type, submodel_type)}: {name}"
+        self.properties.set_payload(title, {"kind": "submodel", "type": submodel_type}, data, self._volume_names(), self._submodel_ref_choices())
+        self.submodel_library.refresh(self._submodels_state(), (submodel_type, name))
+        self.status.showMessage(f"Submodell ausgewaehlt: {name}", 2500)
+        self._update_status_labels()
+
+    def _target_volume_for_submodel_apply(self) -> dict[str, Any] | None:
+        selected = self.scene.selectedItems()
+        if selected and isinstance(selected[0], DiagramNodeItem):
+            model = self._find_model(selected[0].model_id)
+            if model is not None and model.get("type") in {"cylinder", "plenum"}:
+                self.last_selected_volume_id = str(model.get("name", ""))
+                return model
+        if self.last_selected_volume_id:
+            model = self._find_model(self.last_selected_volume_id)
+            if model is not None and model.get("type") in {"cylinder", "plenum"}:
+                return model
+        return None
+
+    def apply_submodel_to_selection(self, submodel_type: str, name: str) -> None:
+        group = self._submodels_state().get(submodel_type, {})
+        if not isinstance(group, dict) or name not in group:
+            return
+        target = self._target_volume_for_submodel_apply()
+        if target is None:
+            show_warning(self, "Submodell anwenden", "Bitte zuerst einen Zylinder oder ein Plenum auswaehlen.")
+            return
+        if submodel_type == "ignition":
+            combustion = target.get("combustion")
+            if not isinstance(combustion, dict) or combustion.get("model") != "vibe":
+                show_warning(self, "Ignition-Diagnose anwenden", "Bitte ein Volumen mit combustion.model = vibe auswaehlen.")
+                return
+            combustion["hcci_diagnostics_ref"] = name
+            self.state.setdefault("preprocessing", {}).setdefault("features", {})["combustion"] = True
+            self._sync_all(select_id=str(target.get("name", "")), selected_submodel=(submodel_type, name))
+            self.status.showMessage(f"Ignition-Diagnose {name} auf {target.get('name')} angewendet.", 3500)
+            return
+        target[submodel_type] = {"ref": name}
+        feature_key = {"wall_heat": "wall_heat", "combustion": "combustion", "evaporation": "evaporation"}.get(submodel_type)
+        if feature_key:
+            self.state.setdefault("preprocessing", {}).setdefault("features", {})[feature_key] = True
+        self._sync_all(select_id=str(target.get("name", "")), selected_submodel=(submodel_type, name))
+        self.status.showMessage(f"{name} auf {target.get('name')} angewendet.", 3500)
+
+    def delete_submodel(self, submodel_type: str, name: str) -> None:
+        group = self._submodels_state().get(submodel_type, {})
+        if not isinstance(group, dict) or name not in group:
+            return
+        answer = ask_question(
+            self,
+            "Submodell loeschen",
+            f"Submodell '{name}' loeschen? Bestehende refs in Volumen bleiben sichtbar und werden in der Pruefung markiert.",
+            buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            default_button=QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        group.pop(name, None)
+        self._sync_all()
+        self.status.showMessage(f"Submodell geloescht: {name}", 3000)
+
     def _on_scene_selection_changed(self, payload: dict[str, Any] | None) -> None:
         if payload is None:
+            self.active_submodel_selection = None
             self.node_list.refresh(self.state["preprocessing"]["volumes"], self.state["preprocessing"]["connections"], None)
-            self.properties.set_payload("Eigenschaften", {"kind": "root"}, self.state, self._volume_names())
+            self.properties.set_payload("Eigenschaften", {"kind": "root"}, self.state, self._volume_names(), self._submodel_ref_choices())
             return
         model = self._find_model(payload["id"])
         if model is None:
-            self.properties.set_payload("Eigenschaften", {"kind": "root"}, self.state, self._volume_names())
+            self.active_submodel_selection = None
+            self.properties.set_payload("Eigenschaften", {"kind": "root"}, self.state, self._volume_names(), self._submodel_ref_choices())
             return
+        self.active_submodel_selection = None
+        if model.get("type") in {"cylinder", "plenum"}:
+            self.last_selected_volume_id = str(model.get("name", ""))
         self.node_list.refresh(self.state["preprocessing"]["volumes"], self.state["preprocessing"]["connections"], model["name"])
-        self.properties.set_payload(model["name"], {"kind": "node", "type": model["type"]}, model, self._volume_names())
+        self.properties.set_payload(model["name"], {"kind": "node", "type": model["type"]}, model, self._volume_names(), self._submodel_ref_choices())
         self.status.showMessage(f"Auswahl: {model['name']} ({model['type']})", 2000)
         self._update_status_labels()
 
     def _on_property_value_changed(self, key: str, value: Any) -> None:
         selected = self.scene.selectedItems()
         if not selected:
-            self._sync_all()
+            self._sync_all(selected_submodel=self.active_submodel_selection)
             return
         item = selected[0]
         if not isinstance(item, DiagramNodeItem):
@@ -2004,10 +2760,20 @@ class TopologyConfigEditor(QMainWindow):
         if key == "name":
             self._rename_model(item.model_id, str(value))
             return
+        for submodel_type in SUBMODEL_LIBRARY_TYPES:
+            if key == f"{submodel_type}.ref":
+                if value:
+                    model[submodel_type] = {"ref": str(value)}
+                else:
+                    model[submodel_type] = {"model": "none"}
+                feature_key = {"wall_heat": "wall_heat", "combustion": "combustion", "evaporation": "evaporation"}.get(submodel_type)
+                if feature_key and value:
+                    self.state.setdefault("preprocessing", {}).setdefault("features", {})[feature_key] = True
+                break
         item.set_labels(model["name"], self._subtitle_for_model(model))
         self._sync_all(select_id=item.model_id)
 
-    def _sync_all(self, select_id: str | None = None) -> None:
+    def _sync_all(self, select_id: str | None = None, selected_submodel: tuple[str, str] | None = None) -> None:
         for model_id, node in self.node_items.items():
             model = self._find_model(model_id)
             if model is None:
@@ -2022,9 +2788,13 @@ class TopologyConfigEditor(QMainWindow):
             self.node_items[select_id].setSelected(True)
         elif self.scene.selectedItems() and isinstance(self.scene.selectedItems()[0], DiagramNodeItem):
             active_id = self.scene.selectedItems()[0].model_id
-        elif not self.scene.selectedItems():
-            self.properties.set_payload("Projekt", {"kind": "root"}, self.state, self._volume_names())
+        elif not self.scene.selectedItems() and selected_submodel is None:
+            self.properties.set_payload("Projekt", {"kind": "root"}, self.state, self._volume_names(), self._submodel_ref_choices())
         self.node_list.refresh(self.state["preprocessing"]["volumes"], self.state["preprocessing"]["connections"], active_id)
+        if hasattr(self, "submodel_library"):
+            self.submodel_library.refresh(self._submodels_state(), selected_submodel)
+        if hasattr(self, "problem_panel"):
+            self.problem_panel.refresh(self._topology_problems())
         self.status.showMessage(
             f"Volumen: {len(self.state['preprocessing']['volumes'])} | Verbindungen: {len(self.state['preprocessing']['connections'])}",
             1500,

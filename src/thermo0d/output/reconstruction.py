@@ -12,9 +12,9 @@ from thermo0d.model.free_piston.forces import compute_load_info
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_equivalent_linear_kinematics, free_piston_is_compression_stroke, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
 try:
-    from thermo0d.model.free_piston.combustion_latch import _hcci_ignition_delay_s, free_piston_combustion_enabled, free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector, replay_free_piston_combustion_latch_series, replay_free_piston_cool_flame_series, replay_free_piston_time_combustion_series
+    from thermo0d.model.free_piston.combustion_latch import evaluate_free_piston_hcci_ignition_sample, free_piston_combustion_enabled, free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector, replay_free_piston_combustion_latch_series, replay_free_piston_cool_flame_series, replay_free_piston_time_combustion_series
 except Exception:  # pragma: no cover - compatibility for project states without latch patch
-    _hcci_ignition_delay_s = None
+    evaluate_free_piston_hcci_ignition_sample = None
     free_piston_combustion_enabled = None
     free_piston_cylinder_uses_latched_fuel = None
     free_piston_uses_slot_closure_lambda = None
@@ -258,64 +258,6 @@ def _lambda_from_air_and_fuel(air_mass_kg: float, fuel_mass_kg: float, stoich_af
     if fuel <= 1.0e-30 or afr_stoich <= 1.0e-30:
         return 0.0
     return float(max(float(air_mass_kg), 0.0) / (fuel * afr_stoich))
-
-
-def _hcci_ignition_delays_for_sample(
-    bundle,
-    cyl_idx: int,
-    *,
-    pressure_Pa: float,
-    temp_K: float,
-    volume_m3: float,
-    mass_kg: float,
-    air_mass_kg: float,
-    burned_mass_kg: float,
-    fuel_mass_kg: float,
-    afr_stoich: float,
-) -> tuple[float, float]:
-    fp = getattr(bundle, 'free_piston', None)
-    if fp is None or _hcci_ignition_delay_s is None:
-        return 0.0, 0.0
-    enabled = getattr(fp, 'hcci_enabled_by_vol', np.zeros(0, dtype=np.int64))
-    diagnostics_enabled = getattr(fp, 'hcci_diagnostics_enabled_by_vol', np.zeros(0, dtype=np.int64))
-    cyl = int(cyl_idx)
-    hcci_active = cyl < int(getattr(enabled, 'shape', (0,))[0]) and bool(enabled[cyl])
-    diag_active = cyl < int(getattr(diagnostics_enabled, 'shape', (0,))[0]) and bool(diagnostics_enabled[cyl])
-    if not hcci_active and not diag_active:
-        return 0.0, 0.0
-    if mass_kg <= 1.0e-18 or air_mass_kg <= 1.0e-18 or fuel_mass_kg <= 1.0e-18:
-        return 0.0, 0.0
-    if temp_K < float(fp.hcci_start_temperature_min_by_vol_K[cyl]) or pressure_Pa < float(fp.hcci_start_pressure_min_by_vol_Pa[cyl]):
-        return 0.0, 0.0
-    hot_tau = _hcci_ignition_delay_s(
-        fp,
-        cyl,
-        pressure_Pa=float(pressure_Pa),
-        temp_K=float(temp_K),
-        volume_m3=float(volume_m3),
-        mass_kg=float(mass_kg),
-        air_mass_kg=float(air_mass_kg),
-        burned_mass_kg=float(burned_mass_kg),
-        fuel_mass_kg=float(fuel_mass_kg),
-        afr_stoich=float(afr_stoich),
-    )
-    two_stage = getattr(fp, 'hcci_two_stage_enabled_by_vol', np.zeros(0, dtype=np.int64))
-    cool_tau = 0.0
-    if cyl < int(getattr(two_stage, 'shape', (0,))[0]) and bool(two_stage[cyl]):
-        cool_tau = _hcci_ignition_delay_s(
-            fp,
-            cyl,
-            stage='cool',
-            pressure_Pa=float(pressure_Pa),
-            temp_K=float(temp_K),
-            volume_m3=float(volume_m3),
-            mass_kg=float(mass_kg),
-            air_mass_kg=float(air_mass_kg),
-            burned_mass_kg=float(burned_mass_kg),
-            fuel_mass_kg=float(fuel_mass_kg),
-            afr_stoich=float(afr_stoich),
-        )
-    return float(hot_tau), float(cool_tau)
 
 
 def _smoothstep01(value: float) -> float:
@@ -1343,6 +1285,13 @@ class SignalReconstructionService:
                 hcci_cool_ignition_delay_s = 0.0
                 hcci_integral_0to1 = float(hcci_integral_by_vol[i])
                 hcci_cool_integral_0to1 = float(hcci_cool_integral_by_vol[i])
+                hcci_reason_code = 1.0
+                hcci_accumulation_window_active = 0.0
+                hcci_temperature_min_K = 0.0
+                hcci_pressure_min_Pa = 0.0
+                hcci_lambda = 0.0
+                hcci_residual_fraction = 0.0
+                hcci_tabulated_out_of_bounds = 0.0
                 if comb_idx >= 0:
                     comb_row = comb_matrix[comb_idx]
                     duration_mode = int(combustion_duration_mode_from_row(comb_row))
@@ -1419,24 +1368,34 @@ class SignalReconstructionService:
                     if fp is not None:
                         state_k = y_arr[:, k]
                         fuel_for_delay = float(state_layout.fuel_vapor_mass_from_state(state_k, i))
+                        q_total_for_delay = float(comb_row[int(CombCol.FUEL_MASS_PER_CYCLE)] * comb_row[int(CombCol.LHV)])
                         if i in cylinder_latch_histories and float(cylinder_latch_histories[i][1][k]) > 0.0:
                             fuel_for_delay = float(cylinder_latch_histories[i][1][k])
-                        afr_delay = float(bundle.combustion_afr_stoich_by_vol[i]) if getattr(bundle, 'combustion_afr_stoich_by_vol', None) is not None and i < int(bundle.combustion_afr_stoich_by_vol.shape[0]) else float(getattr(fp, 'combustion_afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5)
-                        hcci_ignition_delay_s, hcci_cool_ignition_delay_s = _hcci_ignition_delays_for_sample(
-                            bundle,
-                            i,
-                            pressure_Pa=float(pressure_by_vol[i]),
-                            temp_K=float(temperature_by_vol[i]),
-                            volume_m3=float(volume_by_vol[i]),
-                            mass_kg=float(state_layout.gas_mass_from_state(state_k, i)),
-                            air_mass_kg=float(state_layout.air_mass_from_state(state_k, i)),
-                            burned_mass_kg=float(state_layout.burned_mass_from_state(state_k, i)),
-                            fuel_mass_kg=fuel_for_delay,
-                            afr_stoich=afr_delay,
-                        )
+                        if i in cylinder_latch_histories and float(cylinder_latch_histories[i][2][k]) > 0.0:
+                            q_total_for_delay = float(cylinder_latch_histories[i][2][k])
+                        if evaluate_free_piston_hcci_ignition_sample is not None:
+                            sample = evaluate_free_piston_hcci_ignition_sample(
+                                bundle,
+                                i,
+                                float(t_arr[k]),
+                                state_k,
+                                q_total_J=q_total_for_delay,
+                                fuel_mass_kg=fuel_for_delay,
+                                soc_active=bool(combustion_soc_energy_J > 0.0 and combustion_fraction < 1.0),
+                                combustion_fraction_0to1=float(combustion_fraction),
+                            )
+                            hcci_reason_code = float(sample['reason_code'])
+                            hcci_accumulation_window_active = 1.0 if bool(sample['window_active']) else 0.0
+                            hcci_ignition_delay_s = float(sample['hot_tau_s'])
+                            hcci_cool_ignition_delay_s = float(sample['cool_tau_s'])
+                            hcci_lambda = float(sample['lambda'])
+                            hcci_residual_fraction = float(sample['residual_fraction'])
+                            hcci_tabulated_out_of_bounds = 1.0 if bool(sample['tabulated_out_of_bounds']) else 0.0
+                        hcci_temperature_min_K = float(fp.hcci_start_temperature_min_by_vol_K[i]) if i < int(getattr(fp.hcci_start_temperature_min_by_vol_K, 'shape', (0,))[0]) else 0.0
+                        hcci_pressure_min_Pa = float(fp.hcci_start_pressure_min_by_vol_Pa[i]) if i < int(getattr(fp.hcci_start_pressure_min_by_vol_Pa, 'shape', (0,))[0]) else 0.0
                         hcci_enabled = hcci_ignition_delay_s > 0.0
                         two_stage = hcci_cool_ignition_delay_s > 0.0
-                        if hcci_enabled and int(compression_active_by_vol[i]) == 1:
+                        if hcci_enabled and hcci_accumulation_window_active > 0.0:
                             if two_stage and int(hcci_cool_done_by_vol[i]) == 0:
                                 hcci_cool_integral_by_vol[i] += dt_sample_s / max(hcci_cool_ignition_delay_s, 1.0e-12)
                                 if hcci_cool_integral_by_vol[i] >= 1.0:
@@ -1444,6 +1403,8 @@ class SignalReconstructionService:
                             else:
                                 hcci_integral_by_vol[i] += dt_sample_s / max(hcci_ignition_delay_s, 1.0e-12)
                         else:
+                            hcci_ignition_delay_s = 0.0
+                            hcci_cool_ignition_delay_s = 0.0
                             hcci_integral_by_vol[i] = 0.0
                             hcci_cool_integral_by_vol[i] = 0.0
                             if int(compression_active_by_vol[i]) == 0:
@@ -1490,6 +1451,13 @@ class SignalReconstructionService:
                 cls._ensure_float_column(columns, f'{name}_hcci_cool_ignition_integral_0to1', n_samples)[k] = float(hcci_cool_integral_0to1)
                 cls._ensure_float_column(columns, f'{name}_hcci_ignition_integral', n_samples)[k] = float(hcci_integral_0to1)
                 cls._ensure_float_column(columns, f'{name}_hcci_cool_ignition_integral', n_samples)[k] = float(hcci_cool_integral_0to1)
+                cls._ensure_float_column(columns, f'{name}_hcci_validity_reason_code', n_samples)[k] = float(hcci_reason_code)
+                cls._ensure_float_column(columns, f'{name}_hcci_accumulation_window_active_0to1', n_samples)[k] = float(hcci_accumulation_window_active)
+                cls._ensure_float_column(columns, f'{name}_hcci_start_temperature_min_K', n_samples)[k] = float(hcci_temperature_min_K)
+                cls._ensure_float_column(columns, f'{name}_hcci_start_pressure_min_Pa', n_samples)[k] = float(hcci_pressure_min_Pa)
+                cls._ensure_float_column(columns, f'{name}_hcci_lambda', n_samples)[k] = float(hcci_lambda)
+                cls._ensure_float_column(columns, f'{name}_hcci_residual_fraction_0to1', n_samples)[k] = float(hcci_residual_fraction)
+                cls._ensure_float_column(columns, f'{name}_hcci_tabulated_out_of_bounds_0to1', n_samples)[k] = float(hcci_tabulated_out_of_bounds)
                 cls._ensure_float_column(columns, f'{name}_evaporation_sink_W', n_samples)[k] = float(evap_sink_w)
                 cls._ensure_float_column(columns, f'{name}_piston_work_W', n_samples)[k] = float(pdv_power)
                 if fp is not None and bool(getattr(fp, 'scavenging_enabled', False)):

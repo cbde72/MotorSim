@@ -9,8 +9,8 @@ from thermo0d.input.config_loader import ConfigLoadError, load_config
 
 
 def test_pydantic_validation_error_is_pretty_formatted(tmp_path: Path):
-    text = Path('Projekte/config_1cyl_2t.yaml').read_text(encoding='utf-8')
-    text = text.replace('step_deg: 5.0', 'step_deg: 0.0')
+    text = Path('Projekte/config_ref.yaml').read_text(encoding='utf-8')
+    text = text.replace('step_deg: 1', 'step_deg: 0.0', 1)
     cfg_path = tmp_path / 'bad_angle.yaml'
     cfg_path.write_text(text, encoding='utf-8')
 
@@ -21,6 +21,7 @@ def test_pydantic_validation_error_is_pretty_formatted(tmp_path: Path):
     assert 'KONFIGURATIONS-VALIDIERUNG FEHLGESCHLAGEN' in message
     assert str(cfg_path.resolve()) in message
     assert 'postprocessing.sampling.crank_angle' in message
+    assert 'Zeile   :' in message
     assert 'step_deg must be > 0' in message
     assert 'Bitte Feldnamen, Pflichtfelder, Datentypen und Wertebereiche' in message
 

@@ -1,0 +1,444 @@
+versioning:
+  package_version: 7.1.122                                                                                                                                                    # MotorSim-Paketversion, mit der die Config gespeichert wurde.
+  config_schema_version: 8                                                                                                                                                    # Ziel-Schema der Config.
+  loaded_config_schema_version: 8                                                                                                                                             # Schema nach Laden/Migration.
+  migration_applied: false                                                                                                                                                    # Zeigt, ob beim Laden eine Migration angewendet wurde.
+test_description: "Free-piston V30 based on V25a: Vibe active with HCCI ignition diagnostics for Livengood-Wu, tabulated Livengood-Wu and Beck 2003 1-Arrhenius" # Freitext zur Beschreibung dieser Variante.
+modeling:
+  architecture: free_piston                                                                                                                                                   # Simulationsarchitektur, hier Freikolbenmodell.
+free_piston:
+  initial_conditions:
+    x0_m: 0.054                                                                                                                                                               # Startposition des Freikolbens in m.
+    # previous_auto_initial_state_from_last_compression_at_x0_m: v0_m_per_s: -5.130036024060039
+    v0_m_per_s: -5.037844182273213                                                                                                                                            # Startgeschwindigkeit des Freikolbens in m/s.
+    combustion_state:
+      burned_fraction_0to1: 0.0                                                                                                                                               # Verbrannter Massenanteil als Bruchteil 0..1.
+      released_energy_J: 0.0                                                                                                                                                  # Bereits freigesetzte Verbrennungsenergie beim Start.
+      ignition_armed: false                                                                                                                                                   # Startzustand der Zuendfreigabe.
+      injection_armed: false                                                                                                                                                  # Startzustand der Einspritzfreigabe.
+      burned_mass_percent: 0.0                                                                                                                                                # Verbrannter Massenanteil in Prozent.
+  mechanics:
+    kinematics_type: oscillating_rotary                                                                                                                                       # Mechanikmodus: linear oder rotatorisch hin-und-her schwingend.
+    moving_mass_kg: 11.8                                                                                                                                                      # Bewegte Freikolbenmasse.
+    piston_diameter_m: 0.0605                                                                                                                                                 # Kolbendurchmesser fuer wirksame Flaeche.
+    compression_ratio: 50                                                                                                                                                     # Geometrisches Verdichtungsverhaeltnis.
+    x_min_m: 0.0                                                                                                                                                              # Minimale Kolbenposition, nahe OT.
+    x_max_m: 0.10807                                                                                                                                                          # Maximale Kolbenposition, nahe UT.
+    angle_min_deg: -9.0                                                                                                                                                       # Minimaler Schwingwinkel des rotatorischen Kolbens.
+    angle_max_deg: 9.0                                                                                                                                                        # Maximaler Schwingwinkel des rotatorischen Kolbens.
+    effective_radius_m: 0.34399749399882257                                                                                                                                   # Wirkradius fuer x_equiv = r * (phi - phi_min); erhaelt V14-Hub.
+    rotary_inertia_kg_m2: 1.3963444553541455                                                                                                                                  # Traegheitsmoment; hier m*r^2 passend zur V14-Ersatzmasse.
+  friction:
+    model: coulomb_viscous                                                                                                                                                    # Auswahl des jeweiligen Teilmodells.
+    fc_N: 80.0                                                                                                                                                                # Coulomb-Reibkraft.
+    cv_Ns_per_m: 0                                                                                                                                                            # Viskoser Reibkoeffizient.
+  load:
+    model: generator_controlled                                                                                                                                               # Auswahl des jeweiligen Teilmodells.
+    damping_Ns_per_m: 0.0                                                                                                                                                     # Grunddaempfung der Generatorlast.
+    max_damping_Ns_per_m: 10000                                                                                                                                               # Maximal erlaubte Generator-Daempfung.
+    control_zone_m: 0.01                                                                                                                                                      # Positionsfenster fuer geregelte Generatorlast.
+  scavenging:
+    enabled: true                                                                                                                                                             # Schaltet diesen Block aktiv oder inaktiv.
+    model: overlap_short_circuit_0d                                                                                                                                           # Auswahl des jeweiligen Teilmodells.
+    scavenging_factor: 1.25                                                                                                                                                   # Kalibrierfaktor fuer Spuelwirkung.
+    max_trapping_efficiency: 0.92                                                                                                                                             # Maximaler im Zylinder gefangener Frischgasanteil.
+    short_circuit_start_ratio: 0.7                                                                                                                                            # Beginn des Kurzschlussanteils relativ zur Ueberlappung.
+    short_circuit_slope: 0.35                                                                                                                                                 # Anstieg des Kurzschlussanteils.
+    max_short_circuit_fraction: 0.35                                                                                                                                          # Obergrenze des direkt durchstroemenden Anteils.
+    min_residual_fraction: 0.03                                                                                                                                               # Mindest-Restgasanteil nach Spuelung.
+preprocessing:
+  gas_properties:
+    cp_J_per_kgK: 1005.0                                                                                                                                                      # Spezifische Waermekapazitaet bei konstantem Druck.
+    cv_J_per_kgK: 718.0                                                                                                                                                       # Spezifische Waermekapazitaet bei konstantem Volumen.
+    R_J_per_kgK: 287.0                                                                                                                                                        # Spezifische Gaskonstante.
+    thermo_model: promo                                                                                                                                                       # Stoffwertmodell fuer Gasthermodynamik.
+  features:
+    mass_flow: true                                                                                                                                                           # Aktiviert Massenstroeme zwischen Volumen.
+    wall_heat: true                                                                                                                                                           # Aktiviert Wandwaerme global bzw. Submodellblock.
+    combustion: true                                                                                                                                                          # Aktiviert Verbrennung global bzw. Submodellblock.
+    evaporation: false                                                                                                                                                        # Aktiviert Verdampfung global bzw. Submodellblock.
+    pv_work: true                                                                                                                                                             # Beruecksichtigt p*dV-Arbeit.
+  engine:
+    cycle_type: 2t                                                                                                                                                            # Arbeitsverfahren, z. B. 2t oder 4t.
+    speed_rpm: 25.0                                                                                                                                                           # Referenzdrehzahl in 1/min.
+  submodels:
+    volumes:
+      cylinder_free_piston:
+        type: cylinder                                                                                                                                                        # Typ des Volumens, der Verbindung oder Kinematik.
+        kinematics:
+          type: crank_slider                                                                                                                                                  # Typ des Volumens, der Verbindung oder Kinematik.
+          bore_m: 1.0745                                                                                                                                                      # Zylinderbohrung in m.
+          stroke_m: 1.08                                                                                                                                                      # Hub in m.
+          conrod_m: 1.12                                                                                                                                                      # Pleuellaenge in m.
+          compression_ratio: 50.0                                                                                                                                             # Geometrisches Verdichtungsverhaeltnis.
+          phase_deg: 0.0                                                                                                                                                      # Phasenversatz in Grad.
+        wall_temperature:
+          ref: cycle_average_wall
+        wall_heat:
+          ref: woschni_promo_wall                                                                                                                                             # Referenz auf zentral definiertes Submodel.
+        combustion:
+          ref: vibe_lambda_slot                                                                                                                                          # Referenz auf zentral definiertes Submodel.
+        evaporation:
+          model: none                                                                                                                                                         # Auswahl des jeweiligen Teilmodells.
+      compressor_bounce:
+        type: bounce_chamber                                                                                                                                                  # Typ des Volumens, der Verbindung oder Kinematik.
+        model: gas_exchange                                                                                                                                                   # Auswahl des jeweiligen Teilmodells.
+        initial_burned_fraction_0to1: 0.0                                                                                                                                     # Startwert des verbrannten Massenanteils 0..1.
+        initial_burned_mass_percent: 0.0                                                                                                                                      # Startwert des verbrannten Massenanteils in Prozent.
+        chamber_diameter_m: 0.07                                                                                                                                              # Innendurchmesser der Bounce-Kammer.
+        chamber_length_m: 0.10807                                                                                                                                             # Wirksame Laenge der Bounce-Kammer.
+        compression_ratio: 16                                                                                                                                                 # Geometrisches Verdichtungsverhaeltnis.
+        polytropic_exponent: 1.3                                                                                                                                              # Polytropenexponent fuer Bounce-Verdichtung.
+        chamber_volume0_m3: null                                                                                                                                              # Optionales Referenzvolumen der Bounce-Kammer.
+        p0_Pa: null                                                                                                                                                           # Optionaler Referenzdruck der Bounce-Kammer.
+      receiver_plenum:
+        type: plenum                                                                                                                                                          # Typ des Volumens, der Verbindung oder Kinematik.
+        fixed_volume_m3: 0.00048                                                                                                                                              # Festes Plenumvolumen.
+        wall_heat:
+          model: none                                                                                                                                                         # Auswahl des jeweiligen Teilmodells.
+        combustion:
+          model: none                                                                                                                                                         # Auswahl des jeweiligen Teilmodells.
+        evaporation:
+          model: none                                                                                                                                                         # Auswahl des jeweiligen Teilmodells.
+      exhaust_plenum:
+        type: plenum                                                                                                                                                          # Typ des Volumens, der Verbindung oder Kinematik.
+        fixed_volume_m3: 0.00260279                                                                                                                                           # Festes Plenumvolumen.
+        wall_heat:
+          model: none                                                                                                                                                         # Auswahl des jeweiligen Teilmodells.
+        combustion:
+          model: none                                                                                                                                                         # Auswahl des jeweiligen Teilmodells.
+        evaporation:
+          model: none                                                                                                                                                         # Auswahl des jeweiligen Teilmodells.
+      ambient_environment:
+        type: environment                                                                                                                                                     # Typ des Volumens, der Verbindung oder Kinematik.
+        pressure_Pa: 101325.0                                                                                                                                                 # Fester Umgebungsdruck.
+        temperature_K: 300.0                                                                                                                                                  # Feste Umgebungstemperatur.
+
+    wall_temperature:
+      cycle_average_wall:
+        model: cycle_average
+        relaxation: 0.3
+        cylinder:
+          initial_temperature_K: 500.0
+          coolant_temperature_K: 350.0
+          lambda_W_per_mK: 50.0
+          wall_thickness_m: 0.006
+          area_m2: 0.020541
+        head:
+          initial_temperature_K: 550.0
+          coolant_temperature_K: 350.0
+          lambda_W_per_mK: 160.0
+          wall_thickness_m: 0.010
+          area_m2: 0.002875
+        piston:
+          initial_temperature_K: 580.0
+          coolant_temperature_K: 350.0
+          lambda_W_per_mK: 160.0
+          wall_thickness_m: 0.012
+          area_m2: 0.002875
+    wall_heat:
+      woschni_promo_wall:
+        model: woschni                                                                                                                                                        # Auswahl des jeweiligen Teilmodells.
+        variant: promo                                                                                                                                                        # Woschni-Variante bzw. Quellenmodell.
+        wall_temperature_K: 450.0                                                                                                                                             # Wandtemperatur fuer Waermeuebergang.
+        wall_area_m2: 0.03                                                                                                                                                    # Effektive benetzte Wandflaeche.
+        dp_mode: 'off'                                                                                                                                                        # Druckdifferenzterm im Woschni-Modell.
+        multiplier: 15                                                                                                                                                        # Kalibrierfaktor fuer das Teilmodell.
+        reference_state_mode: none                                                                                                                                            # Referenzzustand fuer Woschni-Druckterm.
+        phase_mode: promo                                                                                                                                                     # Aktuelle Phasenlogik der Woschni/PROMO-Koeffizienten.
+        c1: 2.28                                                                                                                                                              # Woschni-Geschwindigkeitskonstante c1.
+        c2: 0.00324                                                                                                                                                           # Woschni-Geschwindigkeitskonstante c2.
+        c3: 0.0                                                                                                                                                               # Woschni-Geschwindigkeitskonstante c3.
+        cucm: 0.0                                                                                                                                                             # Zusaetzlicher Drall-/Geschwindigkeitsterm.
+        swirl_number: 0.0                                                                                                                                                     # Drallzahl fuer Woschni-Varianten.
+        imep_bar: 0.0                                                                                                                                                         # IMEP-Eingang in bar fuer Woschni-Varianten.
+    combustion:
+      vibe_lambda_slot:
+        model: vibe                                                                                                                                                           # Auswahl des jeweiligen Teilmodells.
+        start_mode: hign_position                                                                                                                                             # Ausloesekriterium fuer Verbrennungsbeginn.
+        duration_mode: time                                                                                                                                                   # Bezugsart der Brenndauer.
+        hign_mm: 15.0                                                                                                                                                         # Zuend-/Brennbeginn-Abstand vor OT in mm.
+        duration_ms: 6.0                                                                                                                                                      # Brenndauer in Millisekunden.
+        a: 6.9                                                                                                                                                                # Wiebe/Vibe-Formparameter a.
+        m: 2.0                                                                                                                                                                # Wiebe/Vibe-Formparameter m.
+        energy_coupling: none                                                                                                                                                 # Optionale Kopplung der Energie an den Hub.
+        stroke_reference_m: 0.010807                                                                                                                                          # Referenzhub fuer Hubskalierung.
+        stroke_exponent: 0.01                                                                                                                                                 # Exponent der Hubskalierung.
+        fueling_mode: lambda_from_cylinder_mass_at_slot_close                                                                                                                 # Art der Kraftstoffmassen-Bestimmung.
+        lambda_target: 1.0                                                                                                                                                    # Ziel-Luftverhaeltnis Lambda.
+        lhv_J_per_kg: 43000000.0                                                                                                                                              # Unterer Heizwert des Kraftstoffs.
+        afr_stoich_kg_air_per_kg_fuel: 14.5                                                                                                                                   # Stoechiometrisches Luft-Kraftstoff-Verhaeltnis.
+        combustion_efficiency_0to1: 1.0                                                                                                                                       # Verbrennungswirkungsgrad 0..1.
+        slot_open_threshold_m2: 1.0e-07                                                                                                                                       # Flaechenschwelle fuer Schlitz offen.
+        slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
+        compression_velocity_threshold_m_per_s: 0.02                                                                                                                          # Mindest-Kompressionsgeschwindigkeit fuer Latch.
+        angle_reference: absolute                                                                                                                                             # Winkelbezug des Teilmodells.
+        hcci_diagnostics_ref: hcci_diag_tabulated_livengood_wu                                                                                                                          # Aktive HCCI-Diagnose fuer Vibe; Alternativen: hcci_diag_tabulated_livengood_wu, hcci_diag_beck_2003_1_arrhenius.
+      hcci_diag_livengood_wu:
+        model: hcci_diesel                                                                                                                                                    # Diagnosemodell: gleiche Randbedingungen, generischer Livengood-Wu-Zuendverzug.
+        ignition:
+          ref: ignition_diag_livengood_wu                                                                                                                                     # Eigenes Ignition-Submodell.
+        burn_model: wiebe_autoignition                                                                                                                                        # Brennverlaufsmodell nach Autoignition.
+        duration_mode: time                                                                                                                                                   # Bezugsart der Brenndauer.
+        duration_ms: 1.2                                                                                                                                                      # Brenndauer in Millisekunden.
+        a: 6.9                                                                                                                                                                # Wiebe/Vibe-Formparameter a.
+        m: 2.0                                                                                                                                                                # Wiebe/Vibe-Formparameter m.
+        fueling_mode: lambda_from_cylinder_mass_at_slot_close                                                                                                                 # Art der Kraftstoffmassen-Bestimmung.
+        lambda_target: 1.0                                                                                                                                                    # Gleiche Diagnose-Randbedingung wie Vibe.
+        lhv_J_per_kg: 43000000.0                                                                                                                                              # Unterer Heizwert des Kraftstoffs.
+        afr_stoich_kg_air_per_kg_fuel: 14.5                                                                                                                                   # Stoechiometrisches Luft-Kraftstoff-Verhaeltnis.
+        combustion_efficiency_0to1: 0.96                                                                                                                                      # Verbrennungswirkungsgrad 0..1.
+        slot_open_threshold_m2: 1.0e-07                                                                                                                                       # Flaechenschwelle fuer Schlitz offen.
+        slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
+        compression_velocity_threshold_m_per_s: 0.02                                                                                                                          # Mindest-Kompressionsgeschwindigkeit fuer Latch.
+      hcci_diag_tabulated_livengood_wu:
+        model: hcci_diesel                                                                                                                                                    # Diagnosemodell: gleiche Randbedingungen, tabellierter Livengood-Wu-Zuendverzug.
+        ignition:
+          ref: ignition_diag_tabulated_livengood_wu                                                                                                                           # Eigenes Ignition-Submodell.
+        burn_model: wiebe_autoignition                                                                                                                                        # Brennverlaufsmodell nach Autoignition.
+        duration_mode: time                                                                                                                                                   # Bezugsart der Brenndauer.
+        duration_ms: 1.2                                                                                                                                                      # Brenndauer in Millisekunden.
+        a: 6.9                                                                                                                                                                # Wiebe/Vibe-Formparameter a.
+        m: 2.0                                                                                                                                                                # Wiebe/Vibe-Formparameter m.
+        fueling_mode: lambda_from_cylinder_mass_at_slot_close                                                                                                                 # Art der Kraftstoffmassen-Bestimmung.
+        lambda_target: 1.0                                                                                                                                                    # Gleiche Diagnose-Randbedingung wie Vibe.
+        lhv_J_per_kg: 43000000.0                                                                                                                                              # Unterer Heizwert des Kraftstoffs.
+        afr_stoich_kg_air_per_kg_fuel: 14.5                                                                                                                                   # Stoechiometrisches Luft-Kraftstoff-Verhaeltnis.
+        combustion_efficiency_0to1: 0.96                                                                                                                                      # Verbrennungswirkungsgrad 0..1.
+        slot_open_threshold_m2: 1.0e-07                                                                                                                                       # Flaechenschwelle fuer Schlitz offen.
+        slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
+        compression_velocity_threshold_m_per_s: 0.02                                                                                                                          # Mindest-Kompressionsgeschwindigkeit fuer Latch.
+      hcci_diag_beck_2003_1_arrhenius:
+        model: hcci_diesel                                                                                                                                                    # Diagnosemodell: gleiche Randbedingungen, Beck 2003 1-Arrhenius-Zuendverzug.
+        ignition:
+          ref: ignition_diag_beck_2003_1_arrhenius                                                                                                                            # Eigenes Ignition-Submodell.
+        burn_model: wiebe_autoignition                                                                                                                                        # Brennverlaufsmodell nach Autoignition.
+        duration_mode: time                                                                                                                                                   # Bezugsart der Brenndauer.
+        duration_ms: 1.2                                                                                                                                                      # Brenndauer in Millisekunden.
+        a: 6.9                                                                                                                                                                # Wiebe/Vibe-Formparameter a.
+        m: 2.0                                                                                                                                                                # Wiebe/Vibe-Formparameter m.
+        fueling_mode: lambda_from_cylinder_mass_at_slot_close                                                                                                                 # Art der Kraftstoffmassen-Bestimmung.
+        lambda_target: 1.0                                                                                                                                                    # Gleiche Diagnose-Randbedingung wie Vibe.
+        lhv_J_per_kg: 43000000.0                                                                                                                                              # Unterer Heizwert des Kraftstoffs.
+        afr_stoich_kg_air_per_kg_fuel: 14.5                                                                                                                                   # Stoechiometrisches Luft-Kraftstoff-Verhaeltnis.
+        combustion_efficiency_0to1: 0.96                                                                                                                                      # Verbrennungswirkungsgrad 0..1.
+        slot_open_threshold_m2: 1.0e-07                                                                                                                                       # Flaechenschwelle fuer Schlitz offen.
+        slot_closed_threshold_m2: 1.0e-12                                                                                                                                     # Flaechenschwelle fuer Schlitz geschlossen.
+        compression_velocity_threshold_m_per_s: 0.02                                                                                                                          # Mindest-Kompressionsgeschwindigkeit fuer Latch.
+    ignition:
+      ignition_diag_livengood_wu:
+        model: livengood_wu                                                                                                                                                   # Generischer Livengood-Wu-Zuendverzug.
+        tau_A_s: 2.5e-06                                                                                                                                                      # Vorzeitfaktor der HCCI-Zuendverzugszeit.
+        tau_pressure_exponent: 1.2                                                                                                                                            # Druckexponent der HCCI-Zuendverzugszeit.
+        tau_activation_temperature_K: 5000.0                                                                                                                                  # Aktivierungstemperatur des HCCI-Zuendmodells.
+        tau_reference_pressure_Pa: 1000000.0                                                                                                                                  # Referenzdruck fuer HCCI-Zuendverzug.
+        tau_reference_lambda: 1.0                                                                                                                                             # Gleiche Lambda-Randbedingung wie Vibe.
+        lambda_slowdown_exponent: 0.7                                                                                                                                         # Lambda-Abmagerungsfaktor fuer HCCI-Verzug.
+        residual_slowdown_factor: 1.5                                                                                                                                         # Verlangsamung durch Restgasanteil.
+        start_temperature_min_K: 580.0                                                                                                                                        # Mindesttemperatur fuer HCCI-SOC.
+        start_pressure_min_Pa: 500000.0                                                                                                                                       # Mindestdruck fuer HCCI-SOC.
+        max_ignition_delay_s: 0.002                                                                                                                                           # Maximal erlaubter HCCI-Zuendverzug.
+        accumulation_start_mode: piston_distance_from_tdc                                                                                                                     # Startfenster fuer HCCI-Zuendverzug/Livengood-Wu-Akkumulation.
+        accumulation_start_distance_from_tdc_mm: 30.0                                                                                                                         # Starte Akkumulation erst ab diesem Abstand vor OT.
+        accumulation_end_mode: combustion_end                                                                                                                                 # Beende Diagnose/Akkumulation nach Brennende.
+      ignition_diag_tabulated_livengood_wu:
+        model: tabulated_livengood_wu                                                                                                                                         # Livengood-Wu-Integral mit tabelliertem Zuendverzug.
+        ignition_delay_table_npz: ../diesel_ntc_zuendverzug_4d.npz                                                                                                            # NPZ: T, p, Lambda/Phi, EGR -> Zuendverzug.
+        tau_A_s: 2.5e-06                                                                                                                                                      # Nur Fallback/Schema; tabelliertes Modell nutzt die NPZ-Tabelle fuer tau.
+        tau_pressure_exponent: 1.2                                                                                                                                            # Nur Fallback/Schema; tabelliertes Modell nutzt die NPZ-Tabelle fuer tau.
+        tau_activation_temperature_K: 5000.0                                                                                                                                  # Nur Fallback/Schema; tabelliertes Modell nutzt die NPZ-Tabelle fuer tau.
+        tau_reference_pressure_Pa: 1000000.0                                                                                                                                  # Referenzdruck fuer konsistente Parametrierung.
+        tau_reference_lambda: 1.0                                                                                                                                             # Gleiche Lambda-Randbedingung wie Vibe.
+        lambda_slowdown_exponent: 0.7                                                                                                                                         # Konsistente Parametrierung.
+        residual_slowdown_factor: 1.5                                                                                                                                         # Konsistente Parametrierung.
+        start_temperature_min_K: 580.0                                                                                                                                        # Mindesttemperatur fuer HCCI-SOC.
+        start_pressure_min_Pa: 500000.0                                                                                                                                       # Mindestdruck fuer HCCI-SOC.
+        max_ignition_delay_s: 0.002                                                                                                                                           # Konsistente Diagnose-Randbedingung.
+        accumulation_start_mode: piston_distance_from_tdc                                                                                                                     # Startfenster fuer HCCI-Zuendverzug/Livengood-Wu-Akkumulation.
+        accumulation_start_distance_from_tdc_mm: 30.0                                                                                                                         # Starte Akkumulation erst ab diesem Abstand vor OT.
+        accumulation_end_mode: combustion_end                                                                                                                                 # Beende Diagnose/Akkumulation nach Brennende.
+      ignition_diag_beck_2003_1_arrhenius:
+        model: beck_2003_1_arrhenius                                                                                                                                          # Beck 2003 1-Arrhenius-Zuendverzug ohne Cool-Flame-Stufe.
+        beck_c1_s: 1.0e-05                                                                                                                                                    # Beck-Vorfaktor c1 in Sekunden.
+        beck_c2: -1.2                                                                                                                                                         # Beck-Druckexponent c2.
+        beck_reference_pressure_bar: 1.0                                                                                                                                      # Beck-Referenzdruck in bar.
+        beck_reference_o2_percent: 20.94                                                                                                                                      # Referenz-Sauerstoffanteil trockener Luft.
+        tau_activation_temperature_K: 5000.0                                                                                                                                  # Aktivierungstemperatur, falls keine Aktivierungsenergie gesetzt ist.
+        tau_reference_pressure_Pa: 1000000.0                                                                                                                                  # Referenzdruck fuer konsistente Parametrierung.
+        tau_reference_lambda: 1.0                                                                                                                                             # Gleiche Lambda-Randbedingung wie Vibe.
+        lambda_slowdown_exponent: 0.7                                                                                                                                         # Konsistente Parametrierung.
+        residual_slowdown_factor: 1.5                                                                                                                                         # Verlangsamung durch Restgasanteil.
+        start_temperature_min_K: 580.0                                                                                                                                        # Mindesttemperatur fuer HCCI-SOC.
+        start_pressure_min_Pa: 500000.0                                                                                                                                       # Mindestdruck fuer HCCI-SOC.
+        max_ignition_delay_s: 0.002                                                                                                                                           # Maximal erlaubter HCCI-Zuendverzug.
+        accumulation_start_mode: piston_distance_from_tdc                                                                                                                     # Startfenster fuer HCCI-Zuendverzug/Livengood-Wu-Akkumulation.
+        accumulation_start_distance_from_tdc_mm: 30.0                                                                                                                         # Starte Akkumulation erst ab diesem Abstand vor OT.
+        accumulation_end_mode: combustion_end                                                                                                                                 # Beende Diagnose/Akkumulation nach Brennende.
+    connections:
+      compressor_in_check_valve:
+        type: check_valve                                                                                                                                                     # Typ des Volumens, der Verbindung oder Kinematik.
+        diameter_mm: 55                                                                                                                                                       # Durchmesser fuer Orifice oder Rueckschlagventil.
+        discharge_coefficient: 0.82                                                                                                                                           # Durchflussbeiwert des Rueckschlagventils.
+        cracking_pressure_Pa: 0.0                                                                                                                                             # Oeffnungsdruck des Rueckschlagventils.
+      compressor_out_check_valve:
+        type: check_valve                                                                                                                                                     # Typ des Volumens, der Verbindung oder Kinematik.
+        diameter_mm: 55.3                                                                                                                                                     # Durchmesser fuer Orifice oder Rueckschlagventil.
+        discharge_coefficient: 0.82                                                                                                                                           # Durchflussbeiwert des Rueckschlagventils.
+        cracking_pressure_Pa: 50000.0                                                                                                                                         # Oeffnungsdruck des Rueckschlagventils.
+      transfer_slot:
+        type: slot                                                                                                                                                            # Typ des Volumens, der Verbindung oder Kinematik.
+        source_of_data: rectangle                                                                                                                                             # Geometriequelle fuer den Slot.
+        opening_mode: by_distance                                                                                                                                             # Definition der Oeffnung ueber Abstand oder Winkel.
+        distance_from_tdc_mm: 92.07                                                                                                                                           # Abstand der Schlitzkante vom OT in mm.
+        opening_angle_deg: null                                                                                                                                               # Alternativer Oeffnungswinkel in Grad.
+        piston_height_if_crankcase_m: 0.0                                                                                                                                     # Kolbenhoehe bei Kurbelgehaeusebezug.
+        entrance_angle_deg: 0.0                                                                                                                                               # Eintrittswinkel des Kanals.
+        width_mm: 26.0                                                                                                                                                        # Schlitzbreite in mm.
+        height_mm: 16.0                                                                                                                                                       # Schlitzhoehe in mm.
+        open_fillet_radius_m: 0.0                                                                                                                                             # Radius beim ersten Oeffnen.
+        full_fillet_radius_m: 0.0                                                                                                                                             # Radius bei voller Oeffnung.
+        number_of_identical_holes: 6                                                                                                                                          # Anzahl identischer Oeffnungen.
+        discharge_coefficients:
+          mode: constant                                                                                                                                                      # Auswahl des lokalen Modus.
+          forward_cd: 0.95                                                                                                                                                    # Durchflussbeiwert in Vorwaertsrichtung.
+          reverse_cd: 0.95                                                                                                                                                    # Durchflussbeiwert in Rueckwaertsrichtung.
+      exhaust_slot:
+        type: slot                                                                                                                                                            # Typ des Volumens, der Verbindung oder Kinematik.
+        source_of_data: rectangle                                                                                                                                             # Geometriequelle fuer den Slot.
+        opening_mode: by_distance                                                                                                                                             # Definition der Oeffnung ueber Abstand oder Winkel.
+        distance_from_tdc_mm: 90.6                                                                                                                                            # Abstand der Schlitzkante vom OT in mm.
+        opening_angle_deg: null                                                                                                                                               # Alternativer Oeffnungswinkel in Grad.
+        piston_height_if_crankcase_m: 0.0                                                                                                                                     # Kolbenhoehe bei Kurbelgehaeusebezug.
+        entrance_angle_deg: 0.0                                                                                                                                               # Eintrittswinkel des Kanals.
+        width_mm: 24                                                                                                                                                          # Schlitzbreite in mm.
+        height_mm: 18                                                                                                                                                         # Schlitzhoehe in mm.
+        open_fillet_radius_m: 0.0                                                                                                                                             # Radius beim ersten Oeffnen.
+        full_fillet_radius_m: 0.0                                                                                                                                             # Radius bei voller Oeffnung.
+        number_of_identical_holes: 6                                                                                                                                          # Anzahl identischer Oeffnungen.
+        discharge_coefficients:
+          mode: constant                                                                                                                                                      # Auswahl des lokalen Modus.
+          forward_cd: 0.95                                                                                                                                                    # Durchflussbeiwert in Vorwaertsrichtung.
+          reverse_cd: 0.95                                                                                                                                                    # Durchflussbeiwert in Rueckwaertsrichtung.
+      exhaust_bleed:
+        type: orifice                                                                                                                                                         # Typ des Volumens, der Verbindung oder Kinematik.
+        diameter_mm: 14.0                                                                                                                                                     # Durchmesser fuer Orifice oder Rueckschlagventil.
+        forward_cd: 0.98                                                                                                                                                      # Durchflussbeiwert in Vorwaertsrichtung.
+        reverse_cd: 0.98                                                                                                                                                      # Durchflussbeiwert in Rueckwaertsrichtung.
+
+  ############ Zusammen bau der Volumen und Verbindungsdefinitionen ############
+  environment:
+  - name: ambient_in                                                                                                                                                           # Feste Randbedingung, kein integriertes Volumen.
+    ref: ambient_environment                                                                                                                                                   # Referenz auf zentral definiertes Umgebungsmodell.
+  - name: ambient_out                                                                                                                                                          # Feste Randbedingung, kein integriertes Volumen.
+    ref: ambient_environment                                                                                                                                                   # Referenz auf zentral definiertes Umgebungsmodell.
+  volumes:
+  - name: cylinder_1                                                                                                                                                          # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: cylinder_free_piston                                                                                                                                                 # Referenz auf zentral definiertes Submodel.
+    initial_pressure_Pa: 257686.2578843034                                                                                                                                    # Anfangsdruck des Volumens.
+    initial_temperature_K: 487.1451361449823                                                                                                                                  # Anfangstemperatur des Volumens.
+    initial_burned_fraction_0to1: 0.26880184209044594                                                                                                                         # Startwert des verbrannten Massenanteils 0..1.
+    initial_burned_mass_percent: 26.880184209044593                                                                                                                           # Startwert des verbrannten Massenanteils in Prozent.
+  - name: cylinder_2                                                                                                                                                          # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: cylinder_free_piston                                                                                                                                                 # Referenz auf zentral definiertes Submodel.
+    initial_pressure_Pa: 542041.7401361301                                                                                                                                    # Anfangsdruck des Volumens.
+    initial_temperature_K: 1010.9070106970368                                                                                                                                 # Anfangstemperatur des Volumens.
+    initial_burned_fraction_0to1: 0.8712299779910716                                                                                                                          # Startwert des verbrannten Massenanteils 0..1.
+    initial_burned_mass_percent: 87.12299779910715                                                                                                                            # Startwert des verbrannten Massenanteils in Prozent.
+  - name: compressor_1                                                                                                                                                        # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: compressor_bounce                                                                                                                                                    # Referenz auf zentral definiertes Submodel.
+    initial_pressure_Pa: 101134.76663730493                                                                                                                                   # Anfangsdruck des Volumens.
+    initial_temperature_K: 299.424290135677                                                                                                                                   # Anfangstemperatur des Volumens.
+  - name: compressor_2                                                                                                                                                        # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: compressor_bounce                                                                                                                                                    # Referenz auf zentral definiertes Submodel.
+    initial_pressure_Pa: 198464.6892500843                                                                                                                                    # Anfangsdruck des Volumens.
+    initial_temperature_K: 361.45685718326035                                                                                                                                 # Anfangstemperatur des Volumens.
+  - name: receiver_1                                                                                                                                                          # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: receiver_plenum                                                                                                                                                      # Referenz auf zentral definiertes Submodel.
+    initial_pressure_Pa: 134002.76562248185                                                                                                                                   # Anfangsdruck des Volumens.
+    initial_temperature_K: 345.65556573570336                                                                                                                                 # Anfangstemperatur des Volumens.
+    initial_burned_fraction_0to1: 0.013388033957062654                                                                                                                        # Startwert des verbrannten Massenanteils 0..1.
+    initial_burned_mass_percent: 1.3388033957062653                                                                                                                           # Startwert des verbrannten Massenanteils in Prozent.
+  - name: receiver_2                                                                                                                                                          # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: receiver_plenum                                                                                                                                                      # Referenz auf zentral definiertes Submodel.
+    initial_pressure_Pa: 149846.55096679396                                                                                                                                   # Anfangsdruck des Volumens.
+    initial_temperature_K: 366.9824892796944                                                                                                                                  # Anfangstemperatur des Volumens.
+    initial_burned_fraction_0to1: 0.023555537179546386                                                                                                                        # Startwert des verbrannten Massenanteils 0..1.
+    initial_burned_mass_percent: 2.3555537179546384                                                                                                                           # Startwert des verbrannten Massenanteils in Prozent.
+  - name: exhaust_plenum_1                                                                                                                                                    # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: exhaust_plenum                                                                                                                                                       # Referenz auf zentral definiertes Submodel.
+    initial_pressure_Pa: 123188.4645178203                                                                                                                                    # Anfangsdruck des Volumens.
+    initial_temperature_K: 499.4320592240638                                                                                                                                  # Anfangstemperatur des Volumens.
+    initial_burned_fraction_0to1: 0.30316959683064754                                                                                                                         # Startwert des verbrannten Massenanteils 0..1.
+    initial_burned_mass_percent: 30.316959683064752                                                                                                                           # Startwert des verbrannten Massenanteils in Prozent.
+  - name: exhaust_plenum_2                                                                                                                                                    # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: exhaust_plenum                                                                                                                                                       # Referenz auf zentral definiertes Submodel.
+    initial_pressure_Pa: 105762.06635913745                                                                                                                                   # Anfangsdruck des Volumens.
+    initial_temperature_K: 497.89529443664713                                                                                                                                 # Anfangstemperatur des Volumens.
+    initial_burned_fraction_0to1: 0.31810838102263905                                                                                                                         # Startwert des verbrannten Massenanteils 0..1.
+    initial_burned_mass_percent: 31.810838102263904                                                                                                                           # Startwert des verbrannten Massenanteils in Prozent.
+  connections:
+  - name: compressor_1_in_cv                                                                                                                                                  # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: compressor_in_check_valve                                                                                                                                            # Referenz auf zentral definiertes Submodel.
+    from_volume: ambient_in                                                                                                                                                   # Quellvolumen der Verbindung.
+    to_volume: compressor_1                                                                                                                                                   # Zielvolumen der Verbindung.
+  - name: compressor_1_out_cv                                                                                                                                                 # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: compressor_out_check_valve                                                                                                                                           # Referenz auf zentral definiertes Submodel.
+    from_volume: compressor_1                                                                                                                                                 # Quellvolumen der Verbindung.
+    to_volume: receiver_1                                                                                                                                                     # Zielvolumen der Verbindung.
+  - name: compressor_2_in_cv                                                                                                                                                  # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: compressor_in_check_valve                                                                                                                                            # Referenz auf zentral definiertes Submodel.
+    from_volume: ambient_in                                                                                                                                                   # Quellvolumen der Verbindung.
+    to_volume: compressor_2                                                                                                                                                   # Zielvolumen der Verbindung.
+  - name: compressor_2_out_cv                                                                                                                                                 # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: compressor_out_check_valve                                                                                                                                           # Referenz auf zentral definiertes Submodel.
+    from_volume: compressor_2                                                                                                                                                 # Quellvolumen der Verbindung.
+    to_volume: receiver_2                                                                                                                                                     # Zielvolumen der Verbindung.
+  - name: transfer_slot_1                                                                                                                                                     # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: transfer_slot                                                                                                                                                        # Referenz auf zentral definiertes Submodel.
+    from_volume: receiver_1                                                                                                                                                   # Quellvolumen der Verbindung.
+    to_volume: cylinder_1                                                                                                                                                     # Zielvolumen der Verbindung.
+  - name: transfer_slot_2                                                                                                                                                     # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: transfer_slot                                                                                                                                                        # Referenz auf zentral definiertes Submodel.
+    from_volume: receiver_2                                                                                                                                                   # Quellvolumen der Verbindung.
+    to_volume: cylinder_2                                                                                                                                                     # Zielvolumen der Verbindung.
+  - name: exhaust_slot_1                                                                                                                                                      # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: exhaust_slot                                                                                                                                                         # Referenz auf zentral definiertes Submodel.
+    from_volume: cylinder_1                                                                                                                                                   # Quellvolumen der Verbindung.
+    to_volume: exhaust_plenum_1                                                                                                                                               # Zielvolumen der Verbindung.
+  - name: exhaust_slot_2                                                                                                                                                      # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: exhaust_slot                                                                                                                                                         # Referenz auf zentral definiertes Submodel.
+    from_volume: cylinder_2                                                                                                                                                   # Quellvolumen der Verbindung.
+    to_volume: exhaust_plenum_2                                                                                                                                               # Zielvolumen der Verbindung.
+  - name: exhaust_bleed_1                                                                                                                                                     # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: exhaust_bleed                                                                                                                                                        # Referenz auf zentral definiertes Submodel.
+    from_volume: exhaust_plenum_1                                                                                                                                             # Quellvolumen der Verbindung.
+    to_volume: ambient_out                                                                                                                                                    # Zielvolumen der Verbindung.
+  - name: exhaust_bleed_2                                                                                                                                                     # Eindeutiger Name dieses Volumens oder dieser Verbindung.
+    ref: exhaust_bleed                                                                                                                                                        # Referenz auf zentral definiertes Submodel.
+    from_volume: exhaust_plenum_2                                                                                                                                             # Quellvolumen der Verbindung.
+    to_volume: ambient_out                                                                                                                                                    # Zielvolumen der Verbindung.
+simulation:
+  dt_s: 1.0e-05                                                                                                                                                               # Integrationszeitschritt in s.
+  total_cycles: 3                                                                                                                                                             # Anzahl simulierter Zyklen.
+  save_last_cycles: 2                                                                                                                                                         # Anzahl zu speichernder letzter Zyklen.
+  simulationtime: 0.2                                                                                                                                                         # Simulationsdauer in s.
+  solver:
+    kind: rk4                                                                                                                                                                 # Numerischer Integrator.
+    rtol: 1.0e-05                                                                                                                                                             # Relative Solver-Toleranz.
+    atol: 1.0e-07                                                                                                                                                             # Absolute Solver-Toleranz.
+postprocessing:
+  mode: pipeline                                                                                                                                                              # Aktueller Postprocessing-Pfad; Legacy ist deaktiviert.
+  config: postprocessing.yaml                                                                                                                                                 # Separate Pipeline-Konfiguration relativ zu dieser Simulations-YAML.
+  auto_update_initial_conditions: false                                                                                                                                        # Schreibt Startwerte aus letztem Lauf zurueck.
+  sampling:
+    mode: time                                                                                                                                                                # Zeitbasiertes Solver-/Export-Sampling fuer den Lauf.
+    step_s: 0.0001                                                                                                                                                            # Zeitliche Ausgabeschrittweite.
+  console:
+    run_summary:
+      enabled: true                                                                                                                                                           # Gibt die Run-Zusammenfassung in der Konsole aus.
+    cycle_summary:
+      enabled: false                                                                                                                                                          # Unterdrueckt die zyklusweise Konsolenausgabe.
+    check_report:
+      enabled: false                                                                                                                                                          # Checkreport wird ueber die Pipeline-Dateien dokumentiert.
+    geometry:
+      enabled: false                                                                                                                                                          # Geometrieausgabe bleibt im Pipeline-README.

@@ -156,6 +156,13 @@ signals:
   - cylinder_1_hcci_cool_ignition_integral
   - cylinder_1_hcci_ignition_integral_0to1
   - cylinder_1_hcci_cool_ignition_integral_0to1
+  - cylinder_1_hcci_validity_reason_code
+  - cylinder_1_hcci_accumulation_window_active_0to1
+  - cylinder_1_hcci_start_temperature_min_K
+  - cylinder_1_hcci_start_pressure_min_Pa
+  - cylinder_1_hcci_lambda
+  - cylinder_1_hcci_residual_fraction_0to1
+  - cylinder_1_hcci_tabulated_out_of_bounds_0to1
   - cylinder_1_combustion_active_0to1
   - cylinder_1_combustion_fuel_mass_latched_kg
   - cylinder_1_combustion_fuel_burn_rate_kg_per_s
@@ -192,6 +199,13 @@ signals:
   - cylinder_2_hcci_cool_ignition_integral
   - cylinder_2_hcci_ignition_integral_0to1
   - cylinder_2_hcci_cool_ignition_integral_0to1
+  - cylinder_2_hcci_validity_reason_code
+  - cylinder_2_hcci_accumulation_window_active_0to1
+  - cylinder_2_hcci_start_temperature_min_K
+  - cylinder_2_hcci_start_pressure_min_Pa
+  - cylinder_2_hcci_lambda
+  - cylinder_2_hcci_residual_fraction_0to1
+  - cylinder_2_hcci_tabulated_out_of_bounds_0to1
   - cylinder_2_combustion_active_0to1
   - cylinder_2_combustion_fuel_mass_latched_kg
   - cylinder_2_combustion_fuel_burn_rate_kg_per_s
@@ -273,8 +287,8 @@ last_ut_ot_ut:
   enabled: true
   path: csv/signals_last_ut_ot_ut.csv
   step_deg: 0.1
-  axis_min_deg: -10.0
-  axis_max_deg: 10.0
+  axis_min_deg: -9.0
+  axis_max_deg: 9.0
   axis_signal: theta_deg
 
 # Reconstruct engineering signals from raw states when they are requested.

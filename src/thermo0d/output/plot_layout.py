@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import transforms as mtransforms
-from matplotlib.ticker import MultipleLocator
+from matplotlib.ticker import FuncFormatter, MultipleLocator
 import yaml
 import imageio
 
@@ -600,6 +600,23 @@ def _series_values(rows: list[dict[str, Any]], signal_key: str, scale_factor: fl
     return out
 
 
+def _hide_values_before_positive_signal(rows: list[dict[str, Any]], values: list[float | None], signal_key: str, threshold: float = 0.0) -> list[float | None]:
+    if not signal_key:
+        return values
+    first_index: int | None = None
+    for idx, row in enumerate(rows):
+        value = _finite(row, signal_key)
+        if value is not None and value > threshold:
+            first_index = idx
+            break
+    if first_index is None or first_index <= 0:
+        return values
+    masked = list(values)
+    for idx in range(min(first_index, len(masked))):
+        masked[idx] = None
+    return masked
+
+
 def _align_xy(x_values: list[Any], y_values: list[Any]) -> tuple[list[float], list[float]]:
     xs: list[float] = []
     ys: list[float] = []
@@ -676,26 +693,48 @@ def _metric_value(rows: list[dict[str, Any]], metric: dict[str, Any], subplot: d
         key = str(metric.get("signal_key", "") or "").strip()
         if not key:
             return None
-        values = _column(rows, key)
-        finite_values = [item for item in values if math.isfinite(item)]
-        if not finite_values:
-            return None
         mode = str(metric.get("mode", "last") or "last").lower().strip()
-        if mode == "first":
-            value = finite_values[0]
-        elif mode == "min":
-            value = min(finite_values)
-        elif mode == "max":
-            value = max(finite_values)
-        elif mode == "mean":
-            value = sum(finite_values) / len(finite_values)
-        elif mode == "delta":
-            value = finite_values[-1] - finite_values[0]
-        elif mode == "integral":
-            x_key = str(metric.get("x_signal", "") or subplot.get("x_signal", "t_s") or "t_s")
-            value = _trapz(_column(rows, x_key), values, absolute=bool(metric.get("absolute", False)))
+        if mode == "first_where":
+            raw_where_keys = metric.get("where_signal_any", None)
+            if isinstance(raw_where_keys, list):
+                where_keys = [str(item).strip() for item in raw_where_keys if str(item).strip()]
+            else:
+                where_keys = [str(metric.get("where_signal", "") or "").strip()]
+            where_gte_raw = metric.get("where_gte", metric.get("where_ge", None))
+            where_gte = _safe_float(where_gte_raw, 0.0) if where_gte_raw is not None else None
+            where_gt = _safe_float(metric.get("where_gt", 0.0), 0.0)
+            for row in rows:
+                if where_gte is not None:
+                    matches = any((where_value := _finite(row, where_key)) is not None and where_value >= where_gte for where_key in where_keys)
+                else:
+                    matches = any((where_value := _finite(row, where_key)) is not None and where_value > where_gt for where_key in where_keys)
+                if matches:
+                    value = _finite(row, key)
+                    break
+            else:
+                value = None
+            if value is None:
+                return None
         else:
-            value = finite_values[-1]
+            values = _column(rows, key)
+            finite_values = [item for item in values if math.isfinite(item)]
+            if not finite_values:
+                return None
+            if mode == "first":
+                value = finite_values[0]
+            elif mode == "min":
+                value = min(finite_values)
+            elif mode == "max":
+                value = max(finite_values)
+            elif mode == "mean":
+                value = sum(finite_values) / len(finite_values)
+            elif mode == "delta":
+                value = finite_values[-1] - finite_values[0]
+            elif mode == "integral":
+                x_key = str(metric.get("x_signal", "") or subplot.get("x_signal", "t_s") or "t_s")
+                value = _trapz(_column(rows, x_key), values, absolute=bool(metric.get("absolute", False)))
+            else:
+                value = finite_values[-1]
     if value is None or not math.isfinite(value):
         return None
     if bool(metric.get("absolute", False)) and str(metric.get("mode", "") or "").lower() != "integral":
@@ -710,11 +749,14 @@ def _metric_value(rows: list[dict[str, Any]], metric: dict[str, Any], subplot: d
 def _format_metric_value(value: float | None, metric: dict[str, Any]) -> str:
     unit = str(metric.get("unit", "") or "").strip()
     try:
-        digits = int(metric.get("digits", 2) or 2)
+        digits_raw = metric.get("digits", 2)
+        digits = int(2 if digits_raw is None else digits_raw)
     except Exception:
         digits = 2
     if value is None or not math.isfinite(value):
         return "n/a"
+    if bool(metric.get("fixed", False)):
+        return f"{value:.{max(0, digits)}f} {unit}".strip()
     if bool(metric.get("scientific", False)):
         return f"{value:.{max(0, digits)}e} {unit}".strip()
     if abs(value) >= 1000.0 or (abs(value) < 0.01 and value != 0.0):
@@ -885,12 +927,27 @@ def _theta_data_limits(subplot: dict[str, Any], export_rows: list[dict[str, Any]
 
 def _safe_float(value: Any, default: float) -> float:
     try:
-        numeric = float(value)
+        text = str(value).strip()
+        if text.startswith("="):
+            text = text[1:].strip()
+        numeric = float(text)
     except Exception:
         return float(default)
     if math.isnan(numeric):
         return float(default)
     return numeric
+
+
+def _format_ut_ot_ut_tick(value: float, x_min: float, x_max: float) -> str:
+    if abs(value) < 1.0e-9:
+        return "0 (OT)"
+    if abs(value - x_min) < 1.0e-9:
+        return f"{value:g} UT"
+    if abs(value - x_max) < 1.0e-9:
+        return f"{value:g} UT"
+    if abs(value - round(value)) < 1.0e-9:
+        return str(int(round(value)))
+    return f"{value:g}"
 
 
 def _apply_x_axis_layout(axis, subplot: dict[str, Any], export_rows: list[dict[str, Any]], style: dict[str, Any] | None = None) -> None:
@@ -911,8 +968,20 @@ def _apply_x_axis_layout(axis, subplot: dict[str, Any], export_rows: list[dict[s
             if data_max == data_min:
                 data_max = data_min + 1.0
             axis.set_xlim(data_min, data_max)
-        axis.xaxis.set_major_locator(MultipleLocator(180.0))
-        axis.xaxis.set_minor_locator(MultipleLocator(60.0))
+        major_step = _safe_float(subplot.get('x_tick_step', subplot.get('x_major_tick_step', 180.0)), 180.0)
+        minor_step = _safe_float(subplot.get('x_minor_tick_step', 0.0), 0.0)
+        if major_step > 0.0:
+            axis.xaxis.set_major_locator(MultipleLocator(major_step))
+        if minor_step > 0.0:
+            axis.xaxis.set_minor_locator(MultipleLocator(minor_step))
+        elif major_step > 0.0 and major_step < 180.0:
+            axis.xaxis.set_minor_locator(MultipleLocator(major_step))
+        if str(subplot.get('x_tick_label_mode', '') or '').lower() in {'ut_ot_ut', 'last_ut_ot_ut'}:
+            axis.xaxis.set_major_formatter(FuncFormatter(lambda value, pos: _format_ut_ot_ut_tick(value, x_min, x_max)))
+        if str(subplot.get('x_axis_position', 'bottom') or 'bottom').lower() == 'bottom':
+            axis.xaxis.set_ticks_position('bottom')
+            axis.xaxis.set_label_position('bottom')
+            axis.tick_params(axis='x', bottom=True, labelbottom=True, top=False, labeltop=False)
         axis.grid(grid_visible, which='major', alpha=grid_alpha if grid_visible else 0.0)
         axis.grid(grid_visible, which='minor', alpha=min(1.0, grid_alpha * 0.6) if grid_visible else 0.0)
         return
@@ -1100,6 +1169,12 @@ def render_plot_project(export_rows: list[dict[str, Any]], plot_path: str | Path
                     signal_key,
                     float(series.get("scale_factor", 1.0) or 1.0),
                     float(series.get("offset", 0.0) or 0.0),
+                )
+                y_values = _hide_values_before_positive_signal(
+                    export_rows,
+                    y_values,
+                    str(series.get("hide_before_positive_signal", "") or ""),
+                    _safe_float(series.get("hide_threshold", 0.0), 0.0),
                 )
                 xs, ys = _align_xy(x_values, y_values)
                 if not xs:

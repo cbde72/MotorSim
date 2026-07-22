@@ -146,12 +146,15 @@ def resolve_preprocessing_submodel_references(config_data: Mapping[str, Any] | N
     submodels = preprocessing.get("submodels")
     if not isinstance(submodels, Mapping):
         submodels = {}
+    if isinstance(submodels, dict):
+        submodels.setdefault("ignition", {})
     volume_library = submodels.get("volumes") if isinstance(submodels.get("volumes"), Mapping) else {}
     wall_heat_library = submodels.get("wall_heat") if isinstance(submodels.get("wall_heat"), Mapping) else {}
     if isinstance(submodels, dict) and "wall_temperatur" in submodels and "wall_temperature" not in submodels:
         submodels["wall_temperature"] = submodels.pop("wall_temperatur")
     wall_temperature_library = submodels.get("wall_temperature") if isinstance(submodels.get("wall_temperature"), Mapping) else {}
     combustion_library = submodels.get("combustion") if isinstance(submodels.get("combustion"), Mapping) else {}
+    ignition_library = submodels.get("ignition") if isinstance(submodels.get("ignition"), Mapping) else {}
     connection_library = submodels.get("connections") if isinstance(submodels.get("connections"), Mapping) else {}
     volumes = preprocessing.get("volumes")
     if isinstance(volumes, list):
@@ -206,6 +209,15 @@ def resolve_preprocessing_submodel_references(config_data: Mapping[str, Any] | N
                     local_config=combustion_config,
                     legacy_ref=legacy_combustion_ref,
                     context=f"preprocessing.volumes[{index}] {vol_name}.combustion",
+                )
+            combustion_config = volume.get("combustion")
+            ignition_config = combustion_config.get("ignition") if isinstance(combustion_config, Mapping) else None
+            ignition_ref_present = isinstance(ignition_config, Mapping) and ("ref" in ignition_config or "reference" in ignition_config)
+            if ignition_ref_present and isinstance(combustion_config, dict):
+                combustion_config["ignition"] = _resolve_submodel_reference(
+                    library=ignition_library,
+                    local_config=ignition_config,
+                    context=f"preprocessing.volumes[{index}] {vol_name}.combustion.ignition",
                 )
     environment = preprocessing.get("environment")
     if isinstance(environment, list):
@@ -394,7 +406,7 @@ def normalize_config_data(config_data: Mapping[str, Any] | None) -> dict[str, An
     pre = out.setdefault("preprocessing", {})
     pre.setdefault("gas_properties", {"cp_J_per_kgK": 1005.0, "cv_J_per_kgK": 718.0, "R_J_per_kgK": 287.0, "thermo_model": "constant"})
     pre.setdefault("features", {"mass_flow": True, "wall_heat": False, "combustion": False, "evaporation": False, "pv_work": True})
-    pre.setdefault("submodels", {"volumes": {}, "wall_heat": {}, "wall_temperature": {}, "combustion": {}, "connections": {}})
+    pre.setdefault("submodels", {"volumes": {}, "wall_heat": {}, "wall_temperature": {}, "combustion": {}, "ignition": {}, "connections": {}})
     pre.setdefault("engine", {"cycle_type": "4t", "speed_rpm": 3000.0})
     pre.setdefault("environment", [])
     pre.setdefault("volumes", [])

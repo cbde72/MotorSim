@@ -582,8 +582,158 @@ class VibeCombustionConfig(StrictBaseModel):
         return self
 
 
+class LivengoodWuIgnitionConfig(StrictBaseModel):
+    model: Literal["livengood_wu"]
+    tau_A_s: StrictFloat = 2.5e-6
+    tau_pressure_exponent: StrictFloat = 1.2
+    tau_activation_temperature_K: StrictFloat = 15000.0
+    tau_activation_energy_J_per_kg: StrictFloat | None = None
+    tau_reference_pressure_Pa: StrictFloat = 1000000.0
+    tau_reference_lambda: StrictFloat = 1.4
+    lambda_slowdown_exponent: StrictFloat = 0.7
+    residual_slowdown_factor: StrictFloat = 1.5
+    start_temperature_min_K: StrictFloat = 780.0
+    start_pressure_min_Pa: StrictFloat = 2000000.0
+    max_ignition_delay_s: StrictFloat = 0.02
+    accumulation_start_mode: Literal["compression", "piston_distance_from_tdc"] = "compression"
+    accumulation_start_distance_from_tdc_m: StrictFloat | None = None
+    accumulation_start_distance_from_tdc_mm: StrictFloat | None = None
+    accumulation_end_mode: Literal["none", "combustion_end"] = "none"
+
+    @model_validator(mode="after")
+    def validate_values(self) -> "LivengoodWuIgnitionConfig":
+        if self.tau_A_s <= 0.0:
+            raise ValueError("tau_A_s must be > 0")
+        if self.tau_pressure_exponent < 0.0:
+            raise ValueError("tau_pressure_exponent must be >= 0")
+        if self.tau_activation_temperature_K <= 0.0:
+            raise ValueError("tau_activation_temperature_K must be > 0")
+        if self.tau_activation_energy_J_per_kg is not None and self.tau_activation_energy_J_per_kg <= 0.0:
+            raise ValueError("tau_activation_energy_J_per_kg must be > 0 when provided")
+        if self.tau_reference_pressure_Pa <= 0.0:
+            raise ValueError("tau_reference_pressure_Pa must be > 0")
+        if self.tau_reference_lambda <= 0.0:
+            raise ValueError("tau_reference_lambda must be > 0")
+        if self.lambda_slowdown_exponent < 0.0:
+            raise ValueError("lambda_slowdown_exponent must be >= 0")
+        if self.residual_slowdown_factor < 1.0:
+            raise ValueError("residual_slowdown_factor must be >= 1")
+        if self.start_temperature_min_K <= 0.0:
+            raise ValueError("start_temperature_min_K must be > 0")
+        if self.start_pressure_min_Pa <= 0.0:
+            raise ValueError("start_pressure_min_Pa must be > 0")
+        if self.max_ignition_delay_s <= 0.0:
+            raise ValueError("max_ignition_delay_s must be > 0")
+        _resolve_optional_length_m(
+            self.accumulation_start_distance_from_tdc_m,
+            self.accumulation_start_distance_from_tdc_mm,
+            field_m="accumulation_start_distance_from_tdc_m",
+            field_mm="accumulation_start_distance_from_tdc_mm",
+            required=self.accumulation_start_mode == "piston_distance_from_tdc",
+            strictly_positive=False,
+        )
+        if self.accumulation_start_mode != "piston_distance_from_tdc" and (
+            self.accumulation_start_distance_from_tdc_m is not None or self.accumulation_start_distance_from_tdc_mm is not None
+        ):
+            raise ValueError("accumulation_start_distance_from_tdc_* is only allowed when accumulation_start_mode = 'piston_distance_from_tdc'")
+        return self
+
+
+class TabulatedLivengoodWuIgnitionConfig(LivengoodWuIgnitionConfig):
+    model: Literal["tabulated_livengood_wu"]
+    ignition_delay_table_npz: StrictStr
+
+    @model_validator(mode="after")
+    def validate_table(self) -> "TabulatedLivengoodWuIgnitionConfig":
+        super().validate_values()
+        if not self.ignition_delay_table_npz.strip():
+            raise ValueError("ignition_delay_table_npz is required when ignition model is tabulated_livengood_wu")
+        return self
+
+
+class BeckOneArrheniusIgnitionConfig(StrictBaseModel):
+    model: Literal["beck_2003_1_arrhenius"]
+    beck_c1_s: StrictFloat = 1.0e-5
+    beck_c2: StrictFloat = -1.2
+    beck_reference_pressure_bar: StrictFloat = 1.0
+    beck_reference_o2_percent: StrictFloat = 20.94
+    tau_activation_temperature_K: StrictFloat = 15000.0
+    tau_activation_energy_J_per_kg: StrictFloat | None = None
+    tau_reference_pressure_Pa: StrictFloat = 1000000.0
+    tau_reference_lambda: StrictFloat = 1.4
+    lambda_slowdown_exponent: StrictFloat = 0.7
+    residual_slowdown_factor: StrictFloat = 1.5
+    start_temperature_min_K: StrictFloat = 780.0
+    start_pressure_min_Pa: StrictFloat = 2000000.0
+    max_ignition_delay_s: StrictFloat = 0.02
+    accumulation_start_mode: Literal["compression", "piston_distance_from_tdc"] = "compression"
+    accumulation_start_distance_from_tdc_m: StrictFloat | None = None
+    accumulation_start_distance_from_tdc_mm: StrictFloat | None = None
+    accumulation_end_mode: Literal["none", "combustion_end"] = "none"
+
+    @model_validator(mode="after")
+    def validate_values(self) -> "BeckOneArrheniusIgnitionConfig":
+        if self.beck_c1_s <= 0.0:
+            raise ValueError("beck_c1_s must be > 0")
+        if self.beck_reference_pressure_bar <= 0.0:
+            raise ValueError("beck_reference_pressure_bar must be > 0")
+        if self.beck_reference_o2_percent <= 0.0:
+            raise ValueError("beck_reference_o2_percent must be > 0")
+        # Reuse the shared gate/window validation.
+        LivengoodWuIgnitionConfig(
+            model="livengood_wu",
+            tau_activation_temperature_K=self.tau_activation_temperature_K,
+            tau_activation_energy_J_per_kg=self.tau_activation_energy_J_per_kg,
+            tau_reference_pressure_Pa=self.tau_reference_pressure_Pa,
+            tau_reference_lambda=self.tau_reference_lambda,
+            lambda_slowdown_exponent=self.lambda_slowdown_exponent,
+            residual_slowdown_factor=self.residual_slowdown_factor,
+            start_temperature_min_K=self.start_temperature_min_K,
+            start_pressure_min_Pa=self.start_pressure_min_Pa,
+            max_ignition_delay_s=self.max_ignition_delay_s,
+            accumulation_start_mode=self.accumulation_start_mode,
+            accumulation_start_distance_from_tdc_m=self.accumulation_start_distance_from_tdc_m,
+            accumulation_start_distance_from_tdc_mm=self.accumulation_start_distance_from_tdc_mm,
+            accumulation_end_mode=self.accumulation_end_mode,
+        )
+        return self
+
+
+class BeckTwoStageIgnitionConfig(BeckOneArrheniusIgnitionConfig):
+    model: Literal["beck_2003_two_stage"]
+    beck_cf_fuel_name: StrictStr = "Diesel 2"
+    cool_flame_enabled: StrictBool = False
+    cool_flame_burn_model: Literal["gamma", "vibe-beck_CF", "vibe-beck"] = "gamma"
+    cool_flame_energy_fraction: StrictFloat = 0.08
+    cool_flame_duration_ms: StrictFloat = 0.3409
+    cool_flame_a: StrictFloat = 6.9
+    cool_flame_m: StrictFloat = 2.0
+
+    @model_validator(mode="after")
+    def validate_two_stage(self) -> "BeckTwoStageIgnitionConfig":
+        super().validate_values()
+        if self.beck_cf_fuel_name not in BECK_COOL_FLAME_FUEL_NAMES:
+            raise ValueError("beck_cf_fuel_name must be one of: " + ", ".join(BECK_COOL_FLAME_FUEL_NAMES))
+        if not (0.0 < self.cool_flame_energy_fraction < 1.0):
+            raise ValueError("cool_flame_energy_fraction must be > 0 and < 1")
+        if self.cool_flame_duration_ms <= 0.0:
+            raise ValueError("cool_flame_duration_ms must be > 0")
+        if self.cool_flame_a <= 0.0:
+            raise ValueError("cool_flame_a must be > 0")
+        if self.cool_flame_m < 0.0:
+            raise ValueError("cool_flame_m must be >= 0")
+        return self
+
+
+IgnitionConfig = Annotated[
+    Union[LivengoodWuIgnitionConfig, TabulatedLivengoodWuIgnitionConfig, BeckOneArrheniusIgnitionConfig, BeckTwoStageIgnitionConfig],
+    Field(discriminator="model"),
+]
+
+
 class HcciDieselCombustionConfig(StrictBaseModel):
     model: Literal["hcci_diesel"]
+    ignition: IgnitionConfig | None = None
     ignition_model: Literal["livengood_wu", "beck_2003_1_arrhenius", "beck_2003_two_stage", "tabulated_livengood_wu"] = "livengood_wu"
     burn_model: Literal["wiebe_autoignition", "vibe-beck"] = "wiebe_autoignition"
     duration_mode: Literal["time"] = "time"
@@ -636,6 +786,10 @@ class HcciDieselCombustionConfig(StrictBaseModel):
     start_temperature_min_K: StrictFloat = 780.0
     start_pressure_min_Pa: StrictFloat = 2000000.0
     max_ignition_delay_s: StrictFloat = 0.02
+    accumulation_start_mode: Literal["compression", "piston_distance_from_tdc"] = "compression"
+    accumulation_start_distance_from_tdc_m: StrictFloat | None = None
+    accumulation_start_distance_from_tdc_mm: StrictFloat | None = None
+    accumulation_end_mode: Literal["none", "combustion_end"] = "none"
 
     @model_validator(mode="after")
     def validate_values(self) -> "HcciDieselCombustionConfig":
@@ -707,6 +861,17 @@ class HcciDieselCombustionConfig(StrictBaseModel):
             raise ValueError("start_pressure_min_Pa must be > 0")
         if self.max_ignition_delay_s <= 0.0:
             raise ValueError("max_ignition_delay_s must be > 0")
+        has_accum_m = self.accumulation_start_distance_from_tdc_m is not None
+        has_accum_mm = self.accumulation_start_distance_from_tdc_mm is not None
+        if self.accumulation_start_mode == "piston_distance_from_tdc":
+            if has_accum_m == has_accum_mm:
+                raise ValueError("Use exactly one of accumulation_start_distance_from_tdc_m or accumulation_start_distance_from_tdc_mm when accumulation_start_mode = 'piston_distance_from_tdc'")
+        elif has_accum_m or has_accum_mm:
+            raise ValueError("accumulation_start_distance_from_tdc_m/mm is only allowed when accumulation_start_mode = 'piston_distance_from_tdc'")
+        if has_accum_m and self.accumulation_start_distance_from_tdc_m < 0.0:
+            raise ValueError("accumulation_start_distance_from_tdc_m must be >= 0")
+        if has_accum_mm and self.accumulation_start_distance_from_tdc_mm < 0.0:
+            raise ValueError("accumulation_start_distance_from_tdc_mm must be >= 0")
         return self
 
 
@@ -730,6 +895,8 @@ class SubmodelLibraryConfig(StrictBaseModel):
     wall_heat: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
     wall_temperature: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
     combustion: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
+    evaporation: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
+    ignition: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
     connections: dict[StrictStr, dict[StrictStr, object]] = Field(default_factory=dict)
 
 

@@ -21,6 +21,22 @@ HCCI_IGNITION_GENERIC_LIVENGOOD_WU = 0
 HCCI_IGNITION_BECK_2003_1_ARRHENIUS = 1
 HCCI_IGNITION_BECK_2003_TWO_STAGE = 2
 HCCI_IGNITION_TABULATED_LIVENGOOD_WU = 3
+HCCI_ACCUMULATION_START_COMPRESSION = 0
+HCCI_ACCUMULATION_START_PISTON_DISTANCE_FROM_TDC = 1
+HCCI_ACCUMULATION_END_NONE = 0
+HCCI_ACCUMULATION_END_COMBUSTION_END = 1
+HCCI_DIAG_OK = 0
+HCCI_DIAG_NOT_ENABLED = 1
+HCCI_DIAG_NO_COMBUSTION_ROW = 2
+HCCI_DIAG_NOT_TIME_MODE = 3
+HCCI_DIAG_ACCUMULATION_WINDOW_INACTIVE = 4
+HCCI_DIAG_NO_COMBUSTION_ENERGY = 5
+HCCI_DIAG_SOC_ACTIVE = 6
+HCCI_DIAG_INVALID_MASS = 7
+HCCI_DIAG_INVALID_AIR = 8
+HCCI_DIAG_INVALID_FUEL = 9
+HCCI_DIAG_BELOW_TEMPERATURE = 10
+HCCI_DIAG_BELOW_PRESSURE = 11
 
 
 def _interp_axis_index_weight(axis: np.ndarray, value: float) -> tuple[int, int, float]:
@@ -64,6 +80,27 @@ def _tabulated_hcci_ignition_delay_s(table, *, temp_K: float, pressure_Pa: float
                     if weight > 0.0:
                         value += weight * float(delay_grid[i0, i1, i2, i3])
     return max(float(value), 1.0e-9)
+
+
+def _tabulated_hcci_delay_out_of_bounds(table, *, temp_K: float, pressure_Pa: float, lam: float, residual_fraction: float) -> bool:
+    if table is None:
+        return False
+    egr_axis = table["egr_rate"]
+    egr_value = float(residual_fraction)
+    if int(egr_axis.shape[0]) > 0 and float(egr_axis[-1]) > 1.5:
+        egr_value *= 100.0
+    checks = (
+        (table["temperature_K"], float(temp_K)),
+        (table["pressure_bar"], float(pressure_Pa) * 1.0e-5),
+        (table["lambda"], float(lam)),
+        (egr_axis, egr_value),
+    )
+    for axis, value in checks:
+        if int(axis.shape[0]) <= 0:
+            continue
+        if float(value) < float(axis[0]) or float(value) > float(axis[-1]):
+            return True
+    return False
 
 
 def _hcci_charge_o2_percent(air_mass_kg: float, burned_mass_kg: float, reference_o2_percent: float) -> float:
@@ -162,9 +199,245 @@ def _hcci_ignition_delay_s(
     return min(tau_s * residual_factor, float(fp.hcci_max_ignition_delay_by_vol_s[cyl]))
 
 
+def _hcci_tabulated_out_of_bounds(
+    fp,
+    cyl: int,
+    *,
+    temp_K: float,
+    pressure_Pa: float,
+    air_mass_kg: float,
+    burned_mass_kg: float,
+    fuel_mass_kg: float,
+    afr_stoich: float,
+    mass_kg: float,
+) -> bool:
+    ignition_models = getattr(fp, 'hcci_ignition_model_by_vol', np.zeros(0, dtype=np.int64))
+    ignition_model = int(ignition_models[cyl]) if cyl < int(getattr(ignition_models, 'shape', (0,))[0]) else HCCI_IGNITION_GENERIC_LIVENGOOD_WU
+    if ignition_model != HCCI_IGNITION_TABULATED_LIVENGOOD_WU:
+        return False
+    tables = getattr(fp, 'hcci_tabulated_delay_tables_by_vol', ())
+    table = tables[cyl] if cyl < len(tables) else None
+    lam = lambda_from_air_and_fuel_mass(float(air_mass_kg), float(fuel_mass_kg), float(afr_stoich))
+    residual_fraction = max(min(float(burned_mass_kg) / max(float(mass_kg), 1.0e-18), 1.0), 0.0)
+    return _tabulated_hcci_delay_out_of_bounds(
+        table,
+        temp_K=float(temp_K),
+        pressure_Pa=float(pressure_Pa),
+        lam=lam,
+        residual_fraction=residual_fraction,
+    )
+
+
+def _hcci_cylinder_afr(bundle, cyl: int) -> float:
+    fp = bundle.free_piston
+    afr = float(getattr(fp, 'combustion_afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5)
+    if getattr(bundle, 'combustion_afr_stoich_by_vol', None) is not None and cyl < int(bundle.combustion_afr_stoich_by_vol.shape[0]):
+        afr = float(bundle.combustion_afr_stoich_by_vol[cyl])
+    return afr
+
+
+def _hcci_fuel_mass_from_energy(bundle, cyl: int, q_total_J: float) -> float:
+    fp = bundle.free_piston
+    lhv = float(bundle.combustion_lhv_by_vol[cyl]) if getattr(bundle, 'combustion_lhv_by_vol', None) is not None and cyl < int(bundle.combustion_lhv_by_vol.shape[0]) else float(getattr(fp, 'combustion_lhv_J_per_kg', 0.0) or 0.0)
+    comb_eff = float(bundle.combustion_efficiency_by_vol[cyl]) if getattr(bundle, 'combustion_efficiency_by_vol', None) is not None and cyl < int(bundle.combustion_efficiency_by_vol.shape[0]) else float(getattr(fp, 'combustion_efficiency_0to1', 1.0) or 1.0)
+    return float(q_total_J) / max(lhv * comb_eff, 1.0e-18)
+
+
+def evaluate_free_piston_hcci_ignition_sample(
+    bundle,
+    cyl: int,
+    t_s: float,
+    y_state: np.ndarray,
+    *,
+    q_total_J: float | None = None,
+    fuel_mass_kg: float | None = None,
+    soc_active: bool = False,
+    combustion_fraction_0to1: float | None = None,
+) -> dict[str, float | bool]:
+    """Evaluate HCCI ignition gates, delays, and validity diagnostics once."""
+    fp = getattr(bundle, 'free_piston', None)
+    cyl = int(cyl)
+    result: dict[str, float | bool] = {
+        'valid': False,
+        'reason_code': float(HCCI_DIAG_NOT_ENABLED),
+        'window_active': False,
+        'hot_tau_s': 0.0,
+        'cool_tau_s': 0.0,
+        'temperature_K': 0.0,
+        'pressure_Pa': 0.0,
+        'lambda': 0.0,
+        'residual_fraction': 0.0,
+        'tabulated_out_of_bounds': False,
+    }
+    if fp is None:
+        return result
+    enabled = getattr(fp, 'hcci_enabled_by_vol', np.zeros(0, dtype=np.int64))
+    diagnostics_enabled = getattr(fp, 'hcci_diagnostics_enabled_by_vol', np.zeros(0, dtype=np.int64))
+    hcci_active = cyl < int(getattr(enabled, 'shape', (0,))[0]) and bool(enabled[cyl])
+    diag_active = cyl < int(getattr(diagnostics_enabled, 'shape', (0,))[0]) and bool(diagnostics_enabled[cyl])
+    if not hcci_active and not diag_active:
+        return result
+    comb_row = _comb_row_for_cylinder(bundle, cyl)
+    if comb_row is None:
+        result['reason_code'] = float(HCCI_DIAG_NO_COMBUSTION_ROW)
+        return result
+    if _comb_duration_mode(bundle, cyl) != int(CombDurationMode.TIME):
+        result['reason_code'] = float(HCCI_DIAG_NOT_TIME_MODE)
+        return result
+
+    x_m, v_m_per_s = _local_piston_kinematics_for_volume(bundle, y_state, cyl)
+    window_active = _hcci_accumulation_window_active(
+        bundle,
+        cyl,
+        x_m,
+        v_m_per_s,
+        combustion_fraction_0to1=combustion_fraction_0to1,
+    )
+    result['window_active'] = bool(window_active)
+    if not window_active:
+        result['reason_code'] = float(HCCI_DIAG_ACCUMULATION_WINDOW_INACTIVE)
+        return result
+    if q_total_J is None:
+        q_total = _current_combustion_energy_J(bundle, cyl)
+    else:
+        q_total = float(q_total_J)
+    if q_total <= 0.0:
+        result['reason_code'] = float(HCCI_DIAG_NO_COMBUSTION_ENERGY)
+        return result
+    if bool(soc_active):
+        result['reason_code'] = float(HCCI_DIAG_SOC_ACTIVE)
+        return result
+
+    mass = float(bundle.state_layout.gas_mass_from_state(y_state, cyl))
+    energy = float(y_state[int(bundle.state_layout.energy_index(cyl))])
+    air_mass = float(bundle.state_layout.air_mass_from_state(y_state, cyl))
+    burned_mass = float(bundle.state_layout.burned_mass_from_state(y_state, cyl))
+    if fuel_mass_kg is None:
+        latch_valid_by_vol = getattr(fp, 'runtime_latch_valid_by_vol', np.zeros(0, dtype=np.int64))
+        latched_fuel_by_vol = getattr(fp, 'runtime_latched_fuel_mass_by_vol_kg', np.zeros(0, dtype=np.float64))
+        has_latched_fuel = (
+            cyl < int(getattr(latch_valid_by_vol, 'shape', (0,))[0])
+            and cyl < int(getattr(latched_fuel_by_vol, 'shape', (0,))[0])
+            and bool(latch_valid_by_vol[cyl])
+        )
+        fuel_mass = float(latched_fuel_by_vol[cyl]) if has_latched_fuel else float(bundle.state_layout.fuel_vapor_mass_from_state(y_state, cyl))
+    else:
+        fuel_mass = float(fuel_mass_kg)
+    if mass <= 1.0e-18:
+        result['reason_code'] = float(HCCI_DIAG_INVALID_MASS)
+        return result
+    if air_mass <= 1.0e-18:
+        result['reason_code'] = float(HCCI_DIAG_INVALID_AIR)
+        return result
+    if fuel_mass <= 1.0e-18:
+        result['reason_code'] = float(HCCI_DIAG_INVALID_FUEL)
+        return result
+
+    volume = cylinder_volume_from_position(fp.clearance_volume_m3, fp.piston_area_m2, x_m, fp.x_min_m, fp.x_max_m)
+    cv_default = float(bundle.gas_props[1])
+    use_promo_thermo = bundle.gas_props.shape[0] > 4 and float(bundle.gas_props[4]) >= 0.5
+    if use_promo_thermo:
+        fuel_vapor_mass = float(bundle.state_layout.fuel_vapor_mass_from_state(y_state, cyl))
+        temp_K, _cp, cv_i, gas_constant_i, _kappa = properties_from_mass_energy_components_quellen(mass, energy, air_mass, fuel_vapor_mass, burned_mass, cv_default)
+        pressure_Pa = pressure_from_state(mass, energy, volume, gas_constant_i, cv_i)
+    else:
+        temp_K = max(energy / max(mass * cv_default, 1.0e-18), 1.0)
+        pressure_Pa = pressure_from_state(mass, energy, volume, float(bundle.gas_props[2]), cv_default)
+    result['temperature_K'] = float(temp_K)
+    result['pressure_Pa'] = float(pressure_Pa)
+    if temp_K < float(fp.hcci_start_temperature_min_by_vol_K[cyl]):
+        result['reason_code'] = float(HCCI_DIAG_BELOW_TEMPERATURE)
+        return result
+    if pressure_Pa < float(fp.hcci_start_pressure_min_by_vol_Pa[cyl]):
+        result['reason_code'] = float(HCCI_DIAG_BELOW_PRESSURE)
+        return result
+
+    afr = _hcci_cylinder_afr(bundle, cyl)
+    lam = lambda_from_air_and_fuel_mass(float(air_mass), float(fuel_mass), float(afr))
+    residual_fraction = max(min(float(burned_mass) / max(float(mass), 1.0e-18), 1.0), 0.0)
+    hot_tau = _hcci_ignition_delay_s(
+        fp,
+        cyl,
+        pressure_Pa=pressure_Pa,
+        temp_K=temp_K,
+        volume_m3=volume,
+        mass_kg=mass,
+        air_mass_kg=air_mass,
+        burned_mass_kg=burned_mass,
+        fuel_mass_kg=fuel_mass,
+        afr_stoich=afr,
+    )
+    cool_tau = 0.0
+    if _hcci_two_stage_enabled(fp, cyl):
+        cool_tau = _hcci_ignition_delay_s(
+            fp,
+            cyl,
+            stage='cool',
+            pressure_Pa=pressure_Pa,
+            temp_K=temp_K,
+            volume_m3=volume,
+            mass_kg=mass,
+            air_mass_kg=air_mass,
+            burned_mass_kg=burned_mass,
+            fuel_mass_kg=fuel_mass,
+            afr_stoich=afr,
+        )
+    result.update({
+        'valid': True,
+        'reason_code': float(HCCI_DIAG_OK),
+        'hot_tau_s': float(hot_tau),
+        'cool_tau_s': float(cool_tau),
+        'lambda': float(lam),
+        'residual_fraction': float(residual_fraction),
+        'tabulated_out_of_bounds': _hcci_tabulated_out_of_bounds(
+            fp,
+            cyl,
+            temp_K=temp_K,
+            pressure_Pa=pressure_Pa,
+            air_mass_kg=air_mass,
+            burned_mass_kg=burned_mass,
+            fuel_mass_kg=fuel_mass,
+            afr_stoich=afr,
+            mass_kg=mass,
+        ),
+    })
+    return result
+
+
 def _hcci_two_stage_enabled(fp, cyl: int) -> bool:
     enabled = getattr(fp, 'hcci_two_stage_enabled_by_vol', np.zeros(0, dtype=np.int64))
     return cyl < int(getattr(enabled, 'shape', (0,))[0]) and bool(enabled[cyl])
+
+
+def _hcci_accumulation_window_active(
+    bundle,
+    cyl: int,
+    x_m: float,
+    v_m_per_s: float,
+    *,
+    combustion_fraction_0to1: float | None = None,
+) -> bool:
+    fp = bundle.free_piston
+    if not free_piston_is_compression_stroke(v_m_per_s, x_m, fp.x_min_m, fp.x_max_m):
+        return False
+    start_modes = getattr(fp, 'hcci_accumulation_start_mode_by_vol', np.zeros(0, dtype=np.int64))
+    start_mode = int(start_modes[cyl]) if cyl < int(getattr(start_modes, 'shape', (0,))[0]) else HCCI_ACCUMULATION_START_COMPRESSION
+    if start_mode == HCCI_ACCUMULATION_START_PISTON_DISTANCE_FROM_TDC:
+        thresholds = getattr(fp, 'hcci_accumulation_start_distance_from_tdc_by_vol_m', np.zeros(0, dtype=np.float64))
+        threshold_m = float(thresholds[cyl]) if cyl < int(getattr(thresholds, 'shape', (0,))[0]) else 0.0
+        if cylinder_distance_from_tdc(float(x_m), float(fp.x_min_m), float(fp.x_max_m)) > threshold_m:
+            return False
+    end_modes = getattr(fp, 'hcci_accumulation_end_mode_by_vol', np.zeros(0, dtype=np.int64))
+    end_mode = int(end_modes[cyl]) if cyl < int(getattr(end_modes, 'shape', (0,))[0]) else HCCI_ACCUMULATION_END_NONE
+    if end_mode == HCCI_ACCUMULATION_END_COMBUSTION_END:
+        if combustion_fraction_0to1 is not None:
+            return float(combustion_fraction_0to1) < 0.999
+        soc_time = getattr(fp, 'runtime_soc_time_by_vol_s', np.zeros(0, dtype=np.float64))
+        soc_active = getattr(fp, 'runtime_soc_active_by_vol', np.zeros(0, dtype=np.int64))
+        if cyl < int(getattr(soc_time, 'shape', (0,))[0]) and float(soc_time[cyl]) > 0.0:
+            if cyl >= int(getattr(soc_active, 'shape', (0,))[0]) or not bool(soc_active[cyl]):
+                return False
+    return True
 
 
 def _hcci_cool_flame_energy_J(fp, cyl: int, q_total_J: float) -> float:
@@ -826,7 +1099,7 @@ def _update_hcci_diesel_autoignition_state(bundle, t_s: float, y_state: np.ndarr
         dt_s = max(0.0, float(t_s) - last_t)
         fp.runtime_hcci_last_update_time_by_vol_s[cyl] = float(t_s)
         x_m, v_m_per_s = _local_piston_kinematics_for_volume(bundle, y_state, cyl)
-        if not free_piston_is_compression_stroke(v_m_per_s, x_m, fp.x_min_m, fp.x_max_m):
+        if not _hcci_accumulation_window_active(bundle, cyl, x_m, v_m_per_s):
             fp.runtime_hcci_integral_by_vol[cyl] = 0.0
             fp.runtime_hcci_cool_integral_by_vol[cyl] = 0.0
             fp.runtime_cool_flame_active_by_vol[cyl] = 0
@@ -834,65 +1107,39 @@ def _update_hcci_diesel_autoignition_state(bundle, t_s: float, y_state: np.ndarr
             continue
 
         q_total_J = _current_combustion_energy_J(bundle, cyl)
-        if q_total_J <= 0.0 or bool(fp.runtime_soc_active_by_vol[cyl]):
-            continue
-
-        mass = float(bundle.state_layout.gas_mass_from_state(y_state, cyl))
-        energy = float(y_state[int(bundle.state_layout.energy_index(cyl))])
-        air_mass = float(bundle.state_layout.air_mass_from_state(y_state, cyl))
-        burned_mass = float(bundle.state_layout.burned_mass_from_state(y_state, cyl))
-        residual_mass = burned_mass
-        fuel_mass = float(fp.runtime_latched_fuel_mass_by_vol_kg[cyl]) if bool(fp.runtime_latch_valid_by_vol[cyl]) else float(bundle.state_layout.fuel_vapor_mass_from_state(y_state, cyl))
-        if mass <= 1.0e-18 or air_mass <= 1.0e-18 or fuel_mass <= 1.0e-18:
-            continue
-
-        volume = cylinder_volume_from_position(fp.clearance_volume_m3, fp.piston_area_m2, x_m, fp.x_min_m, fp.x_max_m)
-        if use_promo_thermo:
-            fuel_vapor_mass = float(bundle.state_layout.fuel_vapor_mass_from_state(y_state, cyl))
-            temp_K, _cp, cv_i, gas_constant_i, _kappa = properties_from_mass_energy_components_quellen(mass, energy, air_mass, fuel_vapor_mass, burned_mass, cv_default)
-            pressure_Pa = pressure_from_state(mass, energy, volume, gas_constant_i, cv_i)
-        else:
-            temp_K = max(energy / max(mass * cv_default, 1.0e-18), 1.0)
-            pressure_Pa = pressure_from_state(mass, energy, volume, float(bundle.gas_props[2]), cv_default)
-
-        if temp_K < float(fp.hcci_start_temperature_min_by_vol_K[cyl]) or pressure_Pa < float(fp.hcci_start_pressure_min_by_vol_Pa[cyl]):
-            continue
-
-        afr = float(getattr(fp, 'combustion_afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5)
-        if getattr(bundle, 'combustion_afr_stoich_by_vol', None) is not None and cyl < int(bundle.combustion_afr_stoich_by_vol.shape[0]):
-            afr = float(bundle.combustion_afr_stoich_by_vol[cyl])
-        tau_s = _hcci_ignition_delay_s(
-            fp,
+        sample = evaluate_free_piston_hcci_ignition_sample(
+            bundle,
             cyl,
-            pressure_Pa=pressure_Pa,
-            temp_K=temp_K,
-            volume_m3=volume,
-            mass_kg=mass,
-            air_mass_kg=air_mass,
-            burned_mass_kg=residual_mass,
-            fuel_mass_kg=fuel_mass,
-            afr_stoich=afr,
+            t_s,
+            y_state,
+            q_total_J=q_total_J,
+            soc_active=bool(fp.runtime_soc_active_by_vol[cyl]),
         )
+        if not bool(sample['valid']):
+            continue
+
+        tau_s = float(sample['hot_tau_s'])
         fp.runtime_hcci_tau_by_vol_s[cyl] = tau_s
         if _hcci_two_stage_enabled(fp, cyl) and not bool(fp.runtime_cool_flame_done_by_vol[cyl]):
-            tau_s = _hcci_ignition_delay_s(
-                fp,
-                cyl,
-                stage='cool',
-                pressure_Pa=pressure_Pa,
-                temp_K=temp_K,
-                volume_m3=volume,
-                mass_kg=mass,
-                air_mass_kg=air_mass,
-                burned_mass_kg=residual_mass,
-                fuel_mass_kg=fuel_mass,
-                afr_stoich=afr,
-            )
+            tau_s = float(sample['cool_tau_s'])
             fp.runtime_hcci_cool_tau_by_vol_s[cyl] = tau_s
             fp.runtime_hcci_cool_integral_by_vol[cyl] += dt_s / max(tau_s, 1.0e-12)
             if fp.runtime_hcci_cool_integral_by_vol[cyl] >= 1.0:
+                mass = float(bundle.state_layout.gas_mass_from_state(y_state, cyl))
+                air_mass = float(bundle.state_layout.air_mass_from_state(y_state, cyl))
+                burned_mass = float(bundle.state_layout.burned_mass_from_state(y_state, cyl))
+                fuel_mass = float(fp.runtime_latched_fuel_mass_by_vol_kg[cyl]) if bool(fp.runtime_latch_valid_by_vol[cyl]) else float(bundle.state_layout.fuel_vapor_mass_from_state(y_state, cyl))
                 cool_energy_J, cool_duration_s, cool_peak_delay_s, cool_qdot_peak_W = _compute_dynamic_cool_flame(
-                    bundle, cyl, pressure_Pa, temp_K, air_mass, fuel_mass, residual_mass, mass, afr, q_total_J
+                    bundle,
+                    cyl,
+                    float(sample['pressure_Pa']),
+                    float(sample['temperature_K']),
+                    air_mass,
+                    fuel_mass,
+                    burned_mass,
+                    mass,
+                    _hcci_cylinder_afr(bundle, cyl),
+                    q_total_J,
                 )
                 if cool_energy_J > 0.0 and cool_duration_s > 0.0:
                     fp.runtime_cool_flame_active_by_vol[cyl] = 1
@@ -969,76 +1216,49 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
                 active_hist[k] = 1.0
                 continue
 
-            x_m, v_m_per_s = _local_piston_kinematics_for_volume(bundle, y[:, k], cyl_idx)
-            if not free_piston_is_compression_stroke(v_m_per_s, x_m, fp.x_min_m, fp.x_max_m):
-                hcci_integral = 0.0
-                hcci_cool_integral = 0.0
-                cool_done = False
-                continue
-
             if latched_energy_hist is not None:
                 q_total_J = float(latched_energy_hist[k])
             else:
                 q_total_J = float(comb_row[int(CombCol.FUEL_MASS_PER_CYCLE)] * comb_row[int(CombCol.LHV)])
-            if q_total_J <= 0.0:
-                continue
-
-            mass = float(bundle.state_layout.gas_mass_from_state(y[:, k], cyl_idx))
-            energy = float(y[int(bundle.state_layout.energy_index(cyl_idx)), k])
-            air_mass = float(bundle.state_layout.air_mass_from_state(y[:, k], cyl_idx))
-            burned_mass = float(bundle.state_layout.burned_mass_from_state(y[:, k], cyl_idx))
-            residual_mass = burned_mass
-            lhv = float(bundle.combustion_lhv_by_vol[cyl_idx]) if getattr(bundle, 'combustion_lhv_by_vol', None) is not None and cyl_idx < int(bundle.combustion_lhv_by_vol.shape[0]) else float(getattr(fp, 'combustion_lhv_J_per_kg', 0.0) or 0.0)
-            comb_eff = float(bundle.combustion_efficiency_by_vol[cyl_idx]) if getattr(bundle, 'combustion_efficiency_by_vol', None) is not None and cyl_idx < int(bundle.combustion_efficiency_by_vol.shape[0]) else float(getattr(fp, 'combustion_efficiency_0to1', 1.0) or 1.0)
-            fuel_mass = q_total_J / max(lhv * comb_eff, 1.0e-18)
-            if mass <= 1.0e-18 or air_mass <= 1.0e-18 or fuel_mass <= 1.0e-18:
-                continue
-
-            volume = cylinder_volume_from_position(fp.clearance_volume_m3, fp.piston_area_m2, x_m, fp.x_min_m, fp.x_max_m)
-            if use_promo_thermo:
-                fuel_vapor_mass = float(bundle.state_layout.fuel_vapor_mass_from_state(y[:, k], cyl_idx))
-                temp_K, _cp, cv_i, gas_constant_i, _kappa = properties_from_mass_energy_components_quellen(mass, energy, air_mass, fuel_vapor_mass, burned_mass, cv_default)
-                pressure_Pa = pressure_from_state(mass, energy, volume, gas_constant_i, cv_i)
-            else:
-                temp_K = max(energy / max(mass * cv_default, 1.0e-18), 1.0)
-                pressure_Pa = pressure_from_state(mass, energy, volume, float(bundle.gas_props[2]), cv_default)
-
-            if temp_K < float(fp.hcci_start_temperature_min_by_vol_K[cyl_idx]) or pressure_Pa < float(fp.hcci_start_pressure_min_by_vol_Pa[cyl_idx]):
-                continue
-
-            afr = float(bundle.combustion_afr_stoich_by_vol[cyl_idx]) if getattr(bundle, 'combustion_afr_stoich_by_vol', None) is not None and cyl_idx < int(bundle.combustion_afr_stoich_by_vol.shape[0]) else float(getattr(fp, 'combustion_afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5)
-            tau_s = _hcci_ignition_delay_s(
-                fp,
+            fuel_mass = _hcci_fuel_mass_from_energy(bundle, cyl_idx, q_total_J)
+            sample = evaluate_free_piston_hcci_ignition_sample(
+                bundle,
                 cyl_idx,
-                pressure_Pa=pressure_Pa,
-                temp_K=temp_K,
-                volume_m3=volume,
-                mass_kg=mass,
-                air_mass_kg=air_mass,
-                burned_mass_kg=residual_mass,
+                t_k,
+                y[:, k],
+                q_total_J=q_total_J,
                 fuel_mass_kg=fuel_mass,
-                afr_stoich=afr,
+                soc_active=active,
             )
+            if not bool(sample['window_active']):
+                hcci_integral = 0.0
+                hcci_cool_integral = 0.0
+                cool_done = False
+                continue
+            if not bool(sample['valid']):
+                continue
+
+            tau_s = float(sample['hot_tau_s'])
             if _hcci_two_stage_enabled(fp, cyl_idx) and not cool_done:
-                tau_s = _hcci_ignition_delay_s(
-                    fp,
-                    cyl_idx,
-                    stage='cool',
-                    pressure_Pa=pressure_Pa,
-                    temp_K=temp_K,
-                    volume_m3=volume,
-                    mass_kg=mass,
-                    air_mass_kg=air_mass,
-                    burned_mass_kg=residual_mass,
-                    fuel_mass_kg=fuel_mass,
-                    afr_stoich=afr,
-                )
+                tau_s = float(sample['cool_tau_s'])
                 hcci_cool_integral += dt_s / max(tau_s, 1.0e-12)
                 if hcci_cool_integral >= 1.0:
+                    mass = float(bundle.state_layout.gas_mass_from_state(y[:, k], cyl_idx))
+                    air_mass = float(bundle.state_layout.air_mass_from_state(y[:, k], cyl_idx))
+                    burned_mass = float(bundle.state_layout.burned_mass_from_state(y[:, k], cyl_idx))
                     cool_done = True
                     hcci_cool_integral = 0.0
                     cool_energy_latched_J, _cool_duration_s, _cool_peak_delay_s, _cool_qdot_peak_W = _compute_dynamic_cool_flame(
-                        bundle, cyl_idx, pressure_Pa, temp_K, air_mass, fuel_mass, residual_mass, mass, afr, q_total_J
+                        bundle,
+                        cyl_idx,
+                        float(sample['pressure_Pa']),
+                        float(sample['temperature_K']),
+                        air_mass,
+                        fuel_mass,
+                        burned_mass,
+                        mass,
+                        _hcci_cylinder_afr(bundle, cyl_idx),
+                        q_total_J,
                     )
                 continue
             hcci_integral += dt_s / max(tau_s, 1.0e-12)
@@ -1149,51 +1369,41 @@ def replay_free_piston_cool_flame_series(bundle, t: np.ndarray, y: np.ndarray, l
             cf_qdot_peak_hist[k] = cf_qdot_peak_W
             continue
 
-        x_m, v_m_per_s = _local_piston_kinematics_for_volume(bundle, y[:, k], cyl_idx)
-        if not free_piston_is_compression_stroke(v_m_per_s, x_m, fp.x_min_m, fp.x_max_m):
-            cool_integral = 0.0
-            cool_done = False
-            continue
         q_total_J = float(latched_energy_hist[k]) if latched_energy_hist is not None else float(comb_row[int(CombCol.FUEL_MASS_PER_CYCLE)] * comb_row[int(CombCol.LHV)])
         if q_total_J <= 0.0 or cool_done:
             continue
-        mass = float(bundle.state_layout.gas_mass_from_state(y[:, k], cyl_idx))
-        energy = float(y[int(bundle.state_layout.energy_index(cyl_idx)), k])
-        air_mass = float(bundle.state_layout.air_mass_from_state(y[:, k], cyl_idx))
-        burned_mass = float(bundle.state_layout.burned_mass_from_state(y[:, k], cyl_idx))
-        lhv = float(bundle.combustion_lhv_by_vol[cyl_idx]) if getattr(bundle, 'combustion_lhv_by_vol', None) is not None and cyl_idx < int(bundle.combustion_lhv_by_vol.shape[0]) else float(getattr(fp, 'combustion_lhv_J_per_kg', 0.0) or 0.0)
-        comb_eff = float(bundle.combustion_efficiency_by_vol[cyl_idx]) if getattr(bundle, 'combustion_efficiency_by_vol', None) is not None and cyl_idx < int(bundle.combustion_efficiency_by_vol.shape[0]) else float(getattr(fp, 'combustion_efficiency_0to1', 1.0) or 1.0)
-        fuel_mass = q_total_J / max(lhv * comb_eff, 1.0e-18)
-        if mass <= 1.0e-18 or air_mass <= 1.0e-18 or fuel_mass <= 1.0e-18:
-            continue
-        volume = cylinder_volume_from_position(fp.clearance_volume_m3, fp.piston_area_m2, x_m, fp.x_min_m, fp.x_max_m)
-        if use_promo_thermo:
-            fuel_vapor_mass = float(bundle.state_layout.fuel_vapor_mass_from_state(y[:, k], cyl_idx))
-            temp_K, _cp, cv_i, gas_constant_i, _kappa = properties_from_mass_energy_components_quellen(mass, energy, air_mass, fuel_vapor_mass, burned_mass, cv_default)
-            pressure_Pa = pressure_from_state(mass, energy, volume, gas_constant_i, cv_i)
-        else:
-            temp_K = max(energy / max(mass * cv_default, 1.0e-18), 1.0)
-            pressure_Pa = pressure_from_state(mass, energy, volume, float(bundle.gas_props[2]), cv_default)
-        if temp_K < float(fp.hcci_start_temperature_min_by_vol_K[cyl_idx]) or pressure_Pa < float(fp.hcci_start_pressure_min_by_vol_Pa[cyl_idx]):
-            continue
-        afr = float(bundle.combustion_afr_stoich_by_vol[cyl_idx]) if getattr(bundle, 'combustion_afr_stoich_by_vol', None) is not None and cyl_idx < int(bundle.combustion_afr_stoich_by_vol.shape[0]) else float(getattr(fp, 'combustion_afr_stoich_kg_air_per_kg_fuel', 14.5) or 14.5)
-        tau_s = _hcci_ignition_delay_s(
-            fp,
+        fuel_mass = _hcci_fuel_mass_from_energy(bundle, cyl_idx, q_total_J)
+        sample = evaluate_free_piston_hcci_ignition_sample(
+            bundle,
             cyl_idx,
-            stage='cool',
-            pressure_Pa=pressure_Pa,
-            temp_K=temp_K,
-            volume_m3=volume,
-            mass_kg=mass,
-            air_mass_kg=air_mass,
-            burned_mass_kg=burned_mass,
+            t_k,
+            y[:, k],
+            q_total_J=q_total_J,
             fuel_mass_kg=fuel_mass,
-            afr_stoich=afr,
         )
+        if not bool(sample['window_active']):
+            cool_integral = 0.0
+            cool_done = False
+            continue
+        if not bool(sample['valid']):
+            continue
+        tau_s = float(sample['cool_tau_s'])
         cool_integral += dt_s / max(tau_s, 1.0e-12)
         if cool_integral >= 1.0:
+            mass = float(bundle.state_layout.gas_mass_from_state(y[:, k], cyl_idx))
+            air_mass = float(bundle.state_layout.air_mass_from_state(y[:, k], cyl_idx))
+            burned_mass = float(bundle.state_layout.burned_mass_from_state(y[:, k], cyl_idx))
             cf_energy_J, cf_duration_s, cf_peak_delay_s, cf_qdot_peak_W = _compute_dynamic_cool_flame(
-                bundle, cyl_idx, pressure_Pa, temp_K, air_mass, fuel_mass, burned_mass, mass, afr, q_total_J
+                bundle,
+                cyl_idx,
+                float(sample['pressure_Pa']),
+                float(sample['temperature_K']),
+                air_mass,
+                fuel_mass,
+                burned_mass,
+                mass,
+                _hcci_cylinder_afr(bundle, cyl_idx),
+                q_total_J,
             )
             cool_integral = 0.0
             cool_done = True

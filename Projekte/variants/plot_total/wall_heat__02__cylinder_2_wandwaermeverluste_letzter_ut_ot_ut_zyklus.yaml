@@ -1,0 +1,94 @@
+name: cylinder_2 Wandwaermeverluste - letzter UT-OT-UT-Zyklus
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.8
+figures:
+- title: last_ut_ot_ut_wall_heat_losses
+  rows: 1
+  cols: 1
+  subplots:
+  - title: cylinder_2 Wandwaermeverluste - letzter UT-OT-UT-Zyklus
+    plot_type: line
+    x_signal: theta_deg
+    x_title: UT-OT-UT Fortschritt [deg]
+    x_limit_mode: manual
+    x_min: -10.0
+    x_max: 10.0
+    events:
+    - x: -10.0
+      label: UT
+      color: '#666666'
+      line_style: ':'
+      line_width: 0.9
+      label_ha: left
+    - x: 0.0
+      label: OT
+      color: '#666666'
+      line_style: ':'
+      line_width: 0.9
+      label_ha: center
+    - x: 10.0
+      label: UT
+      color: '#666666'
+      line_style: ':'
+      line_width: 0.9
+      label_ha: right
+    text_box:
+      enabled: true
+      source: readme
+      title: Kennwerte cylinder_2
+      x: 0.02
+      y: 0.98
+      ha: left
+      va: top
+      font_size: 7.0
+      facecolor: '#ffffff'
+      edgecolor: '#111111'
+      alpha: 0.94
+      metrics:
+      - label: Lambda
+        readme_key: cylinder_2_lambda
+      - label: Restgasanteil
+        readme_key: cylinder_2_restgas_anteil_brennbeginn_percent
+      - label: IMEP
+        readme_key: cylinder_2_imep_bar
+      - label: Zugefuehrte Energie
+        readme_key: cylinder_2_added_energy_J
+      - label: Wandwaerme Summe
+        readme_key: cylinder_2_wall_heat_loss_J
+      - label: Wandwaerme Kolben
+        readme_key: cylinder_2_wall_piston_heat_loss_J
+      - label: Wandwaerme Kopf
+        readme_key: cylinder_2_wall_head_heat_loss_J
+      - label: Wandwaerme Zylinder
+        readme_key: cylinder_2_wall_cylinder_heat_loss_J
+    y_axes:
+    - id: qwall
+      title: Kumulierte Wandwaerme [J]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: cylinder_2_wall_piston_heat_cycle_J
+      label: Kolben
+      axis_id: qwall
+      color: '#b42318'
+      line_style: '-'
+      line_width: 2.0
+    - signal_key: cylinder_2_wall_head_heat_cycle_J
+      label: Kopf
+      axis_id: qwall
+      color: '#175cd3'
+      line_style: '-'
+      line_width: 2.0
+    - signal_key: cylinder_2_wall_cylinder_heat_cycle_J
+      label: Zylinderwand
+      axis_id: qwall
+      color: '#067647'
+      line_style: '-'
+      line_width: 2.0
+    - signal_key: cylinder_2_wall_heat_zones_sum_cycle_J
+      label: Summe
+      axis_id: qwall
+      color: '#7a271a'
+      line_style: --
+      line_width: 1.6

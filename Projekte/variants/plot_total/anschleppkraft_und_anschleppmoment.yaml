@@ -1,0 +1,41 @@
+name: Anschleppkraft und Anschleppmoment
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.8
+figures:
+- title: anschleppkraft_und_anschleppmoment
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Anschleppkraft und Anschleppmoment
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: force
+      title: Anschleppkraft [N]
+      side: left
+      color: '#b42318'
+      limit_mode: auto
+    - id: torque
+      title: Anschleppmoment [Nm]
+      side: right
+      color: '#175cd3'
+      limit_mode: auto
+    series:
+    - signal_key: free_piston_generator_assist_force_N
+      label: Anschleppkraft
+      axis_id: force
+      color: '#b42318'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: free_piston_generator_assist_torque_Nm
+      label: Anschleppmoment
+      axis_id: torque
+      color: '#175cd3'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw

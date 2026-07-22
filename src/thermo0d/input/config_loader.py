@@ -193,6 +193,7 @@ def _format_config_normalization_error(path: Path, exc: ValueError) -> str:
 
 def _format_pydantic_validation_error(path: Path, exc: ValidationError) -> str:
     error_entries: list[dict[str, Any]] = exc.errors(include_url=False)
+    yaml_lines = _build_yaml_line_lookup(path)
     lines = [
         _LINE,
         'KONFIGURATIONS-VALIDIERUNG FEHLGESCHLAGEN',
@@ -202,11 +203,14 @@ def _format_pydantic_validation_error(path: Path, exc: ValidationError) -> str:
         _SUBLINE,
     ]
     for index, err in enumerate(error_entries, start=1):
-        location = _format_error_location(err.get('loc', ()))
+        loc = err.get('loc', ())
+        location = _format_error_location(loc)
+        line_no = _line_for_error_location(yaml_lines, loc)
         message = str(err.get('msg', 'Unbekannter Validierungsfehler'))
         err_type = str(err.get('type', 'unknown'))
         input_value = _format_input_value(err.get('input', '<nicht verfügbar>'))
         lines.append(f'[{index}] Feld    : {location}')
+        lines.append(f'    Zeile   : {line_no if line_no is not None else "<nicht gefunden>"}')
         lines.append(f'    Meldung : {message}')
         lines.append(f'    Typ     : {err_type}')
         lines.append(f'    Eingabe : {input_value}')
@@ -220,6 +224,82 @@ def _format_pydantic_validation_error(path: Path, exc: ValidationError) -> str:
         _LINE,
     ])
     return '\n'.join(lines)
+
+
+def _build_yaml_line_lookup(path: Path) -> dict[tuple[Any, ...], int]:
+    try:
+        text = path.read_text(encoding='utf-8')
+        root = yaml.compose(text)
+    except Exception:
+        return {}
+    if root is None:
+        return {}
+    result: dict[tuple[Any, ...], int] = {}
+    _collect_yaml_line_lookup(root, (), result)
+    return result
+
+
+def _collect_yaml_line_lookup(node: yaml.Node, path: tuple[Any, ...], result: dict[tuple[Any, ...], int]) -> None:
+    result.setdefault(path, int(node.start_mark.line) + 1)
+    if isinstance(node, yaml.MappingNode):
+        for key_node, value_node in node.value:
+            key = _yaml_key_value(key_node)
+            child_path = (*path, key)
+            result[child_path] = int(key_node.start_mark.line) + 1
+            _collect_yaml_line_lookup(value_node, child_path, result)
+        return
+    if isinstance(node, yaml.SequenceNode):
+        for index, item_node in enumerate(node.value):
+            child_path = (*path, index)
+            result[child_path] = int(item_node.start_mark.line) + 1
+            _collect_yaml_line_lookup(item_node, child_path, result)
+
+
+def _yaml_key_value(node: yaml.Node) -> Any:
+    value = getattr(node, 'value', None)
+    if not isinstance(value, str):
+        return value
+    try:
+        return int(value)
+    except ValueError:
+        return value
+
+
+def _line_for_error_location(lines: dict[tuple[Any, ...], int], loc: tuple[Any, ...] | list[Any]) -> int | None:
+    if not lines:
+        return None
+    parts = tuple(_normalize_error_location_part(part) for part in loc)
+    if parts in lines:
+        return lines[parts]
+
+    # Pydantic union/discriminator branches can inject labels that are not YAML keys.
+    candidate_paths = [()]
+    for part in parts:
+        expanded: list[tuple[Any, ...]] = []
+        for base in candidate_paths:
+            direct = (*base, part)
+            if direct in lines:
+                expanded.append(direct)
+            expanded.append(base)
+        candidate_paths = expanded
+    for path_candidate in sorted(set(candidate_paths), key=len, reverse=True):
+        if path_candidate in lines:
+            return lines[path_candidate]
+    while parts:
+        parts = parts[:-1]
+        if parts in lines:
+            return lines[parts]
+    return lines.get(())
+
+
+def _normalize_error_location_part(part: Any) -> Any:
+    if isinstance(part, int):
+        return part
+    text = str(part)
+    try:
+        return int(text)
+    except ValueError:
+        return text
 
 
 

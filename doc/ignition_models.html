@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MotorSim HCCI Ignition Models</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}]});"></script>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #18212f;
+      --muted: #5f6b7a;
+      --line: #d8dee8;
+      --accent: #0f766e;
+      --accent-2: #7c3aed;
+      --code-bg: #101828;
+      --code-ink: #e6edf3;
+      --warn-bg: #fff8e6;
+      --warn-line: #e6b84a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.55;
+    }
+    header {
+      background: #111827;
+      color: #f9fafb;
+      padding: 34px 24px 28px;
+      border-bottom: 5px solid var(--accent);
+    }
+    header .wrap, main {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+    header p {
+      margin: 0;
+      color: #cbd5e1;
+      max-width: 900px;
+      font-size: 1.05rem;
+    }
+    main {
+      padding: 22px 18px 52px;
+    }
+    nav {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+    }
+    nav a {
+      display: inline-block;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      margin: 4px 16px 4px 0;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 18px 0;
+      padding: 22px;
+    }
+    h2 {
+      margin: 0 0 14px;
+      font-size: 1.6rem;
+      color: #0f172a;
+    }
+    h3 {
+      margin: 22px 0 10px;
+      color: #1f2937;
+      font-size: 1.18rem;
+    }
+    p { margin: 0 0 12px; }
+    .muted { color: var(--muted); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px;
+    }
+    .tile {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fbfcfe;
+    }
+    .tile strong {
+      display: block;
+      margin-bottom: 5px;
+      color: #0f172a;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      font-size: 0.94rem;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      vertical-align: top;
+    }
+    th {
+      text-align: left;
+      background: #eef2f7;
+      color: #111827;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      background: #eef2f7;
+      padding: 1px 4px;
+      border-radius: 4px;
+      color: #102033;
+    }
+    pre {
+      background: var(--code-bg);
+      color: var(--code-ink);
+      padding: 14px;
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid #253044;
+      font-size: 0.92rem;
+    }
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+    .note {
+      border-left: 4px solid var(--accent);
+      background: #ecfdf7;
+      padding: 12px 14px;
+      margin: 12px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    .warn {
+      border-left: 4px solid var(--warn-line);
+      background: var(--warn-bg);
+      padding: 12px 14px;
+      margin: 12px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    .tag {
+      display: inline-block;
+      border: 1px solid #b7c3d3;
+      border-radius: 999px;
+      padding: 1px 8px;
+      margin: 2px 4px 2px 0;
+      color: #334155;
+      background: #f8fafc;
+      font-size: 0.86rem;
+    }
+    .katex-display {
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 4px;
+    }
+    @media (max-width: 720px) {
+      section { padding: 16px; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>HCCI Ignition Models</h1>
+      <p>Dokumentation der vorhandenen Zuendverzugsmodelle in MotorSim, ihrer YAML-Benutzung und der wichtigsten Laufzeitgleichungen.</p>
+    </div>
+  </header>
+
+  <main>
+    <nav aria-label="Inhalt">
+      <a href="#ueberblick">Ueberblick</a>
+      <a href="#yaml">YAML-Struktur</a>
+      <a href="#integration">Akkumulation</a>
+      <a href="#modelle">Modelle</a>
+      <a href="#parameter">Parameter</a>
+      <a href="#beispiele">Beispiele</a>
+      <a href="#diagnose">Diagnose</a>
+    </nav>
+
+    <section id="ueberblick">
+      <h2>Ueberblick</h2>
+      <p>Die Ignition-Modelle gehoeren zum HCCI-Diesel-Combustion-Modell. Das Combustion-Modell definiert Energie, Brennverlauf, Lambda-Ziel und Dauer. Das Ignition-Submodell definiert nur den Zuendverzug, die Aktivierungsbedingungen und das Integrationsfenster.</p>
+      <div class="grid">
+        <div class="tile">
+          <strong><code>livengood_wu</code></strong>
+          Generisches Livengood-Wu-Modell mit analytischer Zuendverzugszeit aus Druck, Temperatur, Lambda und Restgasanteil.
+        </div>
+        <div class="tile">
+          <strong><code>tabulated_livengood_wu</code></strong>
+          Livengood-Wu-Akkumulation, aber die lokale Zuendverzugszeit kommt aus einer NPZ-Tabelle.
+        </div>
+        <div class="tile">
+          <strong><code>beck_2003_1_arrhenius</code></strong>
+          Beck-Korrelation mit Druckexponent und Sauerstoffterm.
+        </div>
+        <div class="tile">
+          <strong><code>beck_2003_two_stage</code></strong>
+          Zweistufige Beck-Variante mit Cool-Flame-Akkumulation und anschliessender Hot-Flame-Akkumulation.
+        </div>
+      </div>
+      <p class="muted">Quelle im Code: <code>src/thermo0d/config/models.py</code>, <code>src/thermo0d/model/free_piston/builder.py</code>, <code>src/thermo0d/model/free_piston/combustion_latch.py</code>.</p>
+    </section>
+
+    <section id="yaml">
+      <h2>YAML-Struktur</h2>
+      <p>Die empfohlene Struktur trennt Combustion und Ignition. Ein HCCI-Combustion-Submodell verweist auf ein eigenes Ignition-Submodell.</p>
+      <pre><code>preprocessing:
+  submodels:
+    combustion:
+      hcci_diesel_default:
+        model: hcci_diesel
+        ignition:
+          ref: ignition_livengood_default
+        burn_model: wiebe_autoignition
+        duration_mode: time
+        duration_ms: 1.2
+        fueling_mode: lambda_from_cylinder_mass_at_slot_close
+        lambda_target: 1.4
+        lhv_J_per_kg: 43000000.0
+
+    ignition:
+      ignition_livengood_default:
+        model: livengood_wu
+        tau_A_s: 2.5e-06
+        tau_pressure_exponent: 1.2
+        tau_activation_temperature_K: 5000.0
+        tau_reference_pressure_Pa: 1000000.0
+        tau_reference_lambda: 1.4
+        lambda_slowdown_exponent: 0.7
+        residual_slowdown_factor: 1.5
+        start_temperature_min_K: 580.0
+        start_pressure_min_Pa: 500000.0
+        max_ignition_delay_s: 0.002
+        accumulation_start_mode: piston_distance_from_tdc
+        accumulation_start_distance_from_tdc_mm: 30.0
+        accumulation_end_mode: combustion_end</code></pre>
+      <div class="note">
+        Alte flache Parameter direkt unter <code>hcci_diesel</code>, z.B. <code>ignition_model</code> oder <code>tau_A_s</code>, werden noch gelesen. Fuer neue Konfigurationen sollte aber <code>combustion.ignition</code> bzw. <code>preprocessing.submodels.ignition</code> verwendet werden.
+      </div>
+    </section>
+
+    <section id="integration">
+      <h2>Livengood-Wu-Akkumulation</h2>
+      <p>Alle vorhandenen Zuendmodelle liefern eine aktuelle Zuendverzugszeit \\(\tau\\). Die Simulation integriert daraus das dimensionslose Livengood-Wu-Integral:</p>
+      <p>$$I(t) = \int_{t_0}^{t} \frac{1}{\tau(p,T,\lambda,r)}\,dt$$</p>
+      <p>Diskret im Zeitschritt:</p>
+      <p>$$I_{n+1} = I_n + \frac{\Delta t}{\max(\tau_n, 10^{-12}\,\mathrm{s})}$$</p>
+      <p>Der Zuend- bzw. Verbrennungsbeginn wird gesetzt, sobald gilt:</p>
+      <p>$$I \ge 1$$</p>
+      <p>Bei <code>beck_2003_two_stage</code> gibt es zusaetzlich ein Cool-Flame-Integral. Zuerst wird die Cool Flame ausgeloest, danach laeuft die Hot-Flame-Akkumulation weiter.</p>
+
+      <h3>Start- und Endfenster</h3>
+      <table>
+        <thead>
+          <tr><th>Parameter</th><th>Optionen</th><th>Bedeutung</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>accumulation_start_mode</code></td>
+            <td><span class="tag">compression</span><span class="tag">piston_distance_from_tdc</span></td>
+            <td>Legt fest, wann die Akkumulation im Kompressionstakt starten darf.</td>
+          </tr>
+          <tr>
+            <td><code>accumulation_start_distance_from_tdc_mm</code><br><code>accumulation_start_distance_from_tdc_m</code></td>
+            <td>Zahl</td>
+            <td>Nur bei <code>piston_distance_from_tdc</code>: Start erst, wenn der Kolbenabstand zu OT kleiner oder gleich diesem Wert ist.</td>
+          </tr>
+          <tr>
+            <td><code>accumulation_end_mode</code></td>
+            <td><span class="tag">none</span><span class="tag">combustion_end</span></td>
+            <td>Optionales Ende der Diagnose/Akkumulation nach Brennende.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Zusatzbedingungen vor jeder Akkumulation:</p>
+      <ul>
+        <li>Der Zylinder muss im Kompressionstakt sein.</li>
+        <li>Die aktuelle Temperatur muss mindestens <code>start_temperature_min_K</code> betragen.</li>
+        <li>Der aktuelle Druck muss mindestens <code>start_pressure_min_Pa</code> betragen.</li>
+        <li>Luftmasse, Kraftstoffmasse und Gesamtmasse muessen positiv sein.</li>
+      </ul>
+    </section>
+
+    <section id="modelle">
+      <h2>Modelle und Gleichungen</h2>
+
+      <h3><code>livengood_wu</code></h3>
+      <p>Dieses Modell berechnet die lokale Zuendverzugszeit aus Druck, Temperatur, Lambda und Restgasanteil.</p>
+      <p>$$\tau = A \left(\frac{p_\mathrm{ref}}{p}\right)^n \exp\left(\frac{T_A}{T}\right) \left(\frac{\lambda}{\lambda_\mathrm{ref}}\right)^b \cdot f_r$$</p>
+      <p>mit Restgasfaktor:</p>
+      <p>$$f_r = 1 + (F_r - 1)\,r$$</p>
+      <p>und Begrenzung:</p>
+      <p>$$\tau_\mathrm{eff} = \min(\tau, \tau_\mathrm{max})$$</p>
+      <table>
+        <thead><tr><th>Symbol</th><th>YAML</th><th>Bedeutung</th></tr></thead>
+        <tbody>
+          <tr><td>\\(A\\)</td><td><code>tau_A_s</code></td><td>Vorfaktor in Sekunden.</td></tr>
+          <tr><td>\\(n\\)</td><td><code>tau_pressure_exponent</code></td><td>Druckexponent.</td></tr>
+          <tr><td>\\(T_A\\)</td><td><code>tau_activation_temperature_K</code></td><td>Aktivierungstemperatur in Kelvin.</td></tr>
+          <tr><td>\\(p_\mathrm{ref}\\)</td><td><code>tau_reference_pressure_Pa</code></td><td>Referenzdruck.</td></tr>
+          <tr><td>\\(\lambda_\mathrm{ref}\\)</td><td><code>tau_reference_lambda</code></td><td>Referenz-Luftverhaeltnis.</td></tr>
+          <tr><td>\\(b\\)</td><td><code>lambda_slowdown_exponent</code></td><td>Exponent fuer Verzoegerung bei magerem Gemisch.</td></tr>
+          <tr><td>\\(F_r\\)</td><td><code>residual_slowdown_factor</code></td><td>Maximaler Restgas-Verlangsamungsfaktor bei \\(r=1\\).</td></tr>
+          <tr><td>\\(r\\)</td><td>intern</td><td>Restgasanteil: verbrannte Masse / Gesamtmasse.</td></tr>
+        </tbody>
+      </table>
+
+      <h3><code>tabulated_livengood_wu</code></h3>
+      <p>Dieses Modell nutzt dieselbe Integral-Logik, aber \\(\tau\\) wird aus einer NPZ-Tabelle interpoliert.</p>
+      <p>Die Interpolation erfolgt ueber vier Achsen:</p>
+      <p>$$\tau = f(T, p_\mathrm{bar}, \lambda, \mathrm{EGR})$$</p>
+      <table>
+        <thead><tr><th>NPZ-Key</th><th>Bedeutung</th></tr></thead>
+        <tbody>
+          <tr><td><code>temperature_K</code></td><td>Temperaturachse in Kelvin.</td></tr>
+          <tr><td><code>pressure_bar</code></td><td>Druckachse in bar. Der Laufzeitdruck in Pa wird nach bar konvertiert.</td></tr>
+          <tr><td><code>lambda</code></td><td>Lambda-Achse.</td></tr>
+          <tr><td><code>egr_rate</code></td><td>Restgas-/EGR-Achse. Wenn die Achse wie Prozentwerte aussieht, wird der interne Anteil mit 100 multipliziert.</td></tr>
+          <tr><td><code>delay_s</code></td><td>Vierdimensionales Delay-Gitter in Sekunden.</td></tr>
+        </tbody>
+      </table>
+
+      <h3><code>beck_2003_1_arrhenius</code></h3>
+      <p>Die Beck-Variante ersetzt den Lambda-Term durch einen Sauerstoffterm und nutzt Druck in bar.</p>
+      <p>$$\tau = c_1 \left(\frac{p_\mathrm{bar}}{p_0}\right)^{c_2}
+      \left(\frac{O_{2,\mathrm{ref}}}{O_{2,\mathrm{charge}}}\right)
+      \exp\left(\frac{T_A}{T}\right)$$</p>
+      <p>Wenn <code>tau_activation_energy_J_per_kg</code> gesetzt ist, wird statt \\(\exp(T_A/T)\\) eine spezifische Aktivierungsenergie verwendet:</p>
+      <p>$$\exp\left(\frac{E_A}{pV/m}\right)$$</p>
+      <p>Der Sauerstoffanteil der Ladung wird intern aus Luftmasse und verbrannter Masse bestimmt:</p>
+      <p>$$O_{2,\mathrm{charge}} = O_{2,\mathrm{ref}}\frac{m_\mathrm{air}}{m_\mathrm{air}+m_\mathrm{burned}}$$</p>
+
+      <h3><code>beck_2003_two_stage</code></h3>
+      <p>Dieses Modell nutzt die Beck-Zuendverzugsformel fuer zwei Stufen:</p>
+      <ol>
+        <li>Cool-Flame-Akkumulation mit Cool-Flame-Aktivierungsenergie.</li>
+        <li>Hot-Flame-Akkumulation mit Hot-Flame-Aktivierungsenergie.</li>
+      </ol>
+      <p>Wenn das Cool-Flame-Integral \\(I_\mathrm{CF}\\) den Wert 1 erreicht, wird eine Cool-Flame-Waermefreisetzung gestartet. Die Hot-Flame-Akkumulation startet bzw. laeuft danach weiter, bis \\(I_\mathrm{HF} \ge 1\\).</p>
+      <p>Die Beck-Fuel-Parameter werden aus <code>beck_cf_fuel_name</code> gelesen. Vorhandene Kraftstoffnamen:</p>
+      <p>
+        <span class="tag">CEC-Ref.</span>
+        <span class="tag">n-Heptan</span>
+        <span class="tag">Naphtha 1</span>
+        <span class="tag">Naphtha 2</span>
+        <span class="tag">Kerosin 1</span>
+        <span class="tag">Kerosin 2</span>
+        <span class="tag">Kerosin 3</span>
+        <span class="tag">Diesel 1</span>
+        <span class="tag">Diesel 2</span>
+      </p>
+    </section>
+
+    <section id="parameter">
+      <h2>Parameterreferenz</h2>
+
+      <h3>Gemeinsame Parameter</h3>
+      <table>
+        <thead><tr><th>Parameter</th><th>Default</th><th>Gueltig fuer</th><th>Beschreibung</th></tr></thead>
+        <tbody>
+          <tr><td><code>model</code></td><td>-</td><td>alle</td><td>Auswahl des Ignition-Modells.</td></tr>
+          <tr><td><code>tau_activation_temperature_K</code></td><td><code>15000.0</code></td><td>alle analytischen Modelle</td><td>Aktivierungstemperatur fuer den exponentiellen Temperaturterm.</td></tr>
+          <tr><td><code>tau_activation_energy_J_per_kg</code></td><td><code>null</code></td><td>Beck, optional auch im Schema</td><td>Spezifische Aktivierungsenergie. Wenn gesetzt, wird sie im Beck-Modell bevorzugt.</td></tr>
+          <tr><td><code>tau_reference_pressure_Pa</code></td><td><code>1000000.0</code></td><td>Livengood-Wu</td><td>Referenzdruck fuer den generischen Druckterm.</td></tr>
+          <tr><td><code>tau_reference_lambda</code></td><td><code>1.4</code></td><td>Livengood-Wu</td><td>Referenz-Lambda fuer den Lambda-Term.</td></tr>
+          <tr><td><code>lambda_slowdown_exponent</code></td><td><code>0.7</code></td><td>alle</td><td>Exponent fuer Lambda-Einfluss. Bei Beck bleibt der Parameter in der Struktur vorhanden, der Zuendverzug nutzt aber den Sauerstoffterm.</td></tr>
+          <tr><td><code>residual_slowdown_factor</code></td><td><code>1.5</code></td><td>alle</td><td>Multiplikativer Restgas-Verlangsamungsfaktor.</td></tr>
+          <tr><td><code>start_temperature_min_K</code></td><td><code>780.0</code></td><td>alle</td><td>Unterhalb dieser Temperatur wird nicht akkumuliert.</td></tr>
+          <tr><td><code>start_pressure_min_Pa</code></td><td><code>2000000.0</code></td><td>alle</td><td>Unterhalb dieses Drucks wird nicht akkumuliert.</td></tr>
+          <tr><td><code>max_ignition_delay_s</code></td><td><code>0.02</code></td><td>alle</td><td>Obergrenze fuer die berechnete Zuendverzugszeit bei analytischen Modellen.</td></tr>
+          <tr><td><code>accumulation_start_mode</code></td><td><code>compression</code></td><td>alle</td><td>Startfenster der Livengood-Wu-Akkumulation.</td></tr>
+          <tr><td><code>accumulation_end_mode</code></td><td><code>none</code></td><td>alle</td><td>Optionale Schlussbedingung fuer die Akkumulation bzw. Diagnose.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Livengood-Wu</h3>
+      <table>
+        <thead><tr><th>Parameter</th><th>Default</th><th>Beschreibung</th></tr></thead>
+        <tbody>
+          <tr><td><code>tau_A_s</code></td><td><code>2.5e-6</code></td><td>Vorfaktor des Zuendverzugs in Sekunden.</td></tr>
+          <tr><td><code>tau_pressure_exponent</code></td><td><code>1.2</code></td><td>Druckexponent im Term \\((p_\mathrm{ref}/p)^n\\).</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Tabelliertes Livengood-Wu</h3>
+      <table>
+        <thead><tr><th>Parameter</th><th>Pflicht</th><th>Beschreibung</th></tr></thead>
+        <tbody>
+          <tr><td><code>ignition_delay_table_npz</code></td><td>ja</td><td>Pfad zur NPZ-Tabelle relativ zur Config-Datei oder absolut.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Beck 2003</h3>
+      <table>
+        <thead><tr><th>Parameter</th><th>Default</th><th>Beschreibung</th></tr></thead>
+        <tbody>
+          <tr><td><code>beck_c1_s</code></td><td><code>1.0e-5</code></td><td>Vorfaktor \\(c_1\\) in Sekunden.</td></tr>
+          <tr><td><code>beck_c2</code></td><td><code>-1.2</code></td><td>Druckexponent \\(c_2\\) in \\((p/p_0)^{c_2}\\).</td></tr>
+          <tr><td><code>beck_reference_pressure_bar</code></td><td><code>1.0</code></td><td>Referenzdruck \\(p_0\\) in bar.</td></tr>
+          <tr><td><code>beck_reference_o2_percent</code></td><td><code>20.94</code></td><td>Referenz-Sauerstoffgehalt trockener Luft.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Beck Two Stage / Cool Flame</h3>
+      <table>
+        <thead><tr><th>Parameter</th><th>Default</th><th>Beschreibung</th></tr></thead>
+        <tbody>
+          <tr><td><code>beck_cf_fuel_name</code></td><td><code>Diesel 2</code></td><td>Kraftstoffname fuer die Beck-Cool-Flame-Parameter.</td></tr>
+          <tr><td><code>cool_flame_enabled</code></td><td><code>false</code></td><td>Schema-Schalter fuer GUI/Sichtbarkeit. Die Two-Stage-Logik wird durch <code>model: beck_2003_two_stage</code> aktiviert.</td></tr>
+          <tr><td><code>cool_flame_burn_model</code></td><td><code>gamma</code></td><td>Waermefreisetzungsform fuer die Cool Flame: <code>gamma</code>, <code>vibe-beck_CF</code> oder <code>vibe-beck</code>.</td></tr>
+          <tr><td><code>cool_flame_energy_fraction</code></td><td><code>0.08</code></td><td>Maximaler Anteil der Gesamtenergie fuer die Cool Flame.</td></tr>
+          <tr><td><code>cool_flame_duration_ms</code></td><td><code>0.3409</code></td><td>Fallback-Dauer der Cool Flame in Millisekunden.</td></tr>
+          <tr><td><code>cool_flame_a</code></td><td><code>6.9</code></td><td>Formparameter fuer Vibe-artige Cool-Flame-Waermefreisetzung.</td></tr>
+          <tr><td><code>cool_flame_m</code></td><td><code>2.0</code></td><td>Formexponent fuer Vibe-artige Cool-Flame-Waermefreisetzung.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="beispiele">
+      <h2>Beispiele</h2>
+
+      <h3>Livengood-Wu als Standard</h3>
+      <pre><code>preprocessing:
+  submodels:
+    combustion:
+      hcci_diesel_default:
+        model: hcci_diesel
+        ignition:
+          ref: ignition_lw
+        burn_model: wiebe_autoignition
+        duration_mode: time
+        duration_ms: 1.2
+        lambda_target: 1.4
+        lhv_J_per_kg: 43000000.0
+    ignition:
+      ignition_lw:
+        model: livengood_wu
+        tau_A_s: 2.5e-06
+        tau_pressure_exponent: 1.2
+        tau_activation_temperature_K: 5000.0
+        tau_reference_pressure_Pa: 1000000.0
+        tau_reference_lambda: 1.4
+        start_temperature_min_K: 580.0
+        start_pressure_min_Pa: 500000.0
+        max_ignition_delay_s: 0.002</code></pre>
+
+      <h3>Start erst nahe OT</h3>
+      <pre><code>ignition_lw_near_tdc:
+  model: livengood_wu
+  tau_A_s: 2.5e-06
+  tau_pressure_exponent: 1.2
+  tau_activation_temperature_K: 5000.0
+  tau_reference_pressure_Pa: 1000000.0
+  tau_reference_lambda: 1.4
+  accumulation_start_mode: piston_distance_from_tdc
+  accumulation_start_distance_from_tdc_mm: 30.0
+  accumulation_end_mode: combustion_end</code></pre>
+
+      <h3>Beck Two Stage</h3>
+      <pre><code>preprocessing:
+  submodels:
+    combustion:
+      hcci_diesel_beck:
+        model: hcci_diesel
+        ignition:
+          ref: ignition_beck_two_stage
+        burn_model: vibe-beck
+        duration_ms: 1.2
+        lambda_target: 2.4
+        lhv_J_per_kg: 43000000.0
+    ignition:
+      ignition_beck_two_stage:
+        model: beck_2003_two_stage
+        beck_c1_s: 1.0e-5
+        beck_c2: -1.2
+        beck_reference_pressure_bar: 1.0
+        beck_reference_o2_percent: 20.94
+        beck_cf_fuel_name: Diesel 2
+        cool_flame_burn_model: vibe-beck_CF
+        start_temperature_min_K: 592.0
+        start_pressure_min_Pa: 50000.0
+        max_ignition_delay_s: 0.002</code></pre>
+
+      <h3>Tabelliertes Modell</h3>
+      <pre><code>ignition_table:
+  model: tabulated_livengood_wu
+  ignition_delay_table_npz: tables/hcci_delay_table.npz
+  start_temperature_min_K: 580.0
+  start_pressure_min_Pa: 500000.0
+  max_ignition_delay_s: 0.002</code></pre>
+    </section>
+
+    <section id="diagnose">
+      <h2>Benutzung als Diagnose</h2>
+      <p>Ein Vibe-Combustion-Modell kann weiterhin einen HCCI-Zuendverzug nur als Diagnose rechnen. Dazu verweist <code>hcci_diagnostics_ref</code> auf ein HCCI-Combustion-Submodell, das wiederum auf ein Ignition-Submodell verweist.</p>
+      <pre><code>preprocessing:
+  submodels:
+    combustion:
+      vibe_lambda_slot:
+        model: vibe
+        hcci_diagnostics_ref: hcci_diesel_default
+
+      hcci_diesel_default:
+        model: hcci_diesel
+        ignition:
+          ref: ignition_livengood_default
+        burn_model: wiebe_autoignition
+        duration_ms: 1.2
+        lambda_target: 1.4
+        lhv_J_per_kg: 43000000.0
+
+    ignition:
+      ignition_livengood_default:
+        model: livengood_wu
+        tau_A_s: 2.5e-06
+        tau_pressure_exponent: 1.2
+        tau_activation_temperature_K: 5000.0</code></pre>
+      <div class="warn">
+        Bei der Diagnose wird der Vibe-Brennverlauf nicht durch das HCCI-Modell ersetzt. Das HCCI-Modell liefert nur Zuendverzug, Integral und Diagnosegroessen fuer Plot und Auswertung.
+      </div>
+    </section>
+  </main>
+</body>
+</html>
