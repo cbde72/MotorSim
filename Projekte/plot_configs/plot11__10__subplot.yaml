@@ -1,20 +1,10 @@
 name: Subplot
 style_sheet: ../plot_style_sheet.yaml
 style:
-  background_color: '#ffffff'
-  axes_facecolor: '#ffffff'
-  text_color: '#202020'
-  grid_color: '#d8d8d8'
-  legend_facecolor: '#ffffff'
-  legend_edgecolor: '#9aa0a6'
-  default_line_width: 1.8
-  default_marker_size: 4.5
-  font_size: 10
-  title_size: 12
-  grid_alpha: 0.65
+  default_line_width: 1.6
 figures:
 - id: 44d8988344ce
-  title: Massenströme / Hubvolumen Copy
+  title: Mass flows / Displacement volume Copy
   rows: 1
   cols: 1
   subplots:
@@ -34,7 +24,7 @@ figures:
       title: Y
       side: left
       spine_offset: 0.0
-      color: '#1f77b4'
+      color: '#111111'
       visible: true
       limit_mode: data
       y_min: 0.0
@@ -49,7 +39,7 @@ figures:
       label: cylinder_p_Pa
       axis_id: 1921883cc2cf
       visible: true
-      color: '#1f77b4'
+      color: '#66B3FF'
       line_style: '-'
       marker: ''
       line_width: 1.8
@@ -314,3 +304,4 @@ figures:
     legend_visible: true
     legend_position: best
     show_grid: true
+    show_title: true

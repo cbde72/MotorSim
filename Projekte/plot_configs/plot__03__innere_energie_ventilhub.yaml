@@ -3,17 +3,17 @@ versioning:
   config_schema_version: 5
   loaded_config_schema_version: 0
   migration_applied: true
-name: Innere Energie / Ventilhub
+name: Innere energy / Valve lift
 style_sheet: ../plot_style_sheet.yaml
 figures:
 - title: Standard Thermo0D Plotpaket
   rows: 1
   cols: 1
   subplots:
-  - title: Innere Energie / Ventilhub
+  - title: Innere energy / Valve lift
     plot_type: line
     x_signal: cylinder_theta_deg
-    x_title: Kurbelwinkel [deg]
+    x_title: Crank angle [deg]
     x_unit_preset: raw
     events:
     - x: 0.0
@@ -98,35 +98,41 @@ figures:
       show_label: true
     y_axes:
     - id: ax_main
-      title: Innere Energie [J]
+      title: Innere energy [J]
       side: left
       color: '#111111'
     - id: ax_lift
-      title: Ventilhub [mm]
+      title: Valve lift [mm]
       side: right
-      color: '#1f77b4'
+      color: '#111111'
     series:
     - signal_key: cylinder_U_J
-      label: Innere Energie
+      label: Internal energy
       axis_id: ax_main
-      color: '#111111'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: intake_valve_valve_lift_m
-      label: Einlasshub
+      label: Intake valve lift
       axis_id: ax_lift
-      color: '#0000ff'
+      color: '#175CD3'
       line_style: --
       scale_factor: 1000.0
       unit_preset: raw
+      line_width: 1.05
     - signal_key: exhaust_valve_valve_lift_m
-      label: Auslasshub
+      label: Exhaust valve lift
       axis_id: ax_lift
-      color: '#ff0000'
+      color: '#D92D20'
       line_style: --
       scale_factor: 1000.0
       unit_preset: raw
+      line_width: 1.05
     x_limit_mode: manual
     x_min: 0.0
     x_max: 720.0
+    show_title: true
+style:
+  default_line_width: 1.6

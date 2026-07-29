@@ -1,28 +1,23 @@
-name: Transfer-Slot über Zeit
+name: Transfer-Slot over time
 style_sheet: ../../plot_style_sheet.yaml
 style:
-  font_size: 6
-  axis_label_size: 6
-  tick_label_size: 6
-  title_size: 6
-  figure_title_size: 6
-  grid_alpha: 0.3
-  default_line_width: 0.8
-  default_marker_size: 3.5
+  default_line_width: 1.6
 figures:
-- title: Transfer-Slot Massenstrom-Komponenten
+- title: Transfer-Slot Mass flow-Komponenten
   rows: 1
   cols: 1
   subplots:
-  - title: Transfer-Slot über Zeit
+  - title: Transfer-Slot over time
     plot_type: line
-    x_signal: t_s
-    x_title: Zeit [s]
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
     x_unit_preset: raw
     x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
     y_axes:
     - id: ax_mdot
-      title: Massenstrom [mg/s]
+      title: Mass flow [mg/s]
       side: left
       color: '#111111'
       limit_mode: auto
@@ -32,21 +27,25 @@ figures:
     - signal_key: transfer_slot_1_mdot_kg_per_s
       label: transfer_slot total
       axis_id: ax_mdot
-      color: '#111111'
-      line_style: '-'
+      color: '#175CD3'
+      line_style: -.
       scale_factor: 1000000
       unit_preset: raw
+      line_width: 1.45
     - signal_key: transfer_slot_1_mdot_unburned_kg_per_s
       label: transfer_slot unburned
       axis_id: ax_mdot
-      color: '#175cd3'
-      line_style: '-'
+      color: '#175CD3'
+      line_style: -.
       scale_factor: 1000000
       unit_preset: raw
+      line_width: 1.45
     - signal_key: transfer_slot_1_mdot_burned_kg_per_s
       label: transfer_slot burned
       axis_id: ax_mdot
-      color: '#b42318'
-      line_style: '-'
+      color: '#175CD3'
+      line_style: -.
       scale_factor: 1000000
       unit_preset: raw
+      line_width: 1.45
+    show_title: true

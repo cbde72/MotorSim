@@ -1,64 +1,62 @@
-name: Slot-Overlap im letzten Fenster
+name: Slot overlap in the last window
 style_sheet: ../../plot_style_sheet.yaml
 style:
-  font_size: 6
-  axis_label_size: 6
-  tick_label_size: 6
-  title_size: 6
-  figure_title_size: 6
-  grid_alpha: 0.3
-  default_line_width: 0.9
-  default_marker_size: 3.5
+  default_line_width: 1.6
 figures:
-- title: Last-Cycle Zoom - Overlap und Modellantwort
+- title: Last-cycle zoom — overlap and model response
   rows: 1
   cols: 1
   subplots:
-  - title: Slot-Overlap im letzten Fenster
+  - title: Slot overlap in the last window
     plot_type: line
     x_signal: t_s
-    x_title: Zeit [s]
+    x_title: Time [s]
     x_unit_preset: raw
     x_limit_mode: manual
     x_min: 0.88
     x_max: 1.0
     y_axes:
     - id: ax_flow
-      title: Massenstrom [g/s]
+      title: Mass flow [g/s]
       side: left
       color: '#111111'
       limit_mode: auto
     - id: ax_area
       title: A_eff [mm2]
       side: right
-      color: '#667085'
+      color: '#111111'
       limit_mode: auto
     series:
     - signal_key: transfer_slot_1_mdot_kg_per_s
       label: transfer mdot
       axis_id: ax_flow
-      color: '#175cd3'
-      line_style: '-'
+      color: '#175CD3'
+      line_style: -.
       scale_factor: 1000.0
       unit_preset: raw
+      line_width: 1.45
     - signal_key: exhaust_slot_1_mdot_kg_per_s
       label: exhaust mdot
       axis_id: ax_flow
-      color: '#b42318'
-      line_style: '-'
+      color: '#D92D20'
+      line_style: -.
       scale_factor: 1000.0
       unit_preset: raw
+      line_width: 1.45
     - signal_key: transfer_slot_1_A_eff_forward_m2
       label: transfer A_eff
       axis_id: ax_area
-      color: '#98a2b3'
+      color: '#175CD3'
       line_style: --
       scale_factor: 1000000.0
       unit_preset: raw
+      line_width: 1.05
     - signal_key: exhaust_slot_1_A_eff_forward_m2
       label: exhaust A_eff
       axis_id: ax_area
-      color: '#7a5af8'
+      color: '#D92D20'
       line_style: --
       scale_factor: 1000000.0
       unit_preset: raw
+      line_width: 1.05
+    show_title: true

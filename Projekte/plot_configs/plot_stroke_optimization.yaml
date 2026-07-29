@@ -1,25 +1,25 @@
-name: Zylindervolumen vs. Zylinderdruck
+name: Cylinder volume vs. cylinder pressure
 style_sheet: ../plot_style_sheet.yaml
 figures:
-- title: 'pV-Diagramm: Letzter vollständiger Hub (UT-OT-UT)'
+- title: 'pV diagram: last complete stroke (BDC-TDC-BDC)'
   rows: 1
   cols: 1
   subplots:
-  - title: Zylindervolumen vs. Zylinderdruck
+  - title: Cylinder volume vs. cylinder pressure
     x_signal: cylinder_0_V_m3
-    x_title: Zylindervolumen [cm³]
+    x_title: Cylindervolumen [cm³]
     y_axes:
     - id: pressure_axis
-      title: Zylinderdruck [bar]
+      title: Cylinder pressure [bar]
       side: left
       color: '#111111'
     series:
     - signal_key: cylinder_0_p_Pa
-      label: Zylinderdruck (letzter Hub)
+      label: Cylinder pressure (last stroke)
       axis_id: pressure_axis
-      color: '#1f77b4'
+      color: '#66B3FF'
       line_style: '-'
-      line_width: 2.5
+      line_width: 1.8
       scale_factor: 1.0e-05
     events:
     - x: 50.0
@@ -30,3 +30,6 @@ figures:
       alpha: 0.8
       show_label: true
       event_type: tdc
+    show_title: true
+style:
+  default_line_width: 1.6

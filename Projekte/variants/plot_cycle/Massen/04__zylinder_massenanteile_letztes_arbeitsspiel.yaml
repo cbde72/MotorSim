@@ -3,17 +3,17 @@ versioning:
   config_schema_version: 8
   loaded_config_schema_version: 0
   migration_applied: true
-name: Zylinder Massenanteile - letztes Arbeitsspiel
+name: Cylinder Massesanteile - last working cycle
 style_sheet: ../../plot_style_sheet.yaml
 figures:
 - title: last_ut_ot_ut_mass_shares
   rows: 1
   cols: 1
   subplots:
-  - title: Zylinder Massenanteile - letztes Arbeitsspiel
+  - title: Cylinder Massesanteile - last working cycle
     plot_type: line
     x_signal: theta_deg
-    x_title: UT-OT-UT Fortschritt [deg]
+    x_title: UT-OT-UT progress [deg]
     x_limit_mode: auto
     events:
     - x: -10.0
@@ -36,7 +36,7 @@ figures:
       label_ha: right
     y_axes:
     - id: share
-      title: Anteil [%]
+      title: Fraction [%]
       side: left
       color: '#111111'
       limit_mode: manual
@@ -44,26 +44,33 @@ figures:
       y_max: 100.0
     series:
     - signal_key: cylinder_1_share_air_0to1
-      label: Luft
+      label: Air
       axis_id: share
-      color: '#175cd3'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 100.0
+      line_width: 1.6
     - signal_key: cylinder_1_share_fuel_vapor_0to1
-      label: Kraftstoff gasfoermig
+      label: Forcestoff vapor
       axis_id: share
-      color: '#f79009'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 100.0
+      line_width: 1.6
     - signal_key: cylinder_1_share_fuel_liquid_0to1
-      label: Kraftstoff fluessig
+      label: Forcestoff liquid
       axis_id: share
-      color: '#12b76a'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 100.0
+      line_width: 1.6
     - signal_key: cylinder_1_share_burned_0to1
-      label: Verbrannt / Restgas
+      label: Verbrannt / Residual gas
       axis_id: share
-      color: '#b42318'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 100.0
+      line_width: 1.6
+    show_title: true
+style:
+  default_line_width: 1.6

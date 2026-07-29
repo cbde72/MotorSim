@@ -5,7 +5,7 @@ import math
 
 import numpy as np
 
-from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnCol, ConnectionType, EndpointKind, VolumeCol, VolumeType, WallTemperatureCol, WallTemperatureZone
+from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnCol, ConnectionType, EndpointKind, VolumeCol, VolumeType, WallCol, WallTemperatureCol, WallTemperatureZone
 from thermo0d.physics.flow import de_st_venant_wantzel_signed
 from thermo0d.physics.kinematics import cylinder_kinematic_state_from_time
 from thermo0d.model.free_piston.forces import compute_load_info
@@ -1145,6 +1145,43 @@ class SignalReconstructionService:
                         cyl_enthalpy_out[right] += -mdot_kg_per_s * h_up
                         cyl_aeff_out[right] += aeff_reverse
 
+            # Emit the same wall-heat diagnostics for Woschni-enabled moving
+            # non-cylinder chambers as for cylinders.
+            for i in range(n_vol):
+                vol_type = int(vol_matrix[i, VolumeCol.TYPE])
+                wall_idx = int(vol_matrix[i, VolumeCol.WALL_ROW])
+                if vol_type == VolumeType.CYLINDER or wall_idx < 0:
+                    continue
+                name = volume_names[i]
+                wall_speed = float(wall_ups_by_vol[i])
+                if getattr(bundle, 'architecture', 'classic') == 'free_piston' and vol_type == VolumeType.BOUNCE_CHAMBER:
+                    _local_x, local_v = _free_piston_local_kinematics(bundle, i, y_arr, k)
+                    wall_speed = abs(float(local_v))
+                _pdv, wall_heat_w, heat_transfer_coeff, _wall_velocity, _comb, _evap = cylinder_energy_source_terms_from_context(
+                    vol_matrix[i],
+                    wall_matrix,
+                    comb_matrix,
+                    evap_matrix,
+                    feature_flags,
+                    wall_bore_by_vol[i],
+                    wall_speed,
+                    pressure_by_vol[i],
+                    temperature_by_vol[i],
+                    volume_by_vol[i],
+                    float(y_arr[int(state_layout.mass_index(i)), k]),
+                    0.0,
+                    dvdt_by_vol[i],
+                    theta_deg_by_vol[i],
+                    theta_global_deg_by_vol[i],
+                    dtheta_local_dt_by_vol[i],
+                    dtheta_global_dt_by_vol[i],
+                    cycle_deg_by_vol[i],
+                )
+                cls._ensure_float_column(columns, f'{name}_wall_heat_W', n_samples)[k] = float(wall_heat_w)
+                cls._ensure_float_column(columns, f'{name}_heat_transfer_power_W', n_samples)[k] = float(wall_heat_w)
+                cls._ensure_float_column(columns, f'{name}_htc_W_per_m2K', n_samples)[k] = float(heat_transfer_coeff)
+                cls._ensure_float_column(columns, f'{name}_wall_temperature_K', n_samples)[k] = float(wall_matrix[wall_idx, WallCol.WALL_TEMP])
+
             for i in range(n_vol):
                 if int(vol_matrix[i, VolumeCol.TYPE]) != VolumeType.CYLINDER:
                     continue
@@ -1172,7 +1209,8 @@ class SignalReconstructionService:
                     cycle_deg_by_vol[i],
                 )
                 wall_heat_zones_sum_w = None
-                wall_temperature_weighted_K = None
+                wall_idx = int(vol_matrix[i, VolumeCol.WALL_ROW])
+                wall_temperature_weighted_K = float(wall_matrix[wall_idx, WallCol.WALL_TEMP]) if wall_idx >= 0 else None
                 wall_temperature_total_area = 0.0
                 zone_heat_values: list[tuple[str, float, float, float]] = []
                 if wall_state_by_vol is not None and wall_temp_params is not None and int(getattr(wall_state_by_vol, 'shape', (0,))[0]) > i:

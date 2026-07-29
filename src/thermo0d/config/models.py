@@ -997,6 +997,7 @@ class BounceChamberVolumeConfig(StrictBaseModel):
     chamber_volume0_m3: StrictFloat | None = None
     p0_Pa: StrictFloat | None = None
     polytropic_exponent: StrictFloat
+    wall_heat: WallHeatConfig = Field(default_factory=lambda: DisabledSubmodelConfig(model="none"))
 
     @property
     def derived_geometric_area_m2(self) -> float:

@@ -1,14 +1,14 @@
-name: Energiebilanz kumuliert
+name: energybilanz cumulative
 style_sheet: ../plot_style_sheet.yaml
 figures:
-- title: Energiebilanz kumuliert
+- title: energybilanz cumulative
   rows: 1
   cols: 1
   subplots:
   - title: ''
     plot_type: line
     x_signal: cylinder_theta_deg
-    x_title: Kurbelwinkel [deg]
+    x_title: Crank angle [deg]
     x_unit_preset: raw
     events:
     - x: 0.0
@@ -93,52 +93,61 @@ figures:
       show_label: true
     y_axes:
     - id: ax_energy
-      title: Energie [J]
+      title: Energy [J]
       side: left
       color: '#111111'
     series:
     - signal_key: cylinder_delta_U_cycle_J
-      label: ΔU seit Zyklusstart
+      label: ΔU since cycle start
       axis_id: ax_energy
-      color: '#111111'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: cylinder_added_energy_cycle_J
-      label: Q_add kumuliert
+      label: Q_add cumulative
       axis_id: ax_energy
-      color: '#ff8c00'
+      color: '#C2185B'
       line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.9
     - signal_key: cylinder_wall_heat_cycle_J
-      label: Q_wall kumuliert
+      label: Q_wall cumulative
       axis_id: ax_energy
-      color: '#7a7a7a'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: cylinder_enthalpy_net_cycle_J
-      label: H_net kumuliert
+      label: H_net cumulative
       axis_id: ax_energy
-      color: '#175cd3'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: cylinder_piston_work_cycle_J
-      label: W_pV kumuliert
+      label: W_pV cumulative
       axis_id: ax_energy
-      color: '#12b76a'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: cylinder_energy_balance_residual_J
-      label: Bilanzfehler
+      label: Balance error
       axis_id: ax_energy
-      color: '#b42318'
-      line_style: --
+      color: '#7DD3C7'
+      line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.6
     x_limit_mode: manual
     x_min: 0.0
     x_max: 720.0
+    show_title: true
+style:
+  default_line_width: 1.6

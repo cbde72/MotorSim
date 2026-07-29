@@ -1,44 +1,68 @@
-name: HCCI Zuendverzug - letzter UT-OT-UT-Zyklus
+name: HCCI Ignition Diagnostics - Cylinder 1 - Last Working Cycle
 style_sheet: ../../plot_style_sheet.yaml
 style:
-  default_line_width: 1.0
+  default_line_width: 1.6
 figures:
-- title: last_ut_ot_ut_hcci_ignition_delay
-  rows: 1
+- title: hcci_ignition_diagnostics_cylinder_1
+  rows: 3
   cols: 1
   subplots:
-  - title: HCCI Zuendverzug - letzter UT-OT-UT-Zyklus
+  - title: Cylinder 1 - Local Ignition Delay
     plot_type: line
-    x_signal: theta_deg
-    x_title: Schwingwinkel [deg]
-    x_limit_mode: manual
-    x_min: -9.0
-    x_max: 9.0
-    x_tick_step: 1.0
-    x_tick_label_mode: last_ut_ot_ut
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
     x_axis_position: bottom
     text_box:
       enabled: true
       source: data
-      title: HCCI Kennwerte
-      x: 0.02
+      title: HCCI Metrics - Cylinder 1
+      x: 0.98
       y: 0.98
-      ha: left
+      ha: right
       va: top
-      font_size: 7.0
+      font_size: 6.0
       facecolor: '#ffffff'
       edgecolor: '#111111'
       alpha: 0.88
       metrics:
-      - label: Z1 LW p
+      - label: LW=1 time
+        signal_key: last_cycle_time_s
+        mode: first_where
+        where_signal: cylinder_1_hcci_ignition_integral
+        where_gte: 1.0
+        unit: s
+        digits: 5
+        fixed: true
+      - label: LW=1 angle
+        signal_key: theta_deg
+        mode: first_where
+        where_signal: cylinder_1_hcci_ignition_integral
+        where_gte: 1.0
+        unit: deg
+        digits: 2
+        fixed: true
+      - label: LW=1 stroke
+        signal_key: cylinder_1_piston_x_m
+        mode: first_where
+        where_signal: cylinder_1_hcci_ignition_integral
+        where_gte: 1.0
+        scale_factor: 1000.0
+        unit: mm
+        digits: 2
+        fixed: true
+      - label: LW=1 pressure
         signal_key: cylinder_1_p_Pa
         mode: first_where
         where_signal: cylinder_1_hcci_ignition_integral
         where_gte: 1.0
-        scale_factor: 1.0e-5
+        scale_factor: 1.0e-05
         unit: bar
         digits: 2
-      - label: Z1 LW T
+        fixed: true
+      - label: LW=1 temperature
         signal_key: cylinder_1_T_K
         mode: first_where
         where_signal: cylinder_1_hcci_ignition_integral
@@ -46,63 +70,133 @@ figures:
         unit: K
         digits: 0
         fixed: true
-      - label: Z1 Zuend p
+      - label: SOC time
+        signal_key: last_cycle_time_s
+        mode: first_where
+        where_signal_any:
+        - cylinder_1_combustion_active_0to1
+        - cylinder_1_added_energy_W
+        where_gt: 0.0
+        unit: s
+        digits: 5
+        fixed: true
+      - label: SOC angle
+        signal_key: theta_deg
+        mode: first_where
+        where_signal_any:
+        - cylinder_1_combustion_active_0to1
+        - cylinder_1_added_energy_W
+        where_gt: 0.0
+        unit: deg
+        digits: 2
+        fixed: true
+      - label: SOC stroke
+        signal_key: cylinder_1_piston_x_m
+        mode: first_where
+        where_signal_any:
+        - cylinder_1_combustion_active_0to1
+        - cylinder_1_added_energy_W
+        where_gt: 0.0
+        scale_factor: 1000.0
+        unit: mm
+        digits: 2
+        fixed: true
+      - label: SOC pressure
         signal_key: cylinder_1_p_Pa
         mode: first_where
         where_signal_any:
         - cylinder_1_combustion_active_0to1
         - cylinder_1_added_energy_W
-        - cylinder_1_combustion_fraction_0to1
         where_gt: 0.0
-        scale_factor: 1.0e-5
+        scale_factor: 1.0e-05
         unit: bar
         digits: 2
-      - label: Z1 Zuend T
+        fixed: true
+      - label: SOC temperature
         signal_key: cylinder_1_T_K
         mode: first_where
         where_signal_any:
         - cylinder_1_combustion_active_0to1
         - cylinder_1_added_energy_W
-        - cylinder_1_combustion_fraction_0to1
         where_gt: 0.0
         unit: K
         digits: 0
         fixed: true
     y_axes:
-    - id: tau
-      title: Zuendverzug [ms]
+    - id: delay
+      title: Local Ignition Delay [ms]
       side: left
       color: '#111111'
-      limit_mode: auto
-    - id: integral
-      title: Livengood-Wu Integral [-]
-      side: right
-      color: '#475467'
+      scale: log
       limit_mode: manual
-      y_min: 0
-      y_max: 10
-    - id: volume
-      title: Volumen [cm3]
-      side: right
-      color: '#7a5af8'
-      limit_mode: auto
+      y_min: 0.01
+      y_max: 1000.0
     series:
     - signal_key: cylinder_1_hcci_ignition_delay_s
-      label: Zyl. 1 t
-      axis_id: tau
-      color: '#b42318'
+      label: Cylinder 1 Ignition Delay
+      axis_id: delay
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 1000.0
-      hide_before_positive_signal: cylinder_1_hcci_ignition_integral
-    - signal_key: cylinder_1_hcci_ignition_integral
-      label: Zyl. 1 LW.
+      show_while_positive_signal: cylinder_1_hcci_accumulation_window_active_0to1
+      line_width: 1.6
+    show_title: true
+  - title: Cylinder 1 - Livengood-Wu Integral
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_limit_mode: auto
+    x_start_at_zero: true
+    y_axes:
+    - id: integral
+      title: Livengood-Wu Integral [-]
+      side: left
+      color: '#111111'
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 1.2
+    y_lines:
+    - y: 1.0
       axis_id: integral
-      color: '#f79009'
+      label: Ignition threshold
+      color: '#111111'
       line_style: --
-    - signal_key: cylinder_1_V_m3
-      label: Zyl. 1 V
-      axis_id: volume
-      color: '#7a5af8'
-      line_style: ':'
-      scale_factor: 1000000.0
-    
+      line_width: 1.0
+    series:
+    - signal_key: cylinder_1_hcci_ignition_integral
+      label: Cylinder 1 Livengood-Wu Integral
+      axis_id: integral
+      color: '#7DD3C7'
+      line_style: '-'
+      line_width: 1.6
+    show_title: true
+  - title: Cylinder 1 - Thermodynamic State
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_limit_mode: auto
+    x_start_at_zero: true
+    y_axes:
+    - id: temperature
+      title: Temperature [K]
+      side: left
+      color: '#111111'
+    - id: pressure
+      title: Pressure [bar]
+      side: right
+      color: '#111111'
+    series:
+    - signal_key: cylinder_1_T_K
+      label: Cylinder 1 temperature
+      axis_id: temperature
+      color: '#FF8A80'
+      line_style: '-'
+      line_width: 1.8
+    - signal_key: cylinder_1_p_Pa
+      label: Cylinder 1 Pressure
+      axis_id: pressure
+      color: '#66B3FF'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      line_width: 1.8
+    show_title: true

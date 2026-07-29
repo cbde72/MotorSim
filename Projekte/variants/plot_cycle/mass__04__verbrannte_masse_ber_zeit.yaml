@@ -1,0 +1,59 @@
+name: Burned mass over time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Burned mass over time
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Burned mass over time
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    y_axes:
+    - id: ax_m_burned
+      title: Burned Mass [mg]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+      y_min: -1.0
+      y_max: 11.0
+    series:
+    - signal_key: cylinder_1_m_burned_kg
+      label: cylinder burned
+      axis_id: ax_m_burned
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: compressor_1_m_burned_kg
+      label: bounce burned
+      axis_id: ax_m_burned
+      color: '#667085'
+      line_style: '-'
+      scale_factor: 1000000
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: receiver_1_m_burned_kg
+      label: receiver burned
+      axis_id: ax_m_burned
+      color: '#667085'
+      line_style: '-'
+      scale_factor: 1000000
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: exhaust_plenum_1_m_burned_kg
+      label: exhaust_plenum burned
+      axis_id: ax_m_burned
+      color: '#667085'
+      line_style: '-'
+      scale_factor: 1000000
+      unit_preset: raw
+      line_width: 1.6
+    show_title: true

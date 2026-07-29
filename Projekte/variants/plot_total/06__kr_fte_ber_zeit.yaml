@@ -1,55 +1,62 @@
-name: Kräfte über Zeit
+name: Forces over time
 style_sheet: ../../plot_style_sheet.yaml
 style:
+  default_line_width: 1.6
 figures:
 - title: Forces
   rows: 1
   cols: 1
   subplots:
-  - title: Kräfte über Zeit
+  - title: Forces over time
     plot_type: line
     x_signal: t_s
-    x_title: Zeit [s]
+    x_title: Time [s]
     x_unit_preset: raw
     x_limit_mode: auto
     y_axes:
     - id: ax_f
-      title: Kraft [N]
+      title: Force [N]
       side: left
       color: '#111111'
     series:
     - signal_key: free_piston_F_gas_N
-      label: Gaskraft
+      label: Gas force
       axis_id: ax_f
-      color: '#b42318'
+      color: '#667085'
       line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: free_piston_F_bounce_N
-      label: Bounce-Kraft
+      label: Bounce force
       axis_id: ax_f
-      color: '#175cd3'
+      color: '#667085'
       line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: free_piston_F_friction_N
-      label: Reibkraft
+      label: Friction force
       axis_id: ax_f
-      color: '#f79009'
+      color: '#667085'
       line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: free_piston_F_load_N
-      label: Lastkraft
+      label: Load force
       axis_id: ax_f
-      color: '#7a5af8'
+      color: '#667085'
       line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: free_piston_F_net_N
-      label: Nettokraft
+      label: Net force
       axis_id: ax_f
-      color: '#027a48'
+      color: '#667085'
       line_style: '-'
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.6
+    show_title: true

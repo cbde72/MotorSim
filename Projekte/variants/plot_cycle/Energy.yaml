@@ -1,35 +1,28 @@
-name: Kolbenweg, Öffnungsquerschnitte, Massenstrom, Zugeführte Energie
+name: Piston lift, Massflow, Added Energy
 style_sheet: ../../plot_style_sheet.yaml
 style:
-  font_size: 6
-  axis_label_size: 6
-  tick_label_size: 6
-  title_size: 6
-  figure_title_size: 6
-  grid_alpha: 0.3
-  default_line_width: 0.8
-  default_marker_size: 3.5
+  default_line_width: 1.6
 figures:
 - title: energy
   rows: 1
   cols: 1
   subplots:
-  - title: Kolbenweg, Öffnungsquerschnitte, Massenstrom, Zugeführte Energie
-    show_title: false
+  - title: Piston lift, Massflow, Added Energy
+    show_title: true
     plot_type: line
-    x_signal: t_s
-    x_title: Zeit [s]
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
     x_unit_preset: raw
     x_limit_mode: auto
     x_start_at_zero: true
-    title_size: 8
+    x_axis_position: bottom
     x_spans:
     - signal_key: cylinder_1_added_energy_W
       threshold: 1.0
       active_when: above
       color: '#FF0000'
       alpha: 0.12
-      label: Verbrennung
+      label: Combustion
       show_label: false
     - signal_key: free_piston_generator_power_W
       threshold: 1.0
@@ -40,7 +33,7 @@ figures:
       show_label: false
     y_axes:
     - id: ax_x
-      title: Kolbenweg [mm] (+54 = OT, -54 = UT)
+      title: Piston lift [mm] (+54 = OT, -54 = UT)
       side: left
       color: '#111111'
       limit_mode: manual
@@ -51,7 +44,7 @@ figures:
       axis_label_size: 8
       tick_label_size: 6
     - id: ax_mdot
-      title: Massenstrom [kg/s]
+      title: Mass flow [kg/s]
       side: right
       color: '#111111'
       axis_label_size: 8
@@ -62,9 +55,9 @@ figures:
       min: -0.5
       max: 0.5
     - id: ax_qzu
-      title: Qzu [W]
+      title: Added Energy [W]
       side: right
-      color: '#FF0000'
+      color: '#111111'
       limit_mode: manual
       y_min: 0.0
       y_max: 350000.0
@@ -121,35 +114,35 @@ figures:
       alpha: 0.9
     series:
     - signal_key: free_piston_x_m
-      label: Kolbenweg
+      label: Piston lift
       axis_id: ax_x
       color: '#111111'
-      line_style: '-'
-      line_width: 1.0
+      line_style: --
+      line_width: 1.35
       scale_factor: -1000.0
       unit_preset: raw
       offset: 54.04
     - signal_key: transfer_slot_1_mdot_kg_per_s
-      label: Einströmender Massenstrom
+      label: Inflowing mass flow
       axis_id: ax_mdot
-      color: '#12b76a'
-      line_style: '-'
-      line_width: 0.8
+      color: '#175CD3'
+      line_style: -.
+      line_width: 1.45
       scale_factor: 1.0
       unit_preset: raw
     - signal_key: exhaust_slot_1_mdot_kg_per_s
-      label: Ausströmender Massenstrom
+      label: Outflowing mass flow
       axis_id: ax_mdot
-      color: '#f79009'
-      line_style: '-'
-      line_width: 0.8
+      color: '#D92D20'
+      line_style: -.
+      line_width: 1.45
       scale_factor: 1.0
       unit_preset: raw
     - signal_key: cylinder_1_added_energy_W
-      label: Zugeführte Energie
+      label: Added Energy
       axis_id: ax_qzu
-      color: '#FF0000'
+      color: '#C2185B'
       line_style: '-'
-      line_width: 0.8
+      line_width: 1.9
       scale_factor: 1.0
       unit_preset: raw

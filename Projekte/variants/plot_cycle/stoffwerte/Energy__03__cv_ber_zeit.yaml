@@ -1,23 +1,16 @@
-name: cv über Zeit
+name: cv over time
 style_sheet: ../../plot_style_sheet.yaml
 style:
-  font_size: 6
-  axis_label_size: 6
-  tick_label_size: 6
-  title_size: 6
-  figure_title_size: 6
-  grid_alpha: 0.3
-  default_line_width: 0.8
-  default_marker_size: 3.5
+  default_line_width: 1.6
 figures:
 - title: cv_t
   rows: 1
   cols: 1
   subplots:
-  - title: cv über Zeit
+  - title: cv over time
     plot_type: line
     x_signal: t_s
-    x_title: Zeit [s]
+    x_title: Time [s]
     x_unit_preset: raw
     y_axes:
     - id: ax_cv
@@ -26,12 +19,15 @@ figures:
       color: '#111111'
     series:
     - signal_key: cylinder_1_cv_J_per_kgK
-      label: Zylinder cv
+      label: Cylinder cv
       axis_id: ax_cv
-      color: '#b42318'
+      color: '#7DD3C7'
       line_style: '-'
+      line_width: 1.6
     - signal_key: compressor_1_cv_J_per_kgK
       label: Bounce cv
       axis_id: ax_cv
-      color: '#175cd3'
-      line_style: --
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.6
+    show_title: true

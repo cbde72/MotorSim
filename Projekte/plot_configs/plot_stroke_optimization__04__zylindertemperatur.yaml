@@ -1,21 +1,26 @@
-name: Zylindertemperatur
+name: Cylinder temperature
 style_sheet: ../plot_style_sheet.yaml
 figures:
-- title: 'Mehrparameter-Analyse: Druck, Temperatur, Volumen'
+- title: 'Multi-parameter analysis: pressure, temperature, volume'
   rows: 1
   cols: 1
   subplots:
-  - title: Zylindertemperatur
+  - title: Cylinder temperature
     x_signal: cylinder_0_theta_deg
-    x_title: Kurbelwinkel [°]
+    x_title: Crank angle [deg]
     y_axes:
     - id: t_ax
-      title: Temperatur [K]
+      title: Temperature [K]
       side: left
+      color: '#111111'
     series:
     - signal_key: cylinder_0_T_K
-      label: Temperatur
+      label: Temperature
       axis_id: t_ax
-      color: '#ff7f0e'
+      color: '#FF8A80'
       line_style: '-'
       scale_factor: 1.0
+      line_width: 1.8
+    show_title: true
+style:
+  default_line_width: 1.6

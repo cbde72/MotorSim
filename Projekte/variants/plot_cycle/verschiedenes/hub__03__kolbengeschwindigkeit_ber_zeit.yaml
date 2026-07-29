@@ -1,0 +1,69 @@
+name: Piston velocity over time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Piston velocity
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Piston velocity over time
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    y_axes:
+    - id: ax_vp
+      title: Velocity [m/s]
+      side: left
+      color: '#111111'
+      limit_mode: data
+    y_lines:
+    - y: 0.0
+      label: v = 0
+      axis_id: ax_vp
+      color: '#667085'
+      line_style: --
+      line_width: 0.6
+      alpha: 0.8
+      show_label: true
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#667085'
+    series:
+    - signal_key: cylinder_1_piston_v_m_per_s
+      label: Power cylinder 1
+      axis_id: ax_vp
+      color: '#111111'
+      line_style: --
+      line_width: 1.35
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_2_piston_v_m_per_s
+      label: Power cylinder 2
+      axis_id: ax_vp
+      color: '#111111'
+      line_style: --
+      line_width: 1.35
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: compressor_1_piston_v_m_per_s
+      label: Compressor 1
+      axis_id: ax_vp
+      color: '#111111'
+      line_style: --
+      line_width: 1.35
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: compressor_2_piston_v_m_per_s
+      label: Compressor 2
+      axis_id: ax_vp
+      color: '#111111'
+      line_style: --
+      line_width: 1.35
+      scale_factor: 1.0
+      unit_preset: raw
+    show_title: true

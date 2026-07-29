@@ -1,0 +1,39 @@
+name: Cylinder 1 and 2 - Heat Transfer Coefficients - Last Working Cycle
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: cylinder_1_and_2_heat_transfer_coefficients
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Cylinder Heat Transfer Coefficients - Last Working Cycle
+    show_title: true
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    y_axes:
+    - id: heat_transfer_coefficient
+      title: Heat Transfer Coefficient [W/(m²·K)]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: cylinder_1_htc_W_per_m2K
+      label: Cylinder 1
+      axis_id: heat_transfer_coefficient
+      color: '#7DD3C7'
+      line_style: '-'
+      line_width: 1.6
+      unit_preset: raw
+    - signal_key: cylinder_2_htc_W_per_m2K
+      label: Cylinder 2
+      axis_id: heat_transfer_coefficient
+      color: '#087A6A'
+      line_style: '-'
+      line_width: 1.6
+      unit_preset: raw

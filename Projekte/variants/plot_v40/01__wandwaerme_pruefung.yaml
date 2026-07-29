@@ -1,0 +1,192 @@
+name: V40 wall-heat verification — cylinders and compressors
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: V40 wall heat — energy, power, HTC and temperature
+  rows: 2
+  cols: 2
+  figure_size:
+  - 15.0
+  - 9.0
+  subplots:
+  - title: Cumulative wall heat energy
+    show_title: true
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    y_axes:
+    - id: energy
+      title: Wall heat-absolute integral [J]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: cylinder_1_wall_heat_cycle_J
+      label: Cylinder 1
+      axis_id: energy
+      color: '#7DD3C7'
+      line_style: '-'
+      line_width: 1.6
+    - signal_key: cylinder_2_wall_heat_cycle_J
+      label: Cylinder 2
+      axis_id: energy
+      color: '#087A6A'
+      line_style: '-'
+      line_width: 1.6
+    - signal_key: compressor_1_wall_heat_cycle_J
+      label: Compressor 1
+      axis_id: energy
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.6
+    - signal_key: compressor_2_wall_heat_cycle_J
+      label: Compressor 2
+      axis_id: energy
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.6
+  - title: Instantaneous wall heat power
+    show_title: true
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    y_axes:
+    - id: power
+      title: Wall heat rate [W]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: cylinder_1_wall_heat_W
+      label: Cylinder 1
+      axis_id: power
+      color: '#7DD3C7'
+      line_style: '-'
+      line_width: 1.6
+    - signal_key: cylinder_2_wall_heat_W
+      label: Cylinder 2
+      axis_id: power
+      color: '#087A6A'
+      line_style: '-'
+      line_width: 1.6
+    - signal_key: compressor_1_wall_heat_W
+      label: Compressor 1
+      axis_id: power
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.6
+    - signal_key: compressor_2_wall_heat_W
+      label: Compressor 2
+      axis_id: power
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.6
+  - title: Heat transfer coefficient
+    show_title: true
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    y_axes:
+    - id: htc
+      title: HTC [W/(m2 K)]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: cylinder_1_htc_W_per_m2K
+      label: Cylinder 1
+      axis_id: htc
+      color: '#7DD3C7'
+      line_style: '-'
+      line_width: 1.6
+    - signal_key: cylinder_2_htc_W_per_m2K
+      label: Cylinder 2
+      axis_id: htc
+      color: '#087A6A'
+      line_style: '-'
+      line_width: 1.6
+    - signal_key: compressor_1_htc_W_per_m2K
+      label: Compressor 1
+      axis_id: htc
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.6
+    - signal_key: compressor_2_htc_W_per_m2K
+      label: Compressor 2
+      axis_id: htc
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.6
+  - title: Gas and wall temperatures
+    show_title: true
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    y_axes:
+    - id: temperature
+      title: Temperature [K]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: cylinder_1_T_K
+      label: Gas Cylinder 1
+      axis_id: temperature
+      color: '#FF8A80'
+      line_style: '-'
+      line_width: 1.8
+    - signal_key: cylinder_2_T_K
+      label: Gas Cylinder 2
+      axis_id: temperature
+      color: '#B71C1C'
+      line_style: '-'
+      line_width: 1.8
+    - signal_key: compressor_1_T_K
+      label: Gas Compressor 1
+      axis_id: temperature
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.8
+    - signal_key: compressor_2_T_K
+      label: Gas Compressor 2
+      axis_id: temperature
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.8
+    - signal_key: cylinder_1_wall_temperature_K
+      label: Wall Cylinder 1
+      axis_id: temperature
+      color: '#FF8A80'
+      line_style: '-'
+      line_width: 1.8
+    - signal_key: cylinder_2_wall_temperature_K
+      label: Wall Cylinder 2
+      axis_id: temperature
+      color: '#B71C1C'
+      line_style: '-'
+      line_width: 1.8
+    - signal_key: compressor_1_wall_temperature_K
+      label: Wall Compressor 1
+      axis_id: temperature
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.8
+    - signal_key: compressor_2_wall_temperature_K
+      label: Wall Compressor 2
+      axis_id: temperature
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.8

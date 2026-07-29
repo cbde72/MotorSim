@@ -543,6 +543,46 @@ def _build_free_piston_wall_matrices(builder, cylinder_cfg_for_submodels: Cylind
     return wall_matrix, wall_ref_matrix, wall_ref_matrix_safe, 0
 
 
+def _build_free_piston_bounce_wall_matrices(
+    builder,
+    bounce_cfg: BounceChamberVolumeConfig,
+    bounce_geom: _ResolvedBounceGeometry,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+    """Build a Woschni row for a stateful bounce/compressor chamber."""
+    wall_cfg = bounce_cfg.wall_heat
+    if isinstance(wall_cfg, DisabledSubmodelConfig):
+        return (
+            np.zeros((0, len(WallCol)), dtype=np.float64),
+            np.zeros((0, len(WallRefCol)), dtype=np.float64),
+            np.zeros((1, len(WallRefCol)), dtype=np.float64),
+            -1,
+        )
+    if not isinstance(wall_cfg, WoschniHeatTransferConfig):
+        raise TypeError("Unsupported wall_heat model for free_piston bounce chamber")
+
+    wall_row = np.zeros((len(WallCol),), dtype=np.float64)
+    wall_row[WallCol.MODEL] = float(HeatTransferModel.WOSCHNI)
+    wall_row[WallCol.C1] = 0.0 if wall_cfg.c1 is None else float(wall_cfg.c1)
+    wall_row[WallCol.C2] = 0.0 if wall_cfg.c2 is None else float(wall_cfg.c2)
+    wall_row[WallCol.C3] = 0.0 if wall_cfg.c3 is None else float(wall_cfg.c3)
+    wall_row[WallCol.WALL_TEMP] = float(wall_cfg.wall_temperature_K)
+    wall_row[WallCol.WALL_AREA] = float(wall_cfg.wall_area_m2)
+    wall_row[WallCol.VARIANT] = float(builder._woschni_variant_enum(wall_cfg.variant))
+    wall_row[WallCol.DP_MODE] = float(builder._woschni_dp_mode_enum(wall_cfg.dp_mode))
+    wall_row[WallCol.REF_MODE] = float(builder._woschni_reference_mode_enum(wall_cfg.reference_state_mode))
+    wall_row[WallCol.PHASE_MODE] = float(builder._woschni_phase_mode_enum(wall_cfg.phase_mode))
+    wall_row[WallCol.MULTIPLIER] = float(wall_cfg.multiplier)
+    wall_row[WallCol.CUCM] = float(wall_cfg.cucm)
+    wall_row[WallCol.SWIRL_NUMBER] = float(wall_cfg.swirl_number)
+    wall_row[WallCol.IMEP_BAR] = float(wall_cfg.imep_bar)
+    wall_row[WallCol.CLEARANCE_VOL] = float(bounce_geom.chamber_min_volume_m3)
+    wall_row[WallCol.MAX_VOL] = float(bounce_geom.chamber_volume0_m3)
+
+    wall_matrix = wall_row.reshape(1, -1)
+    wall_ref_matrix = np.asarray([[0.0, 0.0, 0.0, 0.0, 0.0, -1.0]], dtype=np.float64)
+    return wall_matrix, wall_ref_matrix, wall_ref_matrix.copy(), 0
+
+
 def _resolve_combustion_total_energy_J(combustion_cfg, nominal_stroke_m: float) -> float:
     if getattr(combustion_cfg, 'added_energy_per_cycle_J', None) is not None:
         q_total = float(combustion_cfg.added_energy_per_cycle_J)
@@ -714,6 +754,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
 
     cylinder_cfg_for_submodels: CylinderVolumeConfig | None = None
     cylinder_cfg_by_index: dict[int, CylinderVolumeConfig] = {}
+    bounce_cfg_by_index: dict[int, BounceChamberVolumeConfig] = {}
     cyl_idx: int | None = None
     cylinder_count = 0
     bounce_count = 0
@@ -814,6 +855,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             initial_burned_mass_kg = initial_mass_kg * builder._initial_burned_fraction_0to1(vol)
             y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
         elif isinstance(vol, BounceChamberVolumeConfig):
+            bounce_cfg_by_index[i] = vol
             bounce_count += 1
             motion_sign = 1.0 if bounce_count == 1 else -1.0
             volume_mechanical_dof[i] = 0
@@ -923,6 +965,17 @@ def build_free_piston_bundle(builder) -> ModelBundle:
                     wall_row[WallCol.WALL_TEMP] = weighted_temp / total_area
             vol_matrix[int(cyl_i), VolumeCol.WALL_ROW] = float(len(wall_rows))
             wall_rows.append(wall_row)
+            wall_ref_rows.append(np.asarray(wall_ref_matrix_i[0], dtype=np.float64))
+            wall_ref_safe_rows.append(np.asarray(wall_ref_matrix_safe_i[0], dtype=np.float64))
+    for bounce_i, bounce_cfg_i in bounce_cfg_by_index.items():
+        wall_matrix_i, wall_ref_matrix_i, wall_ref_matrix_safe_i, wall_idx_i = _build_free_piston_bounce_wall_matrices(
+            builder,
+            bounce_cfg_i,
+            bounce_geom,
+        )
+        if wall_idx_i >= 0 and wall_matrix_i.shape[0] > 0:
+            vol_matrix[int(bounce_i), VolumeCol.WALL_ROW] = float(len(wall_rows))
+            wall_rows.append(np.asarray(wall_matrix_i[wall_idx_i], dtype=np.float64))
             wall_ref_rows.append(np.asarray(wall_ref_matrix_i[0], dtype=np.float64))
             wall_ref_safe_rows.append(np.asarray(wall_ref_matrix_safe_i[0], dtype=np.float64))
     wall_matrix = np.asarray(wall_rows, dtype=np.float64) if wall_rows else np.zeros((0, len(WallCol)), dtype=np.float64)
@@ -1128,6 +1181,8 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             wall_bore_by_vol[int(cyl_i)] = float(cyl_cfg_i.kinematics.bore_m) if cyl_cfg_i is not None else float(_fp_piston_diameter_m(fp))
             stroke_m = float(cyl_cfg_i.kinematics.stroke_m) if cyl_cfg_i is not None else max(float(fp.mechanics.x_max_m) - float(fp.mechanics.x_min_m), 0.0)
             wall_ups_by_vol[int(cyl_i)] = 2.0 * stroke_m * float(config.engine.speed_rpm) / 60.0
+    for bounce_i in bounce_cfg_by_index:
+        wall_bore_by_vol[int(bounce_i)] = float(bounce_geom.chamber_diameter_m)
 
     for i in range(n_vol):
         if int(environment_is_fixed[i]) == 1 or int(vol_matrix[i, VolumeCol.TYPE]) == VolumeType.ENVIRONMENT:

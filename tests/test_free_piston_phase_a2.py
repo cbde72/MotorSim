@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from thermo0d.config.constants import FeatureCol, VolumeCol, WallCol
 from thermo0d.config.models import load_config
 from thermo0d.input.model_builder import build_model_bundle
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_dvdt_from_velocity, cylinder_volume_from_position
@@ -79,6 +80,29 @@ def test_free_piston_v11_initial_rhs_is_finite_with_two_wall_heat_cylinders() ->
     assert np.all(bundle.wall_bore_by_vol[bundle.cylinder_indices] > 0.0)
     assert np.all(bundle.wall_ups_by_vol[bundle.cylinder_indices] > 0.0)
     assert np.all(np.isfinite(dy))
+
+
+def test_free_piston_v40_applies_woschni_wall_heat_to_bounce_compressors() -> None:
+    cfg_path = Path('Projekte/variants/free_piston_GenSet_V40.yaml')
+    cfg = load_config(cfg_path)
+    bundle = build_model_bundle(cfg, cfg_path)
+    compressor_indices = [bundle.volume_names.index('compressor_1'), bundle.volume_names.index('compressor_2')]
+
+    for idx in compressor_indices:
+        wall_idx = int(bundle.vol_matrix[idx, VolumeCol.WALL_ROW])
+        assert wall_idx >= 0
+        assert bundle.wall_bore_by_vol[idx] == pytest.approx(0.07)
+        assert bundle.wall_matrix[wall_idx, WallCol.WALL_TEMP] == pytest.approx(350.0)
+        assert bundle.wall_matrix[wall_idx, WallCol.WALL_AREA] == pytest.approx(0.0315)
+
+    y = bundle.y_init.copy()
+    dy_with_wall = compute_free_piston_rhs(0.0, y, bundle)
+    bundle.feature_flags[FeatureCol.WALL_HEAT] = 0
+    dy_without_wall = compute_free_piston_rhs(0.0, y, bundle)
+
+    for idx in compressor_indices:
+        energy_idx = bundle.state_layout.energy_index(idx)
+        assert dy_with_wall[energy_idx] != pytest.approx(dy_without_wall[energy_idx])
 
 
 def test_free_piston_v12_latches_each_cylinder_against_its_own_slots() -> None:

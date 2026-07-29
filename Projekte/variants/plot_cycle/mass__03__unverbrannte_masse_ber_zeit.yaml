@@ -1,0 +1,59 @@
+name: Unburned mass over time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Unburned mass over time
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Unburned mass over time
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    y_axes:
+    - id: ax_m_unburned
+      title: Unburned Mass [mg]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+      y_min: -1.0
+      y_max: 11.0
+    series:
+    - signal_key: cylinder_1_m_unburned_kg
+      label: cylinder unburned
+      axis_id: ax_m_unburned
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: compressor_1_m_unburned_kg
+      label: bounce unburned
+      axis_id: ax_m_unburned
+      color: '#667085'
+      line_style: '-'
+      scale_factor: 1000000
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: receiver_1_m_unburned_kg
+      label: receiver unburned
+      axis_id: ax_m_unburned
+      color: '#667085'
+      line_style: '-'
+      scale_factor: 1000000
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: exhaust_plenum_1_m_unburned_kg
+      label: exhaust_plenum unburned
+      axis_id: ax_m_unburned
+      color: '#667085'
+      line_style: '-'
+      scale_factor: 1000000
+      unit_preset: raw
+      line_width: 1.6
+    show_title: true

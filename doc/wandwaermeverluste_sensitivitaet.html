@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Wandwärmeverluste – Modell und Sensitivitätsanalyse</title>
+  <style>
+    :root{--ink:#18242b;--muted:#60717a;--paper:#f5f1e8;--card:#fffdf8;--accent:#c54f2f;--blue:#176b87;--line:#d8d2c5}
+    *{box-sizing:border-box} body{margin:0;color:var(--ink);background:var(--paper);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+    header{padding:4.5rem max(6vw,1.25rem) 3rem;background:linear-gradient(125deg,#153947,#176b87);color:white}
+    header p{max-width:72ch;color:#d9edf2}.tag{letter-spacing:.14em;text-transform:uppercase;font-size:.78rem;font-weight:700}
+    main{width:min(1120px,92vw);margin:2.5rem auto 5rem}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:1.2rem}
+    section,.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.5rem;box-shadow:0 8px 26px #24333a0a}
+    section{grid-column:1/-1}.half{grid-column:span 6}.third{grid-column:span 4}
+    h1{font-size:clamp(2.2rem,5vw,4.4rem);line-height:1.05;max-width:900px;margin:.5rem 0}h2{font-size:1.65rem;margin:.1rem 0 1rem}h3{margin:.1rem 0 .6rem}
+    .kpi{font-size:2rem;font-weight:750;color:var(--blue)}.muted,small{color:var(--muted)}
+    .formula{overflow:auto;background:#f0eee7;border-left:4px solid var(--accent);padding:1rem 1.2rem;margin:1rem 0}
+    math{font-size:1.18rem}table{width:100%;border-collapse:collapse}th,td{padding:.65rem .55rem;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{font-size:.82rem;text-transform:uppercase;color:var(--muted)}
+    code{background:#ece8de;padding:.12rem .35rem;border-radius:4px}label{display:block;font-weight:650;margin:.5rem 0 .2rem}
+    input,select{width:100%;padding:.65rem;border:1px solid #b9b4aa;border-radius:7px;background:white;font:inherit}
+    canvas{width:100%;height:330px;background:white;border-radius:8px} .note{border-left:4px solid #e2a52b;background:#fff8df;padding:.8rem 1rem}
+    .pos{color:#a43d25}.neg{color:#176b87}.bar{height:.55rem;background:#ece6d9;border-radius:1rem;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
+    footer{color:var(--muted);text-align:center;padding:2rem}@media(max-width:760px){.half,.third{grid-column:1/-1}header{padding-top:3rem}}
+    @media print{body{background:white}header{background:white;color:black;padding:1rem 0}header p{color:#333}main{width:100%;margin:0}section,.card{box-shadow:none;break-inside:avoid}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="tag">Thermo0D · Technische Dokumentation</div>
+  <h1>Wandwärmeverluste und ihr Anteil an der eingesetzten Energie</h1>
+  <p>Herleitung des im Projekt implementierten Woschni-PROMO-Modells, Definition der Energiebilanz und lokale Sensitivitätsanalyse der maßgebenden Parameter.</p>
+</header>
+<main class="grid">
+  <section>
+    <h2>1 · Aussage und Bezugsgröße</h2>
+    <p>Als Wandwärmeverlust gilt hier die vom heißen Zylindergas an Kolben, Kopf und Laufbuchse abgegebene Wärme. Der dimensionslose Verlustanteil bezieht sich auf die im betrachteten Arbeitszyklus zugeführte Verbrennungsenergie.</p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow><msub><mi>r</mi><mi>W</mi></msub><mo>=</mo>
+        <mfrac><msub><mi>Q</mi><mrow><mi>W</mi><mo>,</mo><mi>Verlust</mi></mrow></msub><msub><mi>E</mi><mi>ein</mi></msub></mfrac><mo>·</mo><mn>100</mn><mo>%</mo></mrow>
+      </math>
+    </div>
+    <p>Im Postprocessing entspricht <code>E<sub>ein</sub></code> dem Zyklusintegral <code>added_energy_cycle_J</code>. Der Verlust wird als positives Betragsintegral ausgewertet:</p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow><msub><mi>Q</mi><mrow><mi>W</mi><mo>,</mo><mi>Verlust</mi></mrow></msub><mo>=</mo>
+        <msubsup><mo>∫</mo><msub><mi>t</mi><mn>0</mn></msub><msub><mi>t</mi><mn>1</mn></msub></msubsup>
+        <mrow><mo>|</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>W</mi></msub><mo>|</mo></mrow><mi>d</mi><mi>t</mi></mrow>
+      </math>
+    </div>
+    <p class="note">Das Betragsintegral zählt auch eine kurzzeitige Rückwärmung des Gases als Wärmeübertragung. Für eine reine Netto-Energiebilanz ist stattdessen das vorzeichenbehaftete Integral zu verwenden.</p>
+  </section>
+
+  <section class="half">
+    <h2>2 · Wärmeleistung</h2>
+    <p>Die Implementierung liefert Wärme <em>zum Gas</em> positiv. Bei <span lang="en">gas temperature</span> oberhalb der Wandtemperatur ist der Wert negativ; der Verlustbetrag lautet:</p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>W</mi></msub><mo>=</mo><mi>h</mi><msub><mi>A</mi><mi>W</mi></msub>
+        <mo>(</mo><msub><mi>T</mi><mi>W</mi></msub><mo>−</mo><msub><mi>T</mi><mi>g</mi></msub><mo>)</mo></mrow>
+      </math>
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow><msub><mover><mi>Q</mi><mo>˙</mo></mover><mrow><mi>W</mi><mo>,</mo><mi>Verlust</mi></mrow></msub><mo>=</mo>
+        <mi>h</mi><msub><mi>A</mi><mi>W</mi></msub><mo>(</mo><msub><mi>T</mi><mi>g</mi></msub><mo>−</mo><msub><mi>T</mi><mi>W</mi></msub><mo>)</mo></mrow>
+      </math>
+    </div>
+  </section>
+
+  <section class="half">
+    <h2>3 · Woschni-PROMO-Koeffizient</h2>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow><mi>h</mi><mo>=</mo><msub><mi>C</mi><mi>M</mi></msub><mo>·</mo><mn>0.013</mn><mo>·</mo>
+        <msup><mi>D</mi><mrow><mo>−</mo><mn>0.2</mn></mrow></msup><mo>·</mo>
+        <msubsup><mi>T</mi><mi>g</mi><mrow><mo>−</mo><mn>0.53</mn></mrow></msubsup><mo>·</mo>
+        <msup><mrow><mo>(</mo><mi>p</mi><mi>w</mi><mo>)</mo></mrow><mn>0.8</mn></msup></mrow>
+      </math>
+    </div>
+    <p>Mit <em>D</em> Bohrung, <em>p</em> absolutem Gasdruck und <em>C<sub>M</sub></em> dem konfigurierbaren Multiplikator. Ohne Druckdifferenzterm gilt:</p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow><mi>w</mi><mo>=</mo><msub><mi>C</mi><mn>1</mn></msub><msub><mover><mi>u</mi><mo>¯</mo></mover><mi>K</mi></msub></mrow>
+      </math>
+    </div>
+    <p><em>C<sub>1</sub></em> ist phasenabhängig: 6,18 + 0,417·CUCM im Verdichtungs-/Verbrennungsbereich, sonst 2,28 + 0,308·CUCM.</p>
+  </section>
+
+  <section>
+    <h2>4 · Verwendete V37-Konfiguration</h2>
+    <div class="grid">
+      <div class="third"><div class="muted">Variante</div><div class="kpi">PROMO</div><small><code>dp_mode: off</code></small></div>
+      <div class="third"><div class="muted">Multiplikator C<sub>M</sub></div><div class="kpi">5,0</div><small>linearer Skalierungsfaktor</small></div>
+      <div class="third"><div class="muted">Nenn-Wandfläche</div><div class="kpi">0,03 m²</div><small>dynamische Zonentemperaturen</small></div>
+    </div>
+    <p>Die Wandtemperatur wird in V37 zyklusgemittelt für Zylinder, Kopf und Kolben berechnet. Die Eingabe <code>wall_temperature_K: 450</code> ist daher nicht zwingend die während der Rechnung wirksame Temperatur. Der konfigurierte Kinematik-Bohrungswert des Modellvolumens ist 1,0745 m; die Freikolbenmechanik enthält zusätzlich 0,0605 m. Diese Geometriediskrepanz sollte vor quantitativer Interpretation geprüft werden.</p>
+  </section>
+
+  <section>
+    <h2>5 · Lokale Sensitivität</h2>
+    <p>Die normierte Sensitivität <em>S<sub>x</sub></em> beschreibt die prozentuale Änderung des Verlustanteils bei 1 % Parameteränderung, während die übrigen Zustandsverläufe festgehalten werden:</p>
+    <div class="formula">
+      <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+        <mrow><msub><mi>S</mi><mi>x</mi></msub><mo>=</mo>
+        <mfrac><mrow><mi>∂</mi><mi>ln</mi><msub><mi>r</mi><mi>W</mi></msub></mrow><mrow><mi>∂</mi><mi>ln</mi><mi>x</mi></mrow></mfrac></mrow>
+      </math>
+    </div>
+    <table>
+      <thead><tr><th>Parameter</th><th>S<sub>x</sub></th><th>+10 % bewirkt näherungsweise</th><th>Bewertung</th></tr></thead>
+      <tbody id="sensitivityRows"></tbody>
+    </table>
+    <p class="muted">Temperaturwerte in der Tabelle verwenden den transparenten Arbeitspunkt T<sub>g</sub> = 1200 K und T<sub>W</sub> = 450 K. Für C<sub>1</sub>, Druck und Geschwindigkeit ist ein unveränderter Zustandsverlauf angenommen. In einer vollständig gekoppelten Simulation verändern diese Parameter zusätzlich Druck und Gastemperatur; das kann die Gesamtsensitivität verstärken oder abschwächen.</p>
+  </section>
+
+  <section class="half">
+    <h2>6 · Interaktive Beispielrechnung</h2>
+    <p>Diese Rechnung skaliert einen frei wählbaren Referenz-Verlustanteil mit der Woschni-Gleichung. Sie ersetzt keinen Simulationslauf.</p>
+    <label for="baseline">Referenz-Verlustanteil [%]</label><input id="baseline" type="number" min="0" max="100" step="0.1" value="25">
+    <label for="parameter">Variierter Parameter</label>
+    <select id="parameter">
+      <option value="mult">Woschni-Multiplikator</option><option value="area">Wandfläche</option>
+      <option value="pressure">Gasdruck</option><option value="speed">mittlere Kolbengeschwindigkeit</option>
+      <option value="bore">Bohrung</option><option value="tgas">Gastemperatur</option><option value="twall">Wandtemperatur</option>
+      <option value="input">eingesetzte Energie</option>
+    </select>
+    <label for="change">Parameteränderung: <output id="changeOut">0 %</output></label>
+    <input id="change" type="range" min="-30" max="30" step="1" value="0">
+    <p>Ergebnis: <span class="kpi" id="result">25,0 %</span></p>
+    <p class="muted" id="delta">Änderung gegenüber Referenz: 0,0 Prozentpunkte</p>
+  </section>
+
+  <section class="half">
+    <h2>7 · Einflussrangfolge bei ±10 %</h2>
+    <canvas id="chart" width="700" height="330" aria-label="Balkendiagramm der relativen Änderung"></canvas>
+    <p class="muted">Balken: Änderung von r<sub>W</sub> gegenüber dem Referenzwert. Rot = Verlust steigt; blau = Verlust sinkt.</p>
+  </section>
+
+  <section>
+    <h2>8 · Interpretation und Vorgehen</h2>
+    <ol>
+      <li><strong>Direkte Kalibrierhebel:</strong> Wandfläche und Multiplikator wirken exakt linear, solange der thermodynamische Verlauf festgehalten wird. Der Multiplikator sollte nur gegen Messdaten kalibriert werden.</li>
+      <li><strong>Betriebszustand:</strong> Druck, Kolbengeschwindigkeit und der phasenabhängige Geschwindigkeitsfaktor wirken jeweils mit Exponent 0,8 und sind damit stark.</li>
+      <li><strong>Temperaturen:</strong> Eine höhere Gastemperatur steigert trotz T<sup>−0,53</sup> im Wärmeübergangskoeffizienten meist den Verlust, weil die Temperaturdifferenz dominiert. Eine höhere Wandtemperatur senkt ihn.</li>
+      <li><strong>Bezugsenergie:</strong> Bei identischem Q<sub>W</sub> senkt +10 % eingesetzte Energie den relativen Verlust auf 1/1,1 = 90,9 % des Ausgangswerts. In der gekoppelten Rechnung steigt Q<sub>W</sub> jedoch typischerweise ebenfalls.</li>
+      <li><strong>Empfohlene numerische Analyse:</strong> Für jeden Parameter Läufe bei −10 %, Referenz und +10 % ausführen; danach Q<sub>W,Verlust</sub>/E<sub>ein</sub> aus dem letzten vollständigen Zyklus bilden. So werden Rückkopplungen erfasst.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>9 · Reproduzierbarkeit</h2>
+    <table>
+      <tbody>
+        <tr><th>Modellcode</th><td><code>src/thermo0d/physics/heat_transfer.py</code></td></tr>
+        <tr><th>Referenzkonfiguration</th><td><code>Projekte/variants/free_piston_GenSet_V37.yaml</code></td></tr>
+        <tr><th>Postprocessing</th><td><code>src/thermo0d/output/geometry_report.py</code> und <code>plots.py</code></td></tr>
+        <tr><th>Stand</th><td>29. Juli 2026 · lokale analytische Sensitivität, keine neu gerechnete Parameterstudie</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+<footer>Thermo0D · Wandwärmedokumentation</footer>
+<script>
+(() => {
+  const Tg=1200, Tw=450;
+  const sens=[
+    ["Wandfläche A_W",1,"linear, unmittelbar"],
+    ["Multiplikator C_M",1,"linearer Kalibrierfaktor"],
+    ["Gasdruck p",.8,"starker Betriebszustandseinfluss"],
+    ["C₁ / Kolbengeschwindigkeit",.8,"wirkt über Gasgeschwindigkeit w"],
+    ["Bohrung D",-.2,"schwach invers (bei fester Fläche)"],
+    ["Gastemperatur T_g",-0.53+Tg/(Tg-Tw),"HTC sinkt, Temperaturgefälle steigt"],
+    ["Wandtemperatur T_W",-Tw/(Tg-Tw),"höhere Wandtemperatur reduziert Verlust"],
+    ["Eingesetzte Energie E_ein",-1,"reiner Nenner-Effekt"]
+  ];
+  const tbody=document.querySelector("#sensitivityRows");
+  sens.forEach(([name,s,note])=>{
+    const exact=(Math.pow(1.1,s)-1)*100;
+    tbody.insertAdjacentHTML("beforeend",`<tr><td>${name}</td><td class="${s>=0?"pos":"neg"}">${s.toLocaleString("de-DE",{maximumFractionDigits:2})}</td><td>${exact>=0?"+":""}${exact.toLocaleString("de-DE",{maximumFractionDigits:1})} %</td><td>${note}</td></tr>`);
+  });
+  const exp={mult:1,area:1,pressure:.8,speed:.8,bore:-.2,input:-1};
+  const baseline=document.querySelector("#baseline"), parameter=document.querySelector("#parameter"), change=document.querySelector("#change");
+  function factor(key,frac){
+    if(exp[key]!==undefined)return Math.pow(1+frac,exp[key]);
+    if(key==="tgas"){const t=Tg*(1+frac);return Math.pow(t/Tg,-.53)*(t-Tw)/(Tg-Tw)}
+    if(key==="twall"){const t=Tw*(1+frac);return (Tg-t)/(Tg-Tw)}
+    return 1;
+  }
+  function update(){
+    const b=+baseline.value||0,c=+change.value,f=factor(parameter.value,c/100),r=b*f;
+    document.querySelector("#changeOut").textContent=`${c>0?"+":""}${c} %`;
+    document.querySelector("#result").textContent=`${r.toLocaleString("de-DE",{maximumFractionDigits:2})} %`;
+    document.querySelector("#delta").textContent=`Änderung gegenüber Referenz: ${(r-b)>=0?"+":""}${(r-b).toLocaleString("de-DE",{maximumFractionDigits:2})} Prozentpunkte`;
+  }
+  [baseline,parameter,change].forEach(e=>e.addEventListener("input",update)); update();
+  const cvs=document.querySelector("#chart"),ctx=cvs.getContext("2d"), items=sens.map(x=>[x[0],(Math.pow(1.1,x[1])-1)*100]);
+  ctx.font="13px system-ui"; const zero=390,scale=13; ctx.strokeStyle="#aaa";ctx.beginPath();ctx.moveTo(zero,15);ctx.lineTo(zero,315);ctx.stroke();
+  items.forEach(([label,val],i)=>{const y=19+i*38,w=val*scale;ctx.fillStyle="#34444b";ctx.fillText(label,8,y+15);ctx.fillStyle=val>=0?"#c54f2f":"#176b87";ctx.fillRect(val>=0?zero:zero+w,y,Math.abs(w),20);ctx.fillStyle="#34444b";ctx.fillText(`${val>=0?"+":""}${val.toFixed(1)} %`,val>=0?zero+w+6:zero+w-48,y+15)});
+})();
+</script>
+</body>
+</html>

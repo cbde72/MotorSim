@@ -1,25 +1,20 @@
-name: Temperaturen über Zeit
+name: Temperatures over time
 style_sheet: ../../plot_style_sheet.yaml
 style:
-  font_size: 6
-  axis_label_size: 6
-  tick_label_size: 6
-  title_size: 6
-  figure_title_size: 6
-  grid_alpha: 0.3
-  default_line_width: 0.8
-  default_marker_size: 3.5
+  default_line_width: 1.6
 figures:
-- title: Free-Piston Temperaturverläufe aller Volumes
+- title: Free-piston temperature traces of all volumes
   rows: 1
   cols: 1
   subplots:
-  - title: Temperaturen über Zeit
+  - title: Temperatures over time
     plot_type: line
-    x_signal: t_s
-    x_title: Zeit [s]
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
     x_unit_preset: raw
     x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
     y_axes:
     - id: ax_p
       title: Temperature [K]
@@ -32,42 +27,49 @@ figures:
     - signal_key: cylinder_1_T_K
       label: cylinder
       axis_id: ax_p
-      color: '#b42318'
+      color: '#FF8A80'
       line_style: '-'
       scale_factor: 1
       unit_preset: raw
+      line_width: 1.8
     - signal_key: compressor_1_T_K
       label: bounce
       axis_id: ax_p
-      color: '#175cd3'
+      color: '#667085'
       line_style: '-'
       scale_factor: 1
       unit_preset: raw
+      line_width: 1.8
     - signal_key: receiver_1_T_K
       label: receiver
       axis_id: ax_p
-      color: '#027a48'
+      color: '#175CD3'
       line_style: '-'
       scale_factor: 1
       unit_preset: raw
+      line_width: 1.8
     - signal_key: exhaust_plenum_1_T_K
       label: exhaust_plenum
       axis_id: ax_p
-      color: '#7a5af8'
+      color: '#D92D20'
       line_style: '-'
       scale_factor: 1
       unit_preset: raw
+      line_width: 1.8
     - signal_key: ambient_in_T_K
       label: ambient_in
       axis_id: ax_p
-      color: '#f79009'
-      line_style: --
+      color: '#175CD3'
+      line_style: '-'
       scale_factor: 1
       unit_preset: raw
+      line_width: 1.8
     - signal_key: ambient_out_T_K
       label: ambient_out
       axis_id: ax_p
-      color: '#667085'
-      line_style: --
+      color: '#D92D20'
+      line_style: '-'
       scale_factor: 1
       unit_preset: raw
+      line_width: 1.8
+    show_title: true

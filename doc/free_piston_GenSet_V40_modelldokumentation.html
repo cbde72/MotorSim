@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thermo0D V40 – vollständige Modelldokumentation</title>
+<style>
+:root{--ink:#17252c;--muted:#61727a;--bg:#f3f0e8;--card:#fffefa;--blue:#176b87;--red:#bd4b31;--green:#19704e;--line:#d8d1c3}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:4rem max(5vw,1rem) 3rem;color:white;background:linear-gradient(125deg,#102f3b,#176b87 65%,#39849a)}
+header h1{font-size:clamp(2.2rem,5vw,4.6rem);line-height:1.04;margin:.4rem 0;max-width:1100px}header p{max-width:80ch;color:#dceef2}
+nav{position:sticky;top:0;z-index:3;background:#fffefaeF;border-bottom:1px solid var(--line);padding:.65rem 4vw;overflow:auto;white-space:nowrap;backdrop-filter:blur(8px)}
+nav a{color:var(--blue);text-decoration:none;margin-right:1rem;font-weight:650}
+main{width:min(1240px,94vw);margin:2rem auto 5rem}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:1rem}
+section,.card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:1.35rem;box-shadow:0 7px 24px #23343b0a}
+section{margin:1rem 0}.half{grid-column:span 6}.third{grid-column:span 4}h2{margin:.1rem 0 1rem;font-size:1.7rem}h3{margin:1rem 0 .4rem;color:#234957}
+.tag{letter-spacing:.14em;text-transform:uppercase;font-weight:750;font-size:.76rem}.muted,small{color:var(--muted)}
+.kpi{font-size:1.75rem;font-weight:750;color:var(--blue)}.formula{overflow:auto;padding:1rem;background:#f1eee6;border-left:4px solid var(--red);margin:.8rem 0}math{font-size:1.15rem}
+table{width:100%;border-collapse:collapse;margin:.5rem 0 1rem}th,td{padding:.52rem .55rem;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{font-size:.78rem;color:var(--muted);text-transform:uppercase}td:first-child{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.9em}
+code{background:#ece8de;border-radius:4px;padding:.1rem .32rem}.on{color:var(--green);font-weight:700}.off{color:#8b3325;font-weight:700}.note{background:#fff7d8;border-left:4px solid #d49b23;padding:.8rem 1rem}
+.diagram{width:100%;height:auto;background:#f9fbfa;border:1px solid var(--line);border-radius:10px}.vol{fill:#fff;stroke:#176b87;stroke-width:2}.env{fill:#edf4f6;stroke:#61727a}.cyl{fill:#fff1eb;stroke:#bd4b31}.comp{fill:#edf5ff;stroke:#175cd3}.plen{fill:#edf8f1;stroke:#19704e}.edge{stroke:#455a64;stroke-width:2;fill:none;marker-end:url(#arrow)}.slot{stroke:#bd4b31}.valve{stroke:#175cd3}.orifice{stroke:#19704e}.svgtitle{font-weight:750;font-size:14px}.svgsmall{font-size:10px;fill:#566}
+.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:.12rem .55rem;margin:.1rem;background:#f7f4ed}
+details{border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0}summary{cursor:pointer;font-weight:700}
+iframe{width:100%;height:520px;border:1px solid var(--line);background:white;border-radius:8px}
+footer{text-align:center;color:var(--muted);padding:2rem}@media(max-width:800px){.half,.third{grid-column:1/-1}header{padding-top:2.5rem}}@media print{nav{display:none}body{background:white}section,.card{box-shadow:none;break-inside:avoid}iframe{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="tag">Thermo0D · Konfiguration V40 · Schema 8</div>
+  <h1>Vollständige Modell- und Parameterdokumentation</h1>
+  <p>Freikolben-Genset mit zwei Arbeitszylindern, zwei Bounce-Kompressoren, getrennten Receiver- und Abgasplenen, HCCI-Diagnostik und Woschni-Wandwärme. Dokumentationsstand: 29. Juli 2026.</p>
+</header>
+<nav>
+  <a href="#scope">Überblick</a><a href="#topology">Topologie</a><a href="#balance">Bilanz</a><a href="#mechanics">Mechanik</a>
+  <a href="#flow">Gaswechsel</a><a href="#wall">Wandwärme</a><a href="#combustion">Verbrennung</a><a href="#ignition">Zündung</a>
+  <a href="#parameters">Parameter</a><a href="#numerics">Numerik</a><a href="#appendix">Vollständigkeit</a>
+</nav>
+<main>
+<section id="scope">
+  <h2>1 · Modellumfang und Aktivierungsstatus</h2>
+  <div class="grid">
+    <div class="third"><div class="muted">Architektur</div><div class="kpi">free_piston</div><small>oszillierend-rotatorische Kinematik</small></div>
+    <div class="third"><div class="muted">Dynamische Volumen</div><div class="kpi">8</div><small>2 Zylinder, 2 Kompressoren, 4 Plenen</small></div>
+    <div class="third"><div class="muted">Connections</div><div class="kpi">10</div><small>4 Rückschlagventile, 4 Slots, 2 Blenden</small></div>
+  </div>
+  <p><span class="pill on">Massenstrom aktiv</span><span class="pill on">Wandwärme aktiv</span><span class="pill on">Verbrennung aktiv</span><span class="pill on">p·dV-Arbeit aktiv</span><span class="pill off">Verdampfung aus</span></p>
+  <table><thead><tr><th>Bereich</th><th>Verwendetes Submodell</th><th>Gültigkeit in V40</th></tr></thead><tbody>
+    <tr><td>Thermodynamik</td><td>PROMO-Stoffwertmodell; Basiswerte cp=1005, cv=718, R=287 J/(kg·K)</td><td>alle dynamischen Volumen</td></tr>
+    <tr><td>Mechanik</td><td>oscillating_rotary, ein mechanischer Freiheitsgrad</td><td>beide Zylinder und Kompressoren spiegelbildlich gekoppelt</td></tr>
+    <tr><td>Reibung</td><td>coulomb_viscous</td><td>Coulomb 80 N; viskoser Anteil 0</td></tr>
+    <tr><td>Last</td><td>generator_controlled</td><td>begrenzte Dämpfung in 0,01-m-Regelzone</td></tr>
+    <tr><td>Spülung</td><td>overlap_short_circuit_0d</td><td>beide Zweitaktzylinder</td></tr>
+    <tr><td>Gaswechsel</td><td>de Saint-Venant/Wanzel, Check-Valve, Slot, Orifice</td><td>alle zehn Connections</td></tr>
+    <tr><td>Wandwärme</td><td>Woschni PROMO, feste Wandtemperatur</td><td>Zylinder: 450 K; Kompressoren: 350 K; Plenen: aus</td></tr>
+    <tr><td>Verbrennung</td><td>Vibe, zeitbasiert, Kraftstoff aus Slot-Schließmasse</td><td>beide Zylinder</td></tr>
+    <tr><td>Zünddiagnostik</td><td>Beck 2003, 1-Arrhenius, Livengood-Wu-Integral</td><td>beide Zylinder; Diagnose/Triggerpfad</td></tr>
+    <tr><td>Verdampfung</td><td>none</td><td>überall deaktiviert</td></tr>
+  </tbody></table>
+</section>
+
+<section id="topology">
+<h2>2 · Modellaufbau: Volumen und Connections</h2>
+<svg class="diagram" viewBox="0 0 1180 530" role="img" aria-label="Topologie der V40">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#455a64"/></marker></defs>
+<rect class="vol env" x="25" y="205" width="120" height="90" rx="12"/><text class="svgtitle" x="85" y="238" text-anchor="middle">ambient_in</text><text class="svgsmall" x="85" y="258" text-anchor="middle">101325 Pa · 300 K</text><text class="svgsmall" x="85" y="276" text-anchor="middle">Randbedingung</text>
+<rect class="vol comp" x="205" y="70" width="150" height="100" rx="12"/><text class="svgtitle" x="280" y="104" text-anchor="middle">compressor_1</text><text class="svgsmall" x="280" y="125" text-anchor="middle">bounce_chamber</text><text class="svgsmall" x="280" y="143" text-anchor="middle">Woschni · 350 K</text>
+<rect class="vol comp" x="205" y="350" width="150" height="100" rx="12"/><text class="svgtitle" x="280" y="384" text-anchor="middle">compressor_2</text><text class="svgsmall" x="280" y="405" text-anchor="middle">bounce_chamber</text><text class="svgsmall" x="280" y="423" text-anchor="middle">Woschni · 350 K</text>
+<rect class="vol plen" x="425" y="70" width="140" height="100" rx="12"/><text class="svgtitle" x="495" y="105" text-anchor="middle">receiver_1</text><text class="svgsmall" x="495" y="128" text-anchor="middle">0,00048 m³</text><text class="svgsmall" x="495" y="146" text-anchor="middle">adiabatisch im Modell</text>
+<rect class="vol plen" x="425" y="350" width="140" height="100" rx="12"/><text class="svgtitle" x="495" y="385" text-anchor="middle">receiver_2</text><text class="svgsmall" x="495" y="408" text-anchor="middle">0,00048 m³</text><text class="svgsmall" x="495" y="426" text-anchor="middle">adiabatisch im Modell</text>
+<rect class="vol cyl" x="640" y="70" width="150" height="100" rx="12"/><text class="svgtitle" x="715" y="104" text-anchor="middle">cylinder_1</text><text class="svgsmall" x="715" y="125" text-anchor="middle">Vibe + Beck-HCCI</text><text class="svgsmall" x="715" y="143" text-anchor="middle">Woschni · 450 K</text>
+<rect class="vol cyl" x="640" y="350" width="150" height="100" rx="12"/><text class="svgtitle" x="715" y="384" text-anchor="middle">cylinder_2</text><text class="svgsmall" x="715" y="405" text-anchor="middle">Vibe + Beck-HCCI</text><text class="svgsmall" x="715" y="423" text-anchor="middle">Woschni · 450 K</text>
+<rect class="vol plen" x="860" y="70" width="150" height="100" rx="12"/><text class="svgtitle" x="935" y="104" text-anchor="middle">exhaust_plenum_1</text><text class="svgsmall" x="935" y="128" text-anchor="middle">0,00260279 m³</text>
+<rect class="vol plen" x="860" y="350" width="150" height="100" rx="12"/><text class="svgtitle" x="935" y="384" text-anchor="middle">exhaust_plenum_2</text><text class="svgsmall" x="935" y="408" text-anchor="middle">0,00260279 m³</text>
+<rect class="vol env" x="1050" y="205" width="110" height="90" rx="12"/><text class="svgtitle" x="1105" y="238" text-anchor="middle">ambient_out</text><text class="svgsmall" x="1105" y="258" text-anchor="middle">101325 Pa · 300 K</text>
+<path class="edge valve" d="M145 230 C170 230,175 120,205 120"/><text class="svgsmall" x="174" y="165">CV in 1</text>
+<path class="edge valve" d="M145 270 C170 270,175 400,205 400"/><text class="svgsmall" x="174" y="345">CV in 2</text>
+<path class="edge valve" d="M355 120 L425 120"/><text class="svgsmall" x="390" y="108" text-anchor="middle">CV out 1</text>
+<path class="edge valve" d="M355 400 L425 400"/><text class="svgsmall" x="390" y="388" text-anchor="middle">CV out 2</text>
+<path class="edge slot" d="M565 120 L640 120"/><text class="svgsmall" x="602" y="108" text-anchor="middle">transfer slot 1</text>
+<path class="edge slot" d="M565 400 L640 400"/><text class="svgsmall" x="602" y="388" text-anchor="middle">transfer slot 2</text>
+<path class="edge slot" d="M790 120 L860 120"/><text class="svgsmall" x="825" y="108" text-anchor="middle">exhaust slot 1</text>
+<path class="edge slot" d="M790 400 L860 400"/><text class="svgsmall" x="825" y="388" text-anchor="middle">exhaust slot 2</text>
+<path class="edge orifice" d="M1010 120 C1035 120,1035 230,1050 230"/><text class="svgsmall" x="1035" y="175">bleed 1</text>
+<path class="edge orifice" d="M1010 400 C1035 400,1035 270,1050 270"/><text class="svgsmall" x="1035" y="345">bleed 2</text>
+<path d="M280 180 L715 180" stroke="#777" stroke-width="2" stroke-dasharray="7 5"/><path d="M280 340 L715 340" stroke="#777" stroke-width="2" stroke-dasharray="7 5"/>
+<text class="svgsmall" x="497" y="198" text-anchor="middle">gemeinsamer mechanischer Freiheitsgrad, spiegelbildliche Vorzeichen</text>
+</svg>
+<table><thead><tr><th>Connection</th><th>Von → nach</th><th>Typ</th><th>Kernparameter</th></tr></thead><tbody>
+<tr><td>compressor_1_in_cv / _2_</td><td>ambient_in → compressor_1/2</td><td>check_valve</td><td>d=55 mm; Cd=0,82; Δp_crack=0 Pa</td></tr>
+<tr><td>compressor_1_out_cv / _2_</td><td>compressor_1/2 → receiver_1/2</td><td>check_valve</td><td>d=55,3 mm; Cd=0,82; Δp_crack=50000 Pa</td></tr>
+<tr><td>transfer_slot_1 / _2_</td><td>receiver_1/2 → cylinder_1/2</td><td>Rechteckslot</td><td>92,07 mm ab OT; 26×16 mm; 6 Öffnungen; Cd f/r=0,95</td></tr>
+<tr><td>exhaust_slot_1 / _2_</td><td>cylinder_1/2 → exhaust_plenum_1/2</td><td>Rechteckslot</td><td>90,6 mm ab OT; 24×18 mm; 6 Öffnungen; Cd f/r=0,95</td></tr>
+<tr><td>exhaust_bleed_1 / _2_</td><td>exhaust_plenum_1/2 → ambient_out</td><td>orifice</td><td>d=14 mm; Cd vor/rück=0,98</td></tr>
+</tbody></table>
+</section>
+
+<section id="balance"><h2>3 · Zustände, Zustandsgleichung und Energiebilanz</h2>
+<p>Jedes dynamische Volumen führt mindestens Gasmasse und innere Energie; die PROMO-Thermodynamik ergänzt Zusammensetzungsgrößen. Druck und Temperatur werden konsistent aus Zustand, Stoffwerten und aktuellem Volumen rekonstruiert.</p>
+<div class="grid">
+<div class="half card"><h3>Ideales Gas</h3><div class="formula"><math display="block"><mrow><mi>p</mi><mi>V</mi><mo>=</mo><mi>m</mi><mi>R</mi><mi>T</mi></mrow></math><math display="block"><mrow><mi>U</mi><mo>=</mo><mi>m</mi><mi>u</mi><mo>≈</mo><mi>m</mi><msub><mi>c</mi><mi>v</mi></msub><mi>T</mi></mrow></math></div><p>Basis: cp=1005, cv=718 und R=287 J/(kg·K); PROMO kann die wirksamen Werte zusammensetzungsabhängig anpassen.</p></div>
+<div class="half card"><h3>Offenes 0D-Volumen</h3><div class="formula"><math display="block"><mrow><mfrac><mrow><mi>d</mi><mi>U</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mo>−</mo><mi>p</mi><mfrac><mrow><mi>d</mi><mi>V</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>+</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>W</mi></msub><mo>+</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>comb</mi></msub><mo>−</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>evap</mi></msub><mo>+</mo><munder><mo>∑</mo><mi>in</mi></munder><mover><mi>m</mi><mo>˙</mo></mover><mi>h</mi><mo>−</mo><munder><mo>∑</mo><mi>out</mi></munder><mover><mi>m</mi><mo>˙</mo></mover><mi>h</mi></mrow></math></div><p>In V40 ist Verdampfung null. Verbrennungswärme existiert nur in den Zylindern; p·dV und Wandwärme gelten in bewegten Kammern.</p></div>
+</div>
+</section>
+
+<section id="mechanics"><h2>4 · Freikolbenmechanik, Reibung und Last</h2>
+<div class="formula"><math display="block"><mrow><mi>J</mi><mover><mi>φ</mi><mo>¨</mo></mover><mo>=</mo><msub><mi>M</mi><mi>Gas</mi></msub><mo>+</mo><msub><mi>M</mi><mi>Kompressor</mi></msub><mo>+</mo><msub><mi>M</mi><mi>Reib</mi></msub><mo>+</mo><msub><mi>M</mi><mi>Gen</mi></msub></mrow></math><math display="block"><mrow><msub><mi>F</mi><mi>Reib</mi></msub><mo>=</mo><mo>−</mo><msub><mi>F</mi><mi>C</mi></msub><mi>sgn</mi><mo>(</mo><mi>v</mi><mo>)</mo><mo>−</mo><msub><mi>c</mi><mi>v</mi></msub><mi>v</mi></mrow></math></div>
+<table><thead><tr><th>Parameter</th><th>V40-Wert</th><th>Bedeutung</th></tr></thead><tbody>
+<tr><td>kinematics_type</td><td>oscillating_rotary</td><td>Äquivalente lineare Kolbenbewegung aus einem rotatorischen Freiheitsgrad.</td></tr>
+<tr><td>moving_mass_kg</td><td>11,8 kg</td><td>Lineare Bezugsmasse.</td></tr><tr><td>rotary_inertia_kg_m2</td><td>1,396 kg·m²</td><td>Wirksame Trägheit der rotatorischen Rechnung.</td></tr>
+<tr><td>piston_diameter_m</td><td>0,0605 m</td><td>Mechanischer Kolbendurchmesser; Fläche πD²/4.</td></tr><tr><td>compression_ratio</td><td>50</td><td>Mechanisches Verdichtungsverhältnis der Arbeitsseite.</td></tr>
+<tr><td>x_min_m / x_max_m</td><td>0 / 0,10807 m</td><td>Erlaubter Hubbereich.</td></tr><tr><td>angle_min_deg / angle_max_deg</td><td>−9° / +9°</td><td>Rotatorischer Oszillationsbereich.</td></tr>
+<tr><td>effective_radius_m</td><td>0,344 m</td><td>Übersetzung zwischen Winkel- und Linearbewegung.</td></tr><tr><td>x0_m / v0_m_per_s</td><td>0,054 m / −5,038 m/s</td><td>Mechanischer Startzustand.</td></tr>
+<tr><td>friction.fc_N / cv_Ns_per_m</td><td>80 N / 0</td><td>Reine Coulomb-Reibung; kein viskoser Anteil.</td></tr>
+<tr><td>load.model</td><td>generator_controlled</td><td>Generatorische Gegenkraft.</td></tr><tr><td>max_damping_Ns_per_m</td><td>10000 N·s/m</td><td>Begrenzung der Regeldämpfung.</td></tr>
+<tr><td>damping_Ns_per_m</td><td>0</td><td>Konstante Grunddämpfung.</td></tr><tr><td>control_zone_m</td><td>0,01 m</td><td>Randzone der Generatorregelung.</td></tr>
+</tbody></table>
+<p class="note"><strong>Geometriehinweis:</strong> Die Zylinder-Submodelle enthalten zusätzlich <code>bore_m=1.0745</code>, <code>stroke_m=1.08</code> und <code>conrod_m=1.12</code>. Diese Werte unterscheiden sich deutlich von der Freikolbenmechanik (D=0,0605 m, Hubbereich 0,10807 m) und werden unter anderem als Woschni-Kontext verwendet. Vor quantitativer Kalibrierung sollte geklärt werden, ob diese Größen bewusst als Ersatzparameter dienen.</p>
+</section>
+
+<section id="flow"><h2>5 · Gaswechsel, Öffnungen und Spülung</h2>
+<h3>Kompressibler Massenstrom</h3>
+<div class="formula"><math display="block"><mrow><mover><mi>m</mi><mo>˙</mo></mover><mo>=</mo><msub><mi>C</mi><mi>d</mi></msub><msub><mi>A</mi><mi>geom</mi></msub><mfrac><msub><mi>p</mi><mi>u</mi></msub><msqrt><mrow><mi>R</mi><msub><mi>T</mi><mi>u</mi></msub></mrow></msqrt></mfrac><mi>Ψ</mi><mo>(</mo><mfrac><msub><mi>p</mi><mi>d</mi></msub><msub><mi>p</mi><mi>u</mi></msub></mfrac><mo>,</mo><mi>κ</mi><mo>)</mo></mrow></math></div>
+<p>Die de-Saint-Venant/Wanzel-Funktion Ψ wechselt zwischen unterkritischem und abgeriegeltem Strom. <em>u</em> und <em>d</em> bezeichnen Upstream und Downstream. Rückschlagventile öffnen nur bei ausreichender Druckdifferenz; Slots werden über den Kolbenabstand vom OT geöffnet.</p>
+<h3>Spülmodell</h3>
+<table><tbody>
+<tr><td>enabled / model</td><td>true / overlap_short_circuit_0d</td><td>0D-Korrektur während Überlappung von Transfer- und Auslassslots.</td></tr>
+<tr><td>scavenging_factor</td><td>1,25</td><td>Skalierung des wirksamen Spülens.</td></tr><tr><td>max_trapping_efficiency</td><td>0,92</td><td>Obere Grenze der Fangwirkung.</td></tr>
+<tr><td>short_circuit_start_ratio</td><td>0,70</td><td>Beginn des Kurzschlussanteils.</td></tr><tr><td>short_circuit_slope</td><td>0,35</td><td>Anstieg des Kurzschlussanteils.</td></tr>
+<tr><td>max_short_circuit_fraction</td><td>0,35</td><td>Maximal 35 % Kurzschluss.</td></tr><tr><td>min_residual_fraction</td><td>0,03</td><td>Mindestens 3 % Restgas.</td></tr>
+</tbody></table>
+</section>
+
+<section id="wall"><h2>6 · Wandwärme und feste Wandtemperaturen</h2>
+<div class="formula"><math display="block"><mrow><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>W</mi></msub><mo>=</mo><mi>h</mi><msub><mi>A</mi><mi>W</mi></msub><mo>(</mo><msub><mi>T</mi><mi>W</mi></msub><mo>−</mo><msub><mi>T</mi><mi>g</mi></msub><mo>)</mo></mrow></math><math display="block"><mrow><mi>h</mi><mo>=</mo><msub><mi>C</mi><mi>M</mi></msub><mo>·</mo><mn>0.013</mn><mo>·</mo><msup><mi>D</mi><mrow><mo>−</mo><mn>0.2</mn></mrow></msup><mo>·</mo><msubsup><mi>T</mi><mi>g</mi><mrow><mo>−</mo><mn>0.53</mn></mrow></msubsup><mo>·</mo><msup><mrow><mo>(</mo><mi>p</mi><mi>w</mi><mo>)</mo></mrow><mn>0.8</mn></msup></mrow></math></div>
+<p>Bei Gas über Wandtemperatur ist Q̇<sub>W</sub> negativ und entzieht dem Gas Energie. <code>dp_mode: off</code> deaktiviert den verbrennungsbedingten Druckdifferenzterm. CUCM, Swirl und IMEP sind null. Für die Kompressoren ist <em>D</em>=0,07 m und <em>w</em>=C₁|v|; für die Zylinder stammt das Geschwindigkeitsmaß aus der Zylinderkinematik.</p>
+<table><thead><tr><th>Parameter</th><th>Zylinder 1/2</th><th>Kompressor 1/2</th><th>Wirkung</th></tr></thead><tbody>
+<tr><td>model / variant</td><td>woschni / promo</td><td>woschni / promo</td><td>Gleiche Korrelation.</td></tr>
+<tr><td>wall_temperature_K</td><td>450 K</td><td>350 K</td><td>Konstant; dynamisches Wandtemperaturmodell ist <code>none</code>.</td></tr>
+<tr><td>wall_area_m2</td><td>0,03 m²</td><td>0,0315 m²</td><td>Lineare Skalierung der Wärmeleistung.</td></tr>
+<tr><td>multiplier</td><td>5,0</td><td>1,0</td><td>Linearer Kalibrierfaktor C<sub>M</sub>.</td></tr>
+<tr><td>c1 / c2 / c3</td><td>2,28 / 0,00324 / 0</td><td>gleich</td><td>Kompatibilitätsparameter; PROMO nutzt phasenabhängiges C₁.</td></tr>
+<tr><td>cucm / swirl_number / imep_bar</td><td>0 / 0 / 0</td><td>gleich</td><td>Keine Zusatzanregung.</td></tr>
+<tr><td>dp_mode</td><td>off</td><td>off</td><td>Kein Motored-Pressure-Term.</td></tr>
+<tr><td>reference_state_mode / phase_mode</td><td>none / promo</td><td>none / promo</td><td>Keine gelatchte Referenz; PROMO-Phasenlogik.</td></tr>
+</tbody></table>
+<p>Receiver und Exhaust-Plenen verwenden <code>wall_heat.model: none</code>. Ihr thermischer Zustand ändert sich nur durch Massen-/Enthalpieströme, Mischung und – soweit zutreffend – Volumenarbeit.</p>
+</section>
+
+<section id="combustion"><h2>7 · Vibe-Verbrennung und Kraftstoffbestimmung</h2>
+<div class="formula"><math display="block"><mrow><msub><mi>x</mi><mi>b</mi></msub><mo>(</mo><mi>τ</mi><mo>)</mo><mo>=</mo><mn>1</mn><mo>−</mo><mi>exp</mi><mo>[</mo><mo>−</mo><mi>a</mi><msup><mi>τ</mi><mrow><mi>m</mi><mo>+</mo><mn>1</mn></mrow></msup><mo>]</mo></mrow></math><math display="block"><mrow><mi>τ</mi><mo>=</mo><mfrac><mrow><mi>t</mi><mo>−</mo><msub><mi>t</mi><mi>SOC</mi></msub></mrow><msub><mi>Δt</mi><mi>comb</mi></msub></mfrac><mo>,</mo><mspace width="1em"/><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>comb</mi></msub><mo>=</mo><msub><mi>Q</mi><mi>fuel</mi></msub><mfrac><mrow><mi>d</mi><msub><mi>x</mi><mi>b</mi></msub></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac></mrow></math><math display="block"><mrow><msub><mi>m</mi><mi>fuel</mi></msub><mo>=</mo><mfrac><msub><mi>m</mi><mi>air,slotclose</mi></msub><mrow><msub><mi>λ</mi><mi>target</mi></msub><msub><mi>AFR</mi><mi>st</mi></msub></mrow></mfrac><mo>,</mo><mspace width="1em"/><msub><mi>Q</mi><mi>fuel</mi></msub><mo>=</mo><msub><mi>η</mi><mi>comb</mi></msub><msub><mi>m</mi><mi>fuel</mi></msub><mi>H</mi><msub><mi>u</mi><mi>LHV</mi></msub></mrow></math></div>
+<table><tbody>
+<tr><td>model</td><td>vibe</td><td>Zeitbasierte Wärmefreisetzung.</td></tr><tr><td>start_mode / hign_mm</td><td>hign_position / 15 mm</td><td>SOC wird positionsabhängig ausgelöst.</td></tr>
+<tr><td>duration_mode / duration_ms</td><td>time / 10 ms</td><td>Normierte Vibe-Dauer.</td></tr><tr><td>a / m</td><td>6,9 / 2,0</td><td>Vollständigkeit und Form der Freisetzung.</td></tr>
+<tr><td>fueling_mode</td><td>lambda_from_cylinder_mass_at_slot_close</td><td>Kraftstoff aus eingeschlossener Luftmasse.</td></tr>
+<tr><td>lambda_target / AFR_st</td><td>1,0 / 14,5 kg Luft/kg Kraftstoff</td><td>Stöchiometrische Zielmischung.</td></tr>
+<tr><td>lhv_J_per_kg</td><td>43.000.000 J/kg</td><td>Unterer Heizwert.</td></tr><tr><td>combustion_efficiency_0to1</td><td>1,0</td><td>100 % des berechneten Brennstoffheizwertes.</td></tr>
+<tr><td>slot_open_threshold_m2 / slot_closed_threshold_m2</td><td>1e−7 / 1e−12 m²</td><td>Hysterese zur Erkennung des Slot-Schließens.</td></tr>
+<tr><td>compression_velocity_threshold_m_per_s</td><td>0,02 m/s</td><td>Mindestgeschwindigkeit zur Verdichtungserkennung.</td></tr>
+<tr><td>energy_coupling / angle_reference</td><td>none / absolute</td><td>Keine Hubskalierung; absolute Referenz.</td></tr>
+</tbody></table>
+<p>Der initiale globale Verbrennungszustand ist vollständig unverbrannt und nicht armed: burned_fraction=0, released_energy=0 J, ignition_armed=false, injection_armed=false. Die Volumenstarts enthalten dagegen eigene Restgas-/Verbranntanteile.</p>
+</section>
+
+<section id="ignition"><h2>8 · Beck-2003-1-Arrhenius-Zünddiagnostik</h2>
+<div class="formula"><math display="block"><mrow><mi>τ</mi><mo>=</mo><msub><mi>C</mi><mn>1</mn></msub><msup><mrow><mo>(</mo><mfrac><mi>p</mi><msub><mi>p</mi><mi>ref</mi></msub></mfrac><mo>)</mo></mrow><msub><mi>C</mi><mn>2</mn></msub></msup><mi>exp</mi><mo>(</mo><mfrac><msub><mi>T</mi><mi>A</mi></msub><mi>T</mi></mfrac><mo>)</mo><mo>·</mo><msub><mi>f</mi><mi>O2,res</mi></msub></mrow></math><math display="block"><mrow><mi>LW</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><msubsup><mo>∫</mo><msub><mi>t</mi><mn>0</mn></msub><mi>t</mi></msubsup><mfrac><mrow><mi>d</mi><mi>t</mi></mrow><mi>τ</mi></mfrac><mo>,</mo><mspace width="1em"/><mi>Zündung</mi><mo>:</mo><mi>LW</mi><mo>≥</mo><mn>1</mn></mrow></math></div>
+<table><thead><tr><th>Parameter</th><th>Wert</th><th>Rolle in V40</th></tr></thead><tbody>
+<tr><td>model</td><td>beck_2003_1_arrhenius</td><td>Eine Arrhenius-Stufe.</td></tr><tr><td>beck_c1_s</td><td>1,47044752e−5 s</td><td>Gefitteter Zeitvorfaktor.</td></tr>
+<tr><td>beck_c2</td><td>−1,2</td><td>Druckexponent.</td></tr><tr><td>beck_reference_pressure_bar</td><td>1,0 bar</td><td>Drucknormierung.</td></tr>
+<tr><td>beck_reference_o2_percent</td><td>20,94 %</td><td>O₂-Normierung.</td></tr><tr><td>tau_activation_temperature_K</td><td>5000 K</td><td>Fallback-Aktivierungstemperatur.</td></tr>
+<tr><td>tau_reference_pressure_Pa</td><td>1.000.000 Pa</td><td>Kompatibilitätsparameter des allgemeinen LW-Modells.</td></tr>
+<tr><td>tau_reference_lambda</td><td>1,0</td><td>Kompatibilitätsbezug.</td></tr><tr><td>lambda_slowdown_exponent</td><td>0,7</td><td>Kompatibilitätsparameter; Beck nutzt O₂-Verdünnung.</td></tr>
+<tr><td>residual_slowdown_factor</td><td>1,5</td><td>Verzögerung bei Restgas.</td></tr><tr><td>start_temperature_min_K</td><td>780 K</td><td>Untere Schwelle der Vorakkumulation.</td></tr>
+<tr><td>start_pressure_min_Pa</td><td>2.000.000 Pa</td><td>Untere Druckschwelle.</td></tr><tr><td>max_ignition_delay_s</td><td>0,1 s</td><td>Obergrenze.</td></tr>
+<tr><td>accumulation_start_mode</td><td>compression</td><td>Integration nur in Verdichtung.</td></tr><tr><td>accumulation_end_mode</td><td>none</td><td>Diagnosepfad nicht durch Vibe-Ende begrenzt.</td></tr>
+</tbody></table>
+</section>
+
+<section id="parameters"><h2>9 · Instanzen und Anfangszustände</h2>
+<table><thead><tr><th>Volumen</th><th>Typ / Referenz</th><th>p₀ [Pa]</th><th>T₀ [K]</th><th>Verbranntanteil</th><th>Geometrie / Modelle</th></tr></thead><tbody>
+<tr><td>cylinder_1</td><td>cylinder / cylinder_free_piston</td><td>257686</td><td>487</td><td>0,269</td><td>bore 1,0745 m; stroke 1,08 m; conrod 1,12 m; CR 50; phase 0°; Woschni 450 K; Vibe; Evaporation none</td></tr>
+<tr><td>cylinder_2</td><td>cylinder / cylinder_free_piston</td><td>542041</td><td>1011</td><td>0,871</td><td>wie Zylinder 1; spiegelbildliche mechanische Kopplung</td></tr>
+<tr><td>compressor_1</td><td>bounce_chamber / compressor_bounce</td><td>101135</td><td>299</td><td>0</td><td>D=0,07 m; L=0,10807 m; CR=16; n=1,3; gas_exchange; Woschni 350 K</td></tr>
+<tr><td>compressor_2</td><td>bounce_chamber / compressor_bounce</td><td>198465</td><td>361</td><td>0</td><td>wie Kompressor 1; spiegelbildliche Kopplung</td></tr>
+<tr><td>receiver_1</td><td>plenum / receiver_plenum</td><td>134003</td><td>346</td><td>0,0134</td><td>V=0,00048 m³; Wandwärme/Verbrennung/Verdampfung aus</td></tr>
+<tr><td>receiver_2</td><td>plenum / receiver_plenum</td><td>149847</td><td>367</td><td>0,02356</td><td>V=0,00048 m³; Submodelle aus</td></tr>
+<tr><td>exhaust_plenum_1</td><td>plenum / exhaust_plenum</td><td>123188</td><td>499</td><td>0,303</td><td>V=0,00260279 m³; Submodelle aus</td></tr>
+<tr><td>exhaust_plenum_2</td><td>plenum / exhaust_plenum</td><td>105762</td><td>498</td><td>0,318</td><td>V=0,00260279 m³; Submodelle aus</td></tr>
+<tr><td>ambient_in / ambient_out</td><td>environment / ambient_environment</td><td>101325</td><td>300</td><td>–</td><td>Feste Randbedingungen, keine dynamischen Zustände</td></tr>
+</tbody></table>
+<h3>Bounce-Polytrope</h3>
+<div class="formula"><math display="block"><mrow><mi>p</mi><msup><mi>V</mi><mi>n</mi></msup><mo>=</mo><mi>const</mi><mo>,</mo><mspace width="1em"/><mi>n</mi><mo>=</mo><mn>1.3</mn></mrow></math></div>
+<p>Der Polytropenexponent dient in der aktuellen <code>gas_exchange</code>-Implementierung vor allem zur Referenzdruck-/Geometriekonsistenz. Die zeitabhängige Energie einschließlich expliziter Woschni-Wandwärme wird über die offene Energiebilanz gelöst; <em>n</em> ist daher kein Ersatz für Q̇<sub>W</sub>.</p>
+</section>
+
+<section id="numerics"><h2>10 · Zyklus, Solver und Ausgabe</h2>
+<table><tbody>
+<tr><td>engine.cycle_type</td><td>2t</td><td>360° Modellzyklus.</td></tr><tr><td>engine.speed_rpm</td><td>25 min⁻¹</td><td>Nominelle Kinematik-/Zeitreferenz.</td></tr>
+<tr><td>simulation.dt_s</td><td>1e−5 s</td><td>Feste RK4-Schrittweite.</td></tr><tr><td>simulationtime</td><td>0,2 s</td><td>Gesamtdauer.</td></tr>
+<tr><td>total_cycles / save_last_cycles</td><td>3 / 2</td><td>Zyklussteuerung und Speicherung.</td></tr><tr><td>solver.kind</td><td>rk4</td><td>Explizites Runge-Kutta 4.</td></tr>
+<tr><td>rtol / atol</td><td>1e−5 / 1e−7</td><td>Konfigurierte Toleranzen; bei klassischem Fixed-Step-RK4 nicht primäre Schrittsteuerung.</td></tr>
+<tr><td>postprocessing.mode / config</td><td>pipeline / postprocessing_V40.yaml</td><td>V40-Signale einschließlich Kompressor-Wandwärme.</td></tr>
+<tr><td>sampling.mode / step_s</td><td>time / 0,0001 s</td><td>Exportabtastung.</td></tr><tr><td>auto_update_initial_conditions</td><td>false</td><td>Startwerte werden nicht automatisch überschrieben.</td></tr>
+<tr><td>CSV / separator</td><td>aktiv / ;</td><td><code>results/editor_export.csv</code>.</td></tr><tr><td>Excel</td><td>deaktiviert</td><td>Konfigurierter Pfad wird nicht geschrieben.</td></tr>
+<tr><td>check_report</td><td>aktiv; HTML aus</td><td>Text-/Pipelineprüfung.</td></tr><tr><td>plots</td><td>aktiv</td><td>V40-Prüfplots über eigene Pipeline-Konfiguration.</td></tr>
+</tbody></table>
+</section>
+
+<section id="appendix"><h2>11 · Vollständigkeitsnachweis und normative Konfiguration</h2>
+<p>Die Tabellen dokumentieren alle physikalisch wirksamen, explizit gesetzten V40-Parameter und alle deaktivierten Submodelle. Referenzblöcke werden in der YAML beim Laden in die Instanzen aufgelöst; dadurch erscheinen viele Werte sowohl in der Bibliothek als auch in den materialisierten Volumen/Connections. Diese Duplikate sind keine zusätzlichen Modelle.</p>
+<details open><summary>Exaktes Schlüsselregister für wiederholte und administrative Parameter</summary>
+<p>Dieses Register ergänzt die lesbaren Tabellen um die wörtlichen YAML-Namen. Volumen-Anfangswerte heißen
+<code>initial_pressure_Pa</code>, <code>initial_temperature_K</code> und <code>initial_burned_fraction_0to1</code>;
+der globale Verbrennungsstart verwendet zusätzlich <code>burned_fraction_0to1</code>, <code>burned_mass_percent</code>
+und <code>released_energy_J</code>. Geometrieschlüssel sind <code>fixed_volume_m3</code>,
+<code>chamber_diameter_m</code>, <code>chamber_length_m</code>, <code>compression_ratio</code>,
+<code>polytropic_exponent</code>, <code>bore_m</code>, <code>stroke_m</code>, <code>conrod_m</code> und
+<code>phase_deg</code>.</p>
+<p>Die Gasbasis lautet <code>thermo_model: promo</code>, <code>cp_J_per_kgK: 1005</code>,
+<code>cv_J_per_kgK: 718</code> und <code>R_J_per_kgK: 287</code>. Feature-Schlüssel:
+<code>mass_flow: true</code>, <code>wall_heat: true</code>, <code>combustion: true</code>,
+<code>evaporation: false</code>, <code>pv_work: true</code>. Die Vibe-Stöchiometrie steht unter
+<code>afr_stoich_kg_air_per_kg_fuel</code>; die Diagnosebindung unter <code>hcci_diagnostics_ref</code>.</p>
+<p>Connection-Endpunkte heißen <code>from_volume</code> und <code>to_volume</code>. Ventile verwenden
+<code>diameter_mm</code>, <code>discharge_coefficient</code> und <code>cracking_pressure_Pa</code>.
+Slots verwenden <code>source_of_data</code>, <code>opening_mode</code>, <code>distance_from_tdc_mm</code>,
+<code>piston_height_if_crankcase_m</code>, <code>entrance_angle_deg</code>, <code>width_mm</code>,
+<code>height_mm</code>, <code>open_fillet_radius_m</code>, <code>full_fillet_radius_m</code>,
+<code>number_of_identical_holes</code>, <code>forward_cd</code> und <code>reverse_cd</code>.</p>
+<p>Ausgabe-Schlüssel: <code>csv_enabled: true</code>, <code>csv_path: results/editor_export.csv</code>,
+<code>csv_separator: ;</code>, <code>excel_enabled: false</code>,
+<code>excel_path: results/editor_export.xlsx</code>, <code>html_enabled: false</code>,
+<code>csv_export_layout: thermo0d_signal_export_layout.csv</code>, <code>csv_export_mode: auto</code>,
+<code>csv_export_missing_layout: warn_all</code>, <code>csv_export_unknown_signals: warn_empty</code>,
+<code>output_dir: results/plots</code> und <code>auto_create_defaults: true</code>.
+Die deaktivierten Winkelausgaben behalten <code>step_deg: 1</code>; der Freikolbenexport zusätzlich
+<code>axis_min_deg: 0</code> und <code>axis_max_deg: 360</code>.</p>
+</details>
+<ul>
+<li>Normative Konfiguration: <a href="../Projekte/variants/free_piston_GenSet_V40.yaml"><code>Projekte/variants/free_piston_GenSet_V40.yaml</code></a></li>
+<li>Postprocessing: <a href="../Projekte/variants/postprocessing_V40.yaml"><code>postprocessing_V40.yaml</code></a></li>
+<li>448 YAML-Blattwerte einschließlich Referenzduplikaten und Ausgabeparametern.</li>
+<li>8 dynamische Volumen + 2 Umgebungsgrenzen; 10 Connection-Instanzen.</li>
+<li>Parservalidierung: Thermo0D-Konfigurationsschema 8, Paketversion 7.1.127, keine Migration.</li>
+</ul>
+<details><summary>Vollständige YAML direkt in der Dokumentation anzeigen</summary>
+<p class="muted">Die folgende Ansicht lädt die unveränderte normative V40-Datei. Falls der Browser lokale Unterressourcen sperrt, den Link oben verwenden.</p>
+<iframe src="../Projekte/variants/free_piston_GenSet_V40.yaml" title="Vollständige V40 YAML"></iframe>
+</details>
+<h3>Implementierungsquellen</h3>
+<table><tbody>
+<tr><td>physics/source_terms.py</td><td>Gemeinsame Energiequellen p·dV, Wandwärme, Verbrennung, Verdampfung.</td></tr>
+<tr><td>physics/heat_transfer.py</td><td>Woschni-Varianten und Vorzeichenkonvention.</td></tr>
+<tr><td>physics/flow.py</td><td>Kompressibler Massenstrom.</td></tr>
+<tr><td>model/free_piston/rhs.py</td><td>Mechanik, bewegte Volumen und gekoppelte ODE.</td></tr>
+<tr><td>model/free_piston/combustion_latch.py</td><td>Slot-Schließmasse, HCCI-/SOC-Latch.</td></tr>
+<tr><td>physics/combustion.py</td><td>Vibe-Wärmefreisetzung.</td></tr>
+</tbody></table>
+</section>
+</main>
+<footer>Thermo0D V40 · Modelldokumentation · MathML + SVG · 29.07.2026</footer>
+</body>
+</html>

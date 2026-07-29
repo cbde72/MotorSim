@@ -1,71 +1,71 @@
-name: Zylinder Massen über Zeit
+name: Cylinder Masses over time
 style_sheet: ../../plot_style_sheet.yaml
 style:
-  font_size: 6
-  axis_label_size: 6
-  tick_label_size: 6
-  title_size: 6
-  figure_title_size: 6
-  grid_alpha: 0.3
-  default_line_width: 0.8
-  default_marker_size: 3.5
+  default_line_width: 1.6
 figures:
-- title: Zylinder Massen über Zeit
+- title: Cylinder Masses over time
   rows: 1
   cols: 1
   subplots:
-  - title: Zylinder Massen über Zeit
+  - title: Cylinder Masses over time
     plot_type: line
     x_signal: t_s
-    x_title: Zeit [s]
+    x_title: Time [s]
     x_unit_preset: raw
     x_limit_mode: auto
     y_axes:
     - id: ax_m_cyl
-      title: Masse [mg]
+      title: Mass [mg]
       side: left
       color: '#111111'
       limit_mode: auto
     series:
     - signal_key: cylinder_1_m_kg
-      label: Gas gesamt
+      label: Gas total
       axis_id: ax_m_cyl
-      color: '#111111'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 1000000.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: cylinder_1_m_air_kg
-      label: Luft
+      label: Air
       axis_id: ax_m_cyl
-      color: '#175cd3'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 1000000.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: cylinder_1_m_fuel_vapor_kg
-      label: Kraftstoff gasförmig
+      label: Forcestoff vapor
       axis_id: ax_m_cyl
-      color: '#f79009'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 1000000.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: cylinder_1_m_fuel_liquid_kg
-      label: Kraftstoff flüssig
+      label: Forcestoff liquid
       axis_id: ax_m_cyl
-      color: '#12b76a'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 1000000.0
       unit_preset: raw
+      line_width: 1.6
     - signal_key: cylinder_1_m_fuel_total_kg
-      label: Kraftstoff gesamt
+      label: Forcestoff total
       axis_id: ax_m_cyl
-      color: '#7a5af8'
-      line_style: --
-      scale_factor: 1000000.0
-      unit_preset: raw
-    - signal_key: cylinder_1_m_burned_kg
-      label: Verbrannt
-      axis_id: ax_m_cyl
-      color: '#b42318'
+      color: '#7DD3C7'
       line_style: '-'
       scale_factor: 1000000.0
       unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_m_burned_kg
+      label: Burned gas
+      axis_id: ax_m_cyl
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    show_title: true

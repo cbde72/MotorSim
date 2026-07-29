@@ -1,42 +1,26 @@
-name: Kraftstoffdosierung und Verbrauch
+name: Fuel metering and consumption
 style_sheet: ../../plot_style_sheet.yaml
 style:
-  background_color: '#ffffff'
-  axes_facecolor: '#ffffff'
-  text_color: '#202020'
-  grid_color: '#d9d9d9'
-  legend_facecolor: '#ffffff'
-  legend_edgecolor: '#a0a0a0'
-  default_line_width: 0.9
-  default_marker_size: 3.5
-  font_size: 6
-  axis_label_size: 6
-  tick_label_size: 6
-  title_size: 6
-  figure_title_size: 7
-  grid_alpha: 0.3
+  default_line_width: 1.6
 figures:
 - id: c5343d6934ed
-  title: Einspritzung und Verbrennung
+  title: Injection and combustion
   rows: 1
   cols: 1
   subplots:
   - id: 47e25f9cb015
-    title: Kraftstoffdosierung und Verbrauch
+    title: Fuel metering and consumption
     show_title: true
     plot_type: line
-    x_signal: t_s
-    x_title: Zeit [s]
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
     x_unit_preset: raw
-    x_scale_factor: 1.0
-    x_offset: 0.0
     x_limit_mode: auto
-    x_min: 0.0
-    x_max: 720.0
     x_start_at_zero: true
+    x_axis_position: bottom
     y_axes:
     - id: ax_mass
-      title: Kraftstoffmasse [mg]
+      title: Forcestoffmasse [mg]
       side: left
       spine_offset: 0.0
       color: '#111111'
@@ -52,7 +36,7 @@ figures:
       title: Rate [g/s]
       side: right
       spine_offset: 0.0
-      color: '#667085'
+      color: '#111111'
       visible: true
       limit_mode: data
       y_min: 0.0
@@ -67,10 +51,10 @@ figures:
       label: cyl1 fuel latched
       axis_id: ax_mass
       visible: true
-      color: '#175cd3'
+      color: '#7DD3C7'
       line_style: '-'
       marker: ''
-      line_width: 1.8
+      line_width: 1.6
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1000000.0
@@ -81,10 +65,10 @@ figures:
       label: cyl2 fuel latched
       axis_id: ax_mass
       visible: true
-      color: '#00aa00'
+      color: '#087A6A'
       line_style: '-'
       marker: ''
-      line_width: 1.8
+      line_width: 1.6
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1000000.0
@@ -95,10 +79,10 @@ figures:
       label: cyl1 fuel vapor
       axis_id: ax_mass
       visible: true
-      color: '#5500ff'
-      line_style: ':'
+      color: '#7DD3C7'
+      line_style: '-'
       marker: ''
-      line_width: 1.8
+      line_width: 1.6
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1000000.0
@@ -109,10 +93,10 @@ figures:
       label: cyl2 fuel vapor
       axis_id: ax_mass
       visible: true
-      color: '#00aa00'
-      line_style: --
+      color: '#087A6A'
+      line_style: '-'
       marker: ''
-      line_width: 1.8
+      line_width: 1.6
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1000000.0

@@ -1,21 +1,26 @@
-name: Hubvolumen
+name: Displacement volume
 style_sheet: ../plot_style_sheet.yaml
 figures:
-- title: 'Mehrparameter-Analyse: Druck, Temperatur, Volumen'
+- title: 'Multi-parameter analysis: pressure, temperature, volume'
   rows: 1
   cols: 1
   subplots:
-  - title: Hubvolumen
+  - title: Displacement volume
     x_signal: cylinder_0_theta_deg
-    x_title: Kurbelwinkel [°]
+    x_title: Crank angle [deg]
     y_axes:
     - id: v_ax
-      title: Volumen [cm³]
+      title: Volume [cm³]
       side: left
+      color: '#111111'
     series:
     - signal_key: cylinder_0_V_m3
-      label: Volumen
+      label: Volume
       axis_id: v_ax
-      color: '#2ca02c'
-      line_style: '-'
+      color: '#7DD3C7'
+      line_style: --
       scale_factor: 1.0e6
+      line_width: 1.05
+    show_title: true
+style:
+  default_line_width: 1.6
