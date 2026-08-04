@@ -716,9 +716,9 @@ def _write_free_piston_last_ut_ot_ut_pv_plot_for_cylinder(
 
 
     info_text = "\n".join([
-        f"Zugef. Energie: {_format_value(added_energy_J, 'J')}",
-        f"Wandwaermeverluste: {_format_value(wall_heat_loss_J, 'J')}{wall_heat_pct}",
-        f"Kolbenarbeit: {_format_value(piston_work_J, 'J')}{piston_work_pct}",
+        f"Fuel Energy: {_format_value(added_energy_J, 'J')}",
+        f"Wall Heat: {_format_value(wall_heat_loss_J, 'J')}{wall_heat_pct}",
+        f"Work: {_format_value(piston_work_J, 'J')}{piston_work_pct}",
 
         f"Druck Brennbeginn: {_format_value(combustion_start_pressure_bar, 'bar')}",
         f"Temperatur Brennbeginn: {_format_value(combustion_start_temperature_K, 'K')}",

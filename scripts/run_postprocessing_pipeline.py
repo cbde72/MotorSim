@@ -19,8 +19,8 @@ from render_pipeline_csv_plots import render_pipeline_csv_plots
 
 
 SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
-    "free_piston_v25": [
-        "--simulation-config", str(ROOT / "Projekte" / "variants" / "free_piston_GenSet_V25.yaml"),
+    "free_piston_v32": [
+        "--simulation-config", str(ROOT / "Projekte" / "variants" / "free_piston_GenSet_V32.yaml"),
         "--config", str(ROOT / "Projekte" / "variants" / "postprocessing.yaml"),
     ],
     "free_piston_v25_reprocessed": [
@@ -31,7 +31,7 @@ SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
 }
 
 # Nur diesen Namen umstellen, wenn du ohne echte CLI-Argumente ein anderes Setup starten willst.
-SELECTED_PRESET = "free_piston_v25"
+SELECTED_PRESET = "free_piston_v32"
 
 
 def _resolve_simulated_args(preset_name: str) -> list[str]:

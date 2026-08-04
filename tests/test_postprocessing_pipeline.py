@@ -6,12 +6,93 @@ from types import SimpleNamespace
 import numpy as np
 
 from thermo0d.core.model_bundle import PostprocessingOptions
-from thermo0d.output.pipeline import PipelinePostprocessingService, run_pipeline_from_raw_archive
+from thermo0d.output.pipeline import LastUtOtUtPipelineConfig, PipelineConfig, PipelinePostprocessingService, run_pipeline_from_raw_archive
 
 
 class _Layout:
     def state_labels(self, volume_names=None):
         return ["state_1_m", "state_2_kg"]
+
+
+def test_last_ut_ot_ut_rotary_axis_uses_mechanical_angle_and_relative_time(monkeypatch, tmp_path):
+    bundle = SimpleNamespace(
+        architecture="free_piston",
+        postprocessing=PostprocessingOptions(mode="pipeline", pipeline_config=None, outdir=None),
+        free_piston=SimpleNamespace(
+            x_state_index=0,
+            v_state_index=1,
+            kinematics_type="oscillating_rotary",
+        ),
+    )
+    service = PipelinePostprocessingService(bundle, tmp_path / "config.yaml")
+    cfg = PipelineConfig(last_ut_ot_ut=LastUtOtUtPipelineConfig(
+        enabled=True,
+        step_deg=90.0,
+        axis_min_deg=-9.0,
+        axis_max_deg=9.0,
+        axis_signal="theta_deg",
+    ))
+    t = np.arange(5, dtype=np.float64)
+    q_rad = np.deg2rad(np.array([-9.0, 0.0, 9.0, 0.0, -9.0]))
+    q_dot = np.array([0.0, 1.0, 0.0, -1.0, 0.0])
+    y = np.vstack([q_rad, q_dot])
+    columns = {
+        "t_s": t,
+        "theta_deg": np.zeros(5),
+        "value": np.arange(5, dtype=np.float64),
+    }
+    turning_point = lambda idx: SimpleNamespace(sample_index=idx)
+    monkeypatch.setattr(
+        "thermo0d.output.pipeline.find_last_ut_ot_ut_turning_points",
+        lambda *_args, **_kwargs: (turning_point(0), turning_point(2), turning_point(4)),
+    )
+
+    sampled = service._sample_last_ut_ot_ut_columns(
+        cfg,
+        keys=["t_s", "theta_deg", "value"],
+        columns=columns,
+        t=t,
+        y=y,
+    )
+
+    assert sampled is not None
+    np.testing.assert_allclose(sampled["theta_deg"], [-9.0, 0.0, 9.0, 0.0, -9.0])
+    np.testing.assert_allclose(sampled["last_cycle_time_s"], [0.0, 1.0, 2.0, 3.0, 4.0])
+
+
+def test_plot_layout_signal_keys_include_event_trigger_signals(tmp_path):
+    layout = tmp_path / "events.yaml"
+    layout.write_text(
+        """
+figures:
+- subplots:
+  - x_signal: theta_deg
+    series:
+    - signal_key: cylinder_1_hcci_ignition_delay_s
+      show_while_positive_signal: cylinder_1_hcci_accumulation_window_active_0to1
+    text_box:
+      metrics:
+      - signal_key: last_cycle_time_s
+        where_signal: exhaust_slot_1_A_geom_m2
+      - signal_key: theta_deg
+        where_signal_any:
+        - cylinder_1_combustion_active_0to1
+        - cylinder_1_added_energy_W
+""".strip(),
+        encoding="utf-8",
+    )
+
+    keys = PipelinePostprocessingService._plot_layout_signal_keys(layout)
+
+    assert {
+        "theta_deg",
+        "last_cycle_time_s",
+        "cylinder_1_hcci_ignition_delay_s",
+        "cylinder_1_hcci_accumulation_window_active_0to1",
+        "exhaust_slot_1_A_geom_m2",
+        "cylinder_1_combustion_active_0to1",
+        "cylinder_1_added_energy_W",
+    } <= keys
 
 
 def test_pipeline_writes_raw_and_filters_zero_columns(tmp_path):

@@ -11,7 +11,6 @@ if str(SRC_DIR) not in sys.path:
 from thermo0d.app.cli import main, run
 from thermo0d.app.paths import DEFAULT_PROJECT, DEFAULT_TEST_SPACE, DEFAULT_VARIANTS_DIR
 
-
 SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
     'project_default': [
         '--config', str(PROJECT_ROOT / 'Projekte' / 'config.yaml'),
@@ -23,14 +22,14 @@ SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
         '--batch-variants',
         '--continue-on-error',
     ],
-    'free_piston_v25': [
-        '--config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V32.yaml'),
+    'free_piston_v47': [
+        '--config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V53.yaml'),
         '--project', str(Path(DEFAULT_PROJECT)),
     ],
 }
 
 # Nur diesen Namen umstellen, wenn du ohne echte CLI-Argumente ein anderes Setup starten willst.
-SELECTED_PRESET = 'free_piston_v25'
+SELECTED_PRESET = 'free_piston_v47'
 
 
 

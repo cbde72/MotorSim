@@ -533,6 +533,8 @@ class AxisModel:
     title: str = ""
     side: str = "left"
     spine_offset: float = 0.0
+    label_pad: float = 4.0
+    tick_label_pad: float = 3.5
     color: str = "#1f77b4"
     visible: bool = True
     # Manual Y-axis control for the plot inspector and persisted project files.
@@ -2059,6 +2061,14 @@ class PlotStyleEditor(QMainWindow):
         self.axis_offset_spin.setRange(-2.0, 4.0)
         self.axis_offset_spin.setSingleStep(0.05)
         self.axis_offset_spin.valueChanged.connect(self.on_axis_meta_changed)
+        self.axis_label_pad_spin = CompactDoubleSpinBox()
+        self.axis_label_pad_spin.setRange(-100.0, 200.0)
+        self.axis_label_pad_spin.setSingleStep(1.0)
+        self.axis_label_pad_spin.valueChanged.connect(self.on_axis_meta_changed)
+        self.axis_tick_label_pad_spin = CompactDoubleSpinBox()
+        self.axis_tick_label_pad_spin.setRange(-100.0, 200.0)
+        self.axis_tick_label_pad_spin.setSingleStep(1.0)
+        self.axis_tick_label_pad_spin.valueChanged.connect(self.on_axis_meta_changed)
         self.axis_color_button = ColorButton("#1f77b4")
         self.axis_color_button.colorChanged.connect(self.on_axis_meta_changed)
         self.axis_visible_check = QCheckBox()
@@ -2085,6 +2095,8 @@ class PlotStyleEditor(QMainWindow):
         form.addRow("Axis title", self.axis_title_edit)
         form.addRow("Side", self.axis_side_combo)
         form.addRow("Spine offset", self.axis_offset_spin)
+        form.addRow("Axis title pad [pt]", self.axis_label_pad_spin)
+        form.addRow("Tick label pad [pt]", self.axis_tick_label_pad_spin)
         form.addRow("Color", self.axis_color_button)
         form.addRow("Visible", self.axis_visible_check)
         form.addRow("Y limits", self.axis_limit_mode_combo)
@@ -3302,6 +3314,8 @@ class PlotStyleEditor(QMainWindow):
         axis.title = self.axis_title_edit.text().strip()
         axis.side = self.axis_side_combo.currentText()
         axis.spine_offset = self.axis_offset_spin.value()
+        axis.label_pad = self.axis_label_pad_spin.value()
+        axis.tick_label_pad = self.axis_tick_label_pad_spin.value()
         axis.color = self.axis_color_button.color()
         axis.visible = self.axis_visible_check.isChecked()
         axis.limit_mode = self.axis_limit_mode_combo.currentText() or "data"
@@ -3456,6 +3470,8 @@ class PlotStyleEditor(QMainWindow):
                 self.axis_title_edit.setText("")
                 self.axis_side_combo.setCurrentText("left")
                 self.axis_offset_spin.setValue(0.0)
+                self.axis_label_pad_spin.setValue(4.0)
+                self.axis_tick_label_pad_spin.setValue(3.5)
                 self.axis_color_button.setColor("#1f77b4")
                 self.axis_visible_check.setChecked(True)
                 self.axis_limit_mode_combo.setCurrentText("data")
@@ -3469,6 +3485,8 @@ class PlotStyleEditor(QMainWindow):
                 self.axis_title_edit.setText(axis.title)
                 self.axis_side_combo.setCurrentText(axis.side)
                 self.axis_offset_spin.setValue(axis.spine_offset)
+                self.axis_label_pad_spin.setValue(getattr(axis, "label_pad", 4.0))
+                self.axis_tick_label_pad_spin.setValue(getattr(axis, "tick_label_pad", 3.5))
                 self.axis_color_button.setColor(axis.color)
                 self.axis_visible_check.setChecked(axis.visible)
                 self.axis_limit_mode_combo.setCurrentText(getattr(axis, "limit_mode", "data"))
@@ -4872,8 +4890,18 @@ class PlotStyleEditor(QMainWindow):
                     ax.yaxis.set_label_position("left")
                     ax.yaxis.tick_left()
                 right_count += 1
-            ax.set_ylabel(axis.title, color=axis.color or self.project.style.text_color, fontsize=self.project.style.axis_label_size)
-            ax.tick_params(axis="y", colors=axis.color or self.project.style.text_color, labelsize=self.project.style.tick_label_size)
+            ax.set_ylabel(
+                axis.title,
+                color=axis.color or self.project.style.text_color,
+                fontsize=self.project.style.axis_label_size,
+                labelpad=getattr(axis, "label_pad", 4.0),
+            )
+            ax.tick_params(
+                axis="y",
+                colors=axis.color or self.project.style.text_color,
+                labelsize=self.project.style.tick_label_size,
+                pad=getattr(axis, "tick_label_pad", 3.5),
+            )
             ax.spines["right" if axis.side == "right" else "left"].set_color(axis.color or self.project.style.text_color)
             axis_map[axis.id] = ax
         if not axis_map and subplot.y_axes:
