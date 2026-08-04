@@ -151,7 +151,7 @@ FIELD_META: dict[str, FieldMeta] = {
     "wall_temperature.piston.area_m2": FieldMeta("Piston area [m²]", "float", default=0.006, help_text="Gasseitige Kolbenbodenfläche.", section="submodel", visible_if=("wall_temperature.model", "cycle_average")),
 
     "combustion.model": FieldMeta("Combustion model", "choice", default="none", choices=("none", "vibe", "hcci_diesel"), help_text="Verbrennungsmodell dieses Volumens.", section="submodel"),
-    "combustion.start_mode": FieldMeta("Start mode", "choice", default="angle", choices=("angle", "compression_hub", "hign_position"), help_text="Startfenster entweder über Winkel oder über den Free-Piston-Kompressionshub angeben.", section="submodel", visible_if=("combustion.model", "vibe")),
+    "combustion.start_mode": FieldMeta("Start mode", "choice", default="angle", choices=("angle", "compression_hub", "hign_position", "expansion_distance_from_tdc"), help_text="Vibe-Start über Winkel, Kompressionshub oder gerichteten Abstand von OT.", section="submodel", visible_if=("combustion.model", "vibe")),
     "combustion.start_deg": FieldMeta("Start [deg]", "float", default=350.0, help_text="Startwinkel des Verbrennungsmodells.", section="submodel", visible_if=("combustion.model", "vibe")),
     "combustion.start_hub_m": FieldMeta("Start hub [m]", "float", default=None, help_text="Startpunkt entlang des Free-Piston-Kompressionshubs, gemessen ab BDC in Richtung TDC.", section="submodel", visible_if=("combustion.model", "vibe")),
     "combustion.hign_m": FieldMeta("Hign [m]", "float", default=None, help_text="Feste Zündposition relativ zum Zylinderkopf/TDC. SOC startet beim Erreichen dieser Distanz zur TDC.", section="submodel", visible_if=("combustion.model", "vibe")),

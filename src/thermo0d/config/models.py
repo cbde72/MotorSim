@@ -273,7 +273,7 @@ class EngineConfig(StrictBaseModel):
 
 class DisabledSubmodelConfig(StrictBaseModel):
     model: Literal["none"]
-    start_mode: Literal["angle", "compression_hub", "hign_position"] | None = None
+    start_mode: Literal["angle", "compression_hub", "hign_position", "expansion_distance_from_tdc"] | None = None
     start_deg: StrictFloat | None = None
     duration_mode: Literal["angle", "compression_hub", "time"] | None = None
     duration_deg: StrictFloat | None = None
@@ -308,7 +308,7 @@ class DisabledSubmodelConfig(StrictBaseModel):
 
 class DisabledCombustionConfig(StrictBaseModel):
     model: Literal["none"]
-    start_mode: Literal["angle", "compression_hub", "hign_position"] | None = None
+    start_mode: Literal["angle", "compression_hub", "hign_position", "expansion_distance_from_tdc"] | None = None
     start_deg: StrictFloat | None = None
     duration_mode: Literal["angle", "compression_hub", "time"] | None = None
     duration_deg: StrictFloat | None = None
@@ -414,7 +414,7 @@ class CycleAverageWallTemperatureConfig(StrictBaseModel):
 
 class VibeCombustionConfig(StrictBaseModel):
     model: Literal["vibe"]
-    start_mode: Literal["angle", "compression_hub", "hign_position"] = "angle"
+    start_mode: Literal["angle", "compression_hub", "hign_position", "expansion_distance_from_tdc"] = "angle"
     start_deg: StrictFloat | None = None
     duration_mode: Literal["angle", "compression_hub", "time"] | None = None
     duration_deg: StrictFloat | None = None
@@ -446,13 +446,15 @@ class VibeCombustionConfig(StrictBaseModel):
 
     @model_validator(mode="after")
     def validate_values(self) -> "VibeCombustionConfig":
+        has_hign_m = self.hign_m is not None
+        has_hign_mm = self.hign_mm is not None
         if self.start_mode == "angle":
             if self.start_deg is None:
                 raise ValueError("start_deg is required when start_mode = 'angle'")
             if self.start_hub_m is not None:
                 raise ValueError("start_hub_m is only allowed when start_mode = 'compression_hub'")
             if self.hign_m is not None or self.hign_mm is not None:
-                raise ValueError("hign_m/hign_mm is only allowed when start_mode = 'hign_position'")
+                raise ValueError("hign_m/hign_mm is only allowed for a position-based start mode")
         elif self.start_mode == "compression_hub":
             if self.start_hub_m is None:
                 raise ValueError("start_hub_m is required when start_mode = 'compression_hub'")
@@ -461,10 +463,8 @@ class VibeCombustionConfig(StrictBaseModel):
             if self.start_deg is not None:
                 raise ValueError("start_deg is only allowed when start_mode = 'angle'")
             if self.hign_m is not None or self.hign_mm is not None:
-                raise ValueError("hign_m/hign_mm is only allowed when start_mode = 'hign_position'")
-        else:
-            has_hign_m = self.hign_m is not None
-            has_hign_mm = self.hign_mm is not None
+                raise ValueError("hign_m/hign_mm is only allowed for a position-based start mode")
+        elif self.start_mode == "hign_position":
             if has_hign_m == has_hign_mm:
                 raise ValueError("Use exactly one of hign_m or hign_mm when start_mode = 'hign_position'")
             resolved_hign_m = float(self.hign_m) if has_hign_m else float(self.hign_mm) * 1.0e-3
@@ -474,6 +474,14 @@ class VibeCombustionConfig(StrictBaseModel):
                 raise ValueError("start_deg is only allowed when start_mode = 'angle'")
             if self.start_hub_m is not None:
                 raise ValueError("start_hub_m is only allowed when start_mode = 'compression_hub'")
+        else:
+            if has_hign_m == has_hign_mm:
+                raise ValueError("Use exactly one of hign_m or hign_mm when start_mode = 'expansion_distance_from_tdc'")
+            expansion_distance_m = float(self.hign_m) if has_hign_m else float(self.hign_mm) * 1.0e-3
+            if expansion_distance_m <= 0.0:
+                raise ValueError("hign_m/hign_mm must resolve to > 0")
+            if self.start_deg is not None or self.start_hub_m is not None:
+                raise ValueError("expansion_distance_from_tdc start mode may not be combined with start_deg or start_hub_m")
 
         resolved_duration_mode = self.duration_mode
         if resolved_duration_mode is None:
@@ -484,8 +492,8 @@ class VibeCombustionConfig(StrictBaseModel):
             else:
                 resolved_duration_mode = "angle"
 
-        if self.start_mode == "hign_position" and resolved_duration_mode != "time":
-            raise ValueError("start_mode = 'hign_position' requires duration_mode = 'time'")
+        if self.start_mode in {"hign_position", "expansion_distance_from_tdc"} and resolved_duration_mode != "time":
+            raise ValueError(f"start_mode = '{self.start_mode}' requires duration_mode = 'time'")
 
         if resolved_duration_mode == "angle":
             if self.duration_deg is None:

@@ -15,6 +15,7 @@ import imageio
 
 from thermo0d.config.constants import CombCol, ConnCol, ConnectionType, VolumeCol, VolumeType
 from thermo0d.physics.kinematics import reference_zero_deg, wrap_angle_deg
+from thermo0d.output.info_box import draw_info_box
 
 
 def _slug(text: str) -> str:
@@ -987,6 +988,16 @@ def _apply_x_axis_layout(axis, subplot: dict[str, Any], export_rows: list[dict[s
         return
     x_limit_mode = str(subplot.get('x_limit_mode', 'data') or 'data').lower()
     if x_limit_mode != 'manual':
+        if bool(subplot.get("x_start_at_zero", False)):
+            x_signal = str(subplot.get("x_signal", "t_s") or "t_s")
+            finite_x = [
+                value
+                for row in export_rows
+                if (value := _finite(row, x_signal)) is not None
+            ]
+            if finite_x:
+                x_max = max(finite_x)
+                axis.set_xlim(0.0, x_max if x_max > 0.0 else 1.0)
         return
     x_min = _safe_float(subplot.get('x_min', 0.0), 0.0)
     x_max = _safe_float(subplot.get('x_max', x_min + 1.0), x_min + 1.0)
@@ -996,6 +1007,9 @@ def _apply_x_axis_layout(axis, subplot: dict[str, Any], export_rows: list[dict[s
 
 
 def _apply_y_axis_layout(axis, y_axis: dict[str, Any]) -> None:
+    y_scale = str(y_axis.get("scale", y_axis.get("y_scale", "linear")) or "linear").strip().lower()
+    if y_scale in {"log", "logarithmic"}:
+        axis.set_yscale("log")
     limit_mode = str(y_axis.get('limit_mode', 'data') or 'data').lower()
     if limit_mode == 'manual':
         y_min = _safe_float(y_axis.get('y_min', 0.0), 0.0)
@@ -1045,8 +1059,77 @@ def _draw_horizontal_lines(base_axis, subplot: dict[str, Any], axis_map: dict[st
             ha = str(y_line.get("label_ha", "right") or "right")
             va = str(y_line.get("label_va", "bottom") or "bottom")
             transform = mtransforms.blended_transform_factory(target_axis.transAxes, target_axis.transData)
-            target_axis.text(x_pos, y_value, label, transform=transform, ha=ha, va=va, fontsize=fontsize, color=color,
-                             bbox={"facecolor": facecolor, "edgecolor": edgecolor, "alpha": bg_alpha, "pad": 0.6})
+        target_axis.text(x_pos, y_value, label, transform=transform, ha=ha, va=va, fontsize=fontsize, color=color,
+                         bbox={"facecolor": facecolor, "edgecolor": edgecolor, "alpha": bg_alpha, "pad": 0.6})
+
+
+def _draw_vertical_lines(base_axis, subplot: dict[str, Any]) -> None:
+    x_lines = subplot.get("x_lines") if isinstance(subplot.get("x_lines"), list) else []
+    for x_line in x_lines:
+        if not bool(x_line.get("visible", True)):
+            continue
+        try:
+            x_value = float(x_line.get("x", 0.0))
+        except Exception:
+            continue
+        color = str(x_line.get("color", "#667085") or "#667085")
+        line_style = str(x_line.get("line_style", "--") or "--")
+        line_width = float(x_line.get("line_width", 1.0) or 1.0)
+        alpha = max(0.0, min(1.0, float(x_line.get("alpha", 0.9) or 0.9)))
+        base_axis.axvline(x=x_value, color=color, linestyle=line_style, linewidth=line_width, alpha=alpha, zorder=0)
+        label = str(x_line.get("label", "") or "").strip()
+        if label and bool(x_line.get("show_label", True)):
+            y_pos = max(0.0, min(1.0, float(x_line.get("label_y", 0.99) or 0.99)))
+            fontsize = float(x_line.get("label_font_size", 8.0) or 8.0)
+            facecolor = str(x_line.get("label_bg_color", "#ffffff") or "#ffffff")
+            edgecolor = str(x_line.get("label_border_color", "none") or "none")
+            bg_alpha = max(0.0, min(1.0, float(x_line.get("label_bg_alpha", min(1.0, alpha * 0.85)) or min(1.0, alpha * 0.85))))
+            ha = str(x_line.get("label_ha", "left") or "left")
+            va = str(x_line.get("label_va", "top") or "top")
+            rotation = float(x_line.get("label_rotation", 90.0) or 90.0)
+            transform = mtransforms.blended_transform_factory(base_axis.transData, base_axis.transAxes)
+            base_axis.text(x_value, y_pos, label, rotation=rotation, transform=transform, ha=ha, va=va, fontsize=fontsize, color=color,
+                           bbox={"facecolor": facecolor, "edgecolor": edgecolor, "alpha": bg_alpha, "pad": 0.6})
+
+
+def _draw_point_markers(base_axis, subplot: dict[str, Any], axis_map: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+    """Draw a single data marker at the first row matching an event condition."""
+    markers = subplot.get("point_markers") if isinstance(subplot.get("point_markers"), list) else []
+    x_key = str(subplot.get("x_signal", "t_s") or "t_s")
+    for marker in markers:
+        if not isinstance(marker, dict) or not bool(marker.get("visible", True)):
+            continue
+        raw_where_keys = marker.get("where_signal_any")
+        where_keys = (
+            [str(value).strip() for value in raw_where_keys if str(value).strip()]
+            if isinstance(raw_where_keys, list)
+            else [str(marker.get("where_signal", "") or "").strip()]
+        )
+        threshold_raw = marker.get("where_gte", marker.get("where_ge"))
+        threshold = _safe_float(threshold_raw, 0.0) if threshold_raw is not None else None
+        matched_row = None
+        for row in rows:
+            values = [_finite(row, key) for key in where_keys if key]
+            if any(value is not None and (value >= threshold if threshold is not None else value > _safe_float(marker.get("where_gt", 0.0), 0.0)) for value in values):
+                matched_row = row
+                break
+        if matched_row is None:
+            continue
+        x_value = _finite(matched_row, str(marker.get("x_signal", x_key) or x_key))
+        y_value = _finite(matched_row, str(marker.get("signal_key", "") or ""))
+        if x_value is None or y_value is None:
+            continue
+        y_value = y_value * _safe_float(marker.get("scale_factor", 1.0), 1.0) + _safe_float(marker.get("offset", 0.0), 0.0)
+        target_axis = axis_map.get(str(marker.get("axis_id", "")), base_axis)
+        target_axis.plot(
+            [x_value], [y_value], linestyle="none",
+            marker=str(marker.get("marker", "o") or "o"),
+            markersize=_safe_float(marker.get("marker_size", 7.0), 7.0),
+            markerfacecolor=str(marker.get("facecolor", marker.get("color", "#ffffff")) or "#ffffff"),
+            markeredgecolor=str(marker.get("edgecolor", marker.get("color", "#111111")) or "#111111"),
+            markeredgewidth=_safe_float(marker.get("edge_width", 1.5), 1.5),
+            zorder=_safe_float(marker.get("zorder", 6.0), 6.0),
+        )
 
 
 def _draw_events(base_axis, subplot: dict[str, Any], y_axes_count: int) -> None:
@@ -1080,7 +1163,7 @@ def _draw_events(base_axis, subplot: dict[str, Any], y_axes_count: int) -> None:
                            bbox={"facecolor": facecolor, "edgecolor": edgecolor, "alpha": bg_alpha, "pad": 0.6})
 
 
-def render_plot_project(export_rows: list[dict[str, Any]], plot_path: str | Path, output_dir: str | Path | None = None, prefix: str = "", run_config_path: str | Path | None = None) -> list[str]:
+def render_plot_project(export_rows: list[dict[str, Any]], plot_path: str | Path, output_dir: str | Path | None = None, prefix: str = "", run_config_path: str | Path | None = None, source_csv_path: str | Path | None = None) -> list[str]:
     if not export_rows:
         return []
     run_config_text = ""
@@ -1091,7 +1174,8 @@ def render_plot_project(export_rows: list[dict[str, Any]], plot_path: str | Path
             run_config_text = f"Config: {run_config_path}"
     plot_path = Path(plot_path).resolve()
     plot_config_text = f"Plot: {plot_path.name}"
-    footer_text = "\n".join(part for part in (run_config_text, plot_config_text) if part)
+    csv_text = f"CSV: {Path(source_csv_path).name}" if source_csv_path is not None else ""
+    footer_text = "\n".join(part for part in (run_config_text, plot_config_text, csv_text) if part)
     data = yaml.safe_load(plot_path.read_text(encoding="utf-8")) or {}
     style = _normalized_style_dict(data, plot_path)
     figures = data.get("figures") if isinstance(data.get("figures"), list) else []
@@ -1146,17 +1230,36 @@ def render_plot_project(export_rows: list[dict[str, Any]], plot_path: str | Path
             base_axis = axis
             for y_axis_index, y_axis in enumerate(y_axes):
                 axis_id = str(y_axis.get("id", f"y{y_axis_index}"))
+                side = str(y_axis.get("side", "left" if y_axis_index == 0 else "right") or "right").lower()
+                spine_offset = _safe_float(y_axis.get("spine_offset", 0.0), 0.0)
                 if y_axis_index == 0:
                     target_axis = base_axis
+                    if side == "right":
+                        target_axis.yaxis.set_label_position("right")
+                        target_axis.yaxis.tick_right()
+                        target_axis.spines["right"].set_position(("axes", 1.0 + spine_offset))
+                        target_axis.spines["left"].set_visible(False)
+                    elif abs(spine_offset) > 1.0e-15:
+                        target_axis.spines["left"].set_position(("axes", -spine_offset))
                 else:
                     target_axis = base_axis.twinx()
-                    if y_axis_index > 1:
-                        target_axis.spines["right"].set_position(("outward", 60 * (y_axis_index - 1)))
-                target_axis.set_ylabel(str(y_axis.get("title", "")))
+                    if side == "left":
+                        target_axis.spines["left"].set_position(("axes", -spine_offset))
+                        target_axis.spines["left"].set_visible(True)
+                        target_axis.spines["right"].set_visible(False)
+                        target_axis.yaxis.set_label_position("left")
+                        target_axis.yaxis.tick_left()
+                    else:
+                        target_axis.spines["right"].set_position(("axes", 1.0 + spine_offset))
+                color = str(y_axis.get("color", "#111111") or "#111111")
+                target_axis.set_ylabel(str(y_axis.get("title", "")), color=color, labelpad=_safe_float(y_axis.get("label_pad", 4.0), 4.0))
+                target_axis.tick_params(axis="y", colors=color, pad=_safe_float(y_axis.get("tick_label_pad", 3.5), 3.5))
+                target_axis.spines["right" if side == "right" else "left"].set_color(color)
                 axis_map[axis_id] = target_axis
             base_axis.set_xlabel(str(subplot.get("x_title", x_signal)), fontsize=float(style.get("axis_label_size", 8.0) or 8.0))
             _apply_x_axis_layout(base_axis, subplot, export_rows, style=style)
             _draw_horizontal_lines(base_axis, subplot, axis_map, y_axes)
+            _draw_vertical_lines(base_axis, subplot)
             _draw_events(base_axis, subplot, len(y_axes))
             legend_handles = []
             legend_labels = []
@@ -1176,6 +1279,14 @@ def render_plot_project(export_rows: list[dict[str, Any]], plot_path: str | Path
                     str(series.get("hide_before_positive_signal", "") or ""),
                     _safe_float(series.get("hide_threshold", 0.0), 0.0),
                 )
+                active_signal = str(series.get("show_while_positive_signal", "") or "").strip()
+                if active_signal:
+                    active_values = _series_values(export_rows, active_signal, 1.0, 0.0)
+                    active_threshold = _safe_float(series.get("active_threshold", 0.0), 0.0)
+                    y_values = [
+                        value if active is not None and active > active_threshold else None
+                        for value, active in zip(y_values, active_values)
+                    ]
                 xs, ys = _align_xy(x_values, y_values)
                 if not xs:
                     continue
@@ -1197,7 +1308,8 @@ def render_plot_project(export_rows: list[dict[str, Any]], plot_path: str | Path
                     loc=str(style.get("legend_position", "best") or "best"),
                     fontsize=float(style.get("tick_label_size", 8.0) or 8.0),
                 )
-            _draw_text_box(base_axis, subplot, export_rows, plot_path, out_dir)
+            _draw_point_markers(base_axis, subplot, axis_map, export_rows)
+            draw_info_box(base_axis, subplot, export_rows, plot_path, out_dir)
             for y_axis in y_axes:
                 axis_id = str(y_axis.get("id", ""))
                 target_axis = axis_map.get(axis_id)
@@ -1224,6 +1336,7 @@ def render_plot_project_with_frame_export(
     output_dir: str | Path | None = None,
     prefix: str = "",
     run_config_path: str | Path | None = None,
+    source_csv_path: str | Path | None = None,
     export_frames: bool = False,
     frame_step: int = 10,
     export_video: bool = False,
@@ -1254,7 +1367,8 @@ def render_plot_project_with_frame_export(
 
     plot_path = Path(plot_path).resolve()
     plot_config_text = f"Plot: {plot_path.name}"
-    footer_text = "\n".join(part for part in (run_config_text, plot_config_text) if part)
+    csv_text = f"CSV: {Path(source_csv_path).name}" if source_csv_path is not None else ""
+    footer_text = "\n".join(part for part in (run_config_text, plot_config_text, csv_text) if part)
     data = yaml.safe_load(plot_path.read_text(encoding="utf-8")) or {}
     style = _normalized_style_dict(data, plot_path)
     figures = data.get("figures") if isinstance(data.get("figures"), list) else []
@@ -1313,17 +1427,36 @@ def render_plot_project_with_frame_export(
             base_axis = axis
             for y_axis_index, y_axis in enumerate(y_axes):
                 axis_id = str(y_axis.get("id", f"y{y_axis_index}"))
+                side = str(y_axis.get("side", "left" if y_axis_index == 0 else "right") or "right").lower()
+                spine_offset = _safe_float(y_axis.get("spine_offset", 0.0), 0.0)
                 if y_axis_index == 0:
                     target_axis = base_axis
+                    if side == "right":
+                        target_axis.yaxis.set_label_position("right")
+                        target_axis.yaxis.tick_right()
+                        target_axis.spines["right"].set_position(("axes", 1.0 + spine_offset))
+                        target_axis.spines["left"].set_visible(False)
+                    elif abs(spine_offset) > 1.0e-15:
+                        target_axis.spines["left"].set_position(("axes", -spine_offset))
                 else:
                     target_axis = base_axis.twinx()
-                    if y_axis_index > 1:
-                        target_axis.spines["right"].set_position(("outward", 60 * (y_axis_index - 1)))
-                target_axis.set_ylabel(str(y_axis.get("title", "")))
+                    if side == "left":
+                        target_axis.spines["left"].set_position(("axes", -spine_offset))
+                        target_axis.spines["left"].set_visible(True)
+                        target_axis.spines["right"].set_visible(False)
+                        target_axis.yaxis.set_label_position("left")
+                        target_axis.yaxis.tick_left()
+                    else:
+                        target_axis.spines["right"].set_position(("axes", 1.0 + spine_offset))
+                color = str(y_axis.get("color", "#111111") or "#111111")
+                target_axis.set_ylabel(str(y_axis.get("title", "")), color=color, labelpad=_safe_float(y_axis.get("label_pad", 4.0), 4.0))
+                target_axis.tick_params(axis="y", colors=color, pad=_safe_float(y_axis.get("tick_label_pad", 3.5), 3.5))
+                target_axis.spines["right" if side == "right" else "left"].set_color(color)
                 axis_map[axis_id] = target_axis
             base_axis.set_xlabel(str(subplot.get("x_title", x_signal)), fontsize=float(style.get("axis_label_size", 8.0) or 8.0))
             _apply_x_axis_layout(base_axis, subplot, export_rows, style=style)
             _draw_horizontal_lines(base_axis, subplot, axis_map, y_axes)
+            _draw_vertical_lines(base_axis, subplot)
             _draw_events(base_axis, subplot, len(y_axes))
             legend_handles = []
             legend_labels = []
@@ -1337,6 +1470,14 @@ def render_plot_project_with_frame_export(
                     float(series.get("scale_factor", 1.0) or 1.0),
                     float(series.get("offset", 0.0) or 0.0),
                 )
+                active_signal = str(series.get("show_while_positive_signal", "") or "").strip()
+                if active_signal:
+                    active_values = _series_values(export_rows, active_signal, 1.0, 0.0)
+                    active_threshold = _safe_float(series.get("active_threshold", 0.0), 0.0)
+                    y_values = [
+                        value if active is not None and active > active_threshold else None
+                        for value, active in zip(y_values, active_values)
+                    ]
                 xs, ys = _align_xy(x_values, y_values)
                 if not xs:
                     continue
@@ -1358,7 +1499,8 @@ def render_plot_project_with_frame_export(
                     loc=str(style.get("legend_position", "best") or "best"),
                     fontsize=float(style.get("tick_label_size", 8.0) or 8.0),
                 )
-            _draw_text_box(base_axis, subplot, export_rows, plot_path, out_dir)
+            _draw_point_markers(base_axis, subplot, axis_map, export_rows)
+            draw_info_box(base_axis, subplot, export_rows, plot_path, out_dir)
             for y_axis in y_axes:
                 axis_id = str(y_axis.get("id", ""))
                 target_axis = axis_map.get(axis_id)
@@ -1368,7 +1510,7 @@ def render_plot_project_with_frame_export(
         if bool(style.get("figure_title_visible", True)):
             mpl_fig.suptitle(title, fontsize=float(style.get("figure_title_size", 10.0) or 10.0))
         if footer_text:
-            mpl_fig.text(0.995, 0.006, footer_text, ha="right", va="bottom", fontsize=6, color="#666666", alpha=0.9)
+            mpl_fig.text(0.995, 0.006, footer_text, ha="right", va="bottom", fontsize=2, color="#666666", alpha=0.9)
         if bool(style.get("tight_layout", True)):
             mpl_fig.tight_layout(rect=(0.0, 0.02, 1.0, 1.0))
         stem = f"{prefix}__{_slug(title)}" if prefix else _slug(title)

@@ -243,7 +243,11 @@ signals:
   - compressor_1_share_fuel_liquid_0to1
   - compressor_1_share_fuel_vapor_0to1
   - compressor_1_piston_x_m
+  - compressor_1_piston_distance_from_tdc_m
   - compressor_1_piston_v_m_per_s
+  - compressor_2_piston_x_m
+  - compressor_2_piston_distance_from_tdc_m
+  - compressor_2_piston_v_m_per_s
   - receiver_1_m_air_kg
   - receiver_1_m_fuel_liquid_kg
   - receiver_1_m_fuel_vapor_kg

@@ -387,6 +387,22 @@ def _update_free_piston_initial_conditions(lines: list[str], sample: RestartStat
     if combustion_state_block is not None:
         cylinder_mass = sample.columns.get("cylinder_m_kg")
         cylinder_burned_mass = sample.columns.get("cylinder_m_burned_kg")
+        if cylinder_mass is None or cylinder_burned_mass is None:
+            # Multi-cylinder reconstruction has no ambiguous generic alias.
+            # Use the first configured/named working cylinder as the legacy
+            # global combustion_state compatibility value.  Each real cylinder
+            # is restarted from its own preprocessing.volumes composition.
+            cylinder_names = sorted(
+                key[:-len("_m_kg")]
+                for key in sample.columns
+                if key.startswith("cylinder_")
+                and key.endswith("_m_kg")
+                and f'{key[:-len("_m_kg")]}_m_burned_kg' in sample.columns
+            )
+            if cylinder_names:
+                primary = cylinder_names[0]
+                cylinder_mass = sample.columns.get(f"{primary}_m_kg")
+                cylinder_burned_mass = sample.columns.get(f"{primary}_m_burned_kg")
         if cylinder_mass is not None and cylinder_burned_mass is not None and cylinder_mass > 1.0e-18:
             burned_fraction = max(0.0, min(1.0, float(cylinder_burned_mass) / float(cylinder_mass)))
             if _replace_scalar_in_block(lines, combustion_state_block, "burned_fraction_0to1", burned_fraction, allow_insert=True):

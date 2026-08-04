@@ -520,7 +520,8 @@
         <h3>4.3 Zeitbasierter Verlauf</h3>
         <p>
           Bei <code>duration_mode: time</code> wird nach einem getriggerten SOC ein zeitbasierter Vibe-Verlauf
-          gestartet. Das ist der Pfad für <code>hign_position</code> und auch für HCCI nach Autozündung.
+          gestartet. Das ist der Pfad für <code>hign_position</code>,
+          <code>expansion_distance_from_tdc</code> und auch für HCCI nach Autozündung.
         </p>
         <math display="block">
           <mrow>
@@ -654,8 +655,48 @@
               <td><code>hign_m</code> oder <code>hign_mm</code></td>
               <td>Der Zylinder wird auf dem Weg zum TDC gezündet, sobald die Distanz zum TDC kleiner oder gleich <code>hign</code> ist. Dieses Startmodell verlangt <code>duration_mode: time</code>.</td>
             </tr>
+            <tr>
+              <td><code>expansion_distance_from_tdc</code></td>
+              <td><code>hign_m</code> oder <code>hign_mm</code></td>
+              <td>OT-nahe Scharfschaltung im Verdichtungshub; Zündung ausschließlich beim Auswärtsqueren des Abstands auf dem Expansionshub. Dieser Modus verlangt <code>duration_mode: time</code>.</td>
+            </tr>
           </tbody>
         </table>
+        <h3>6.1 Gerichteter Start nach OT</h3>
+        <p>Der geometrische Abstand von OT wird unabhängig vom Vorzeichen der globalen Mechanikkoordinate berechnet:</p>
+        <math display="block"><mrow>
+          <mi>d</mi><msub><mi></mi><mi>TDC</mi></msub><mo>=</mo>
+          <mrow><mo>|</mo><mi>x</mi><mo>-</mo><mi>x</mi><msub><mi></mi><mi>TDC</mi></msub><mo>|</mo></mrow>
+        </mrow></math>
+        <p>Scharfschaltung und Trigger sind getrennt:</p>
+        <math display="block"><mrow>
+          <mi>armed</mi><mo>&#x2190;</mo><mi>compression</mi><mo>&#x2227;</mo>
+          <mi>d</mi><msub><mi></mi><mi>TDC</mi></msub><mo>&#x2264;</mo><mi>d</mi><msub><mi></mi><mi>SOC</mi></msub>
+        </mrow></math>
+        <math display="block"><mrow>
+          <mi>trigger</mi><mo>=</mo><mi>armed</mi><mo>&#x2227;</mo><mi>expansion</mi><mo>&#x2227;</mo>
+          <mi>d</mi><msub><mi></mi><mi>TDC</mi></msub><mo>&#x2265;</mo><mi>d</mi><msub><mi></mi><mi>SOC</mi></msub>
+        </mrow></math>
+        <p>
+          Dieselbe Position vor OT kann somit nicht auslösen. Nach dem Trigger wird <code>armed</code>
+          gelöscht. Eine neue Zündung erfordert eine erneute OT-Annäherung. Ausgelöst wird am ersten
+          Simulationssample hinter der Schwelle; die Zeitschrittweite bestimmt daher die Positionsauflösung.
+        </p>
+        <pre><code>combustion:
+  vibe_expansion_start:
+    model: vibe
+    start_mode: expansion_distance_from_tdc
+    hign_mm: 5.0
+    duration_mode: time
+    duration_ms: 12.0
+    a: 6.9
+    m: 2.0
+    fueling_mode: fixed_energy
+    added_energy_per_cycle_J: 500.0</code></pre>
+        <div class="note">
+          Genau eines der beiden Distanzfelder ist zulässig. Die Distanz muss größer als 0 und höchstens so groß wie der nominale
+          Freikolbenhub liegen. <code>angle_reference</code> hat für diesen Startmodus keine Wirkung.
+        </div>
       </section>
 
       <section id="hcci">
@@ -1204,10 +1245,10 @@
           </thead>
           <tbody>
             <tr><td><code>model</code></td><td><code>vibe</code></td><td>ja</td><td>Wählt das Vibe-Modell.</td></tr>
-            <tr><td><code>start_mode</code></td><td><code>angle</code></td><td>nein</td><td><code>angle</code>, <code>compression_hub</code> oder <code>hign_position</code>.</td></tr>
+            <tr><td><code>start_mode</code></td><td><code>angle</code></td><td>nein</td><td><code>angle</code>, <code>compression_hub</code>, <code>hign_position</code> oder <code>expansion_distance_from_tdc</code>.</td></tr>
             <tr><td><code>start_deg</code></td><td>-</td><td>bei <code>angle</code></td><td>Startwinkel in Grad im gewählten Referenzsystem.</td></tr>
             <tr><td><code>start_hub_m</code></td><td>-</td><td>bei <code>compression_hub</code></td><td>Startposition bezogen auf Verdichtungshub.</td></tr>
-            <tr><td><code>hign_m</code>, <code>hign_mm</code></td><td>-</td><td>bei <code>hign_position</code></td><td>Zündabstand vor TDC. Genau eines der beiden Felder ist erlaubt.</td></tr>
+            <tr><td><code>hign_m</code>, <code>hign_mm</code></td><td>-</td><td>bei <code>hign_position</code> oder <code>expansion_distance_from_tdc</code></td><td>Kolbenabstand von OT. <code>start_mode</code> legt fest, ob der Schwellwert im Verdichtungs- oder Expansionshub gilt; genau eines der beiden Einheitenfelder ist erlaubt. Beide Modi erfordern <code>duration_mode: time</code>.</td></tr>
             <tr><td><code>duration_mode</code></td><td>automatisch</td><td>nein</td><td>Wird aus den gesetzten Dauerfeldern abgeleitet, falls nicht explizit gesetzt.</td></tr>
             <tr><td><code>duration_deg</code></td><td>-</td><td>bei Winkeldauer</td><td>Brenndauer in Grad Kurbel-/Zykluswinkel.</td></tr>
             <tr><td><code>duration_hub_m</code></td><td>-</td><td>bei Hubdauer</td><td>Brenndauer als Hubstrecke.</td></tr>

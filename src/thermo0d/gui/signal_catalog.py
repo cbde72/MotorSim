@@ -54,6 +54,12 @@ _CYLINDER_EXTRA_SPECS: list[tuple[str, str, str, str, str]] = [
     ("indicated_power_W", "W", "P_i", "cycle_integral", "Innere Leistung"),
 ]
 
+_FREE_PISTON_LOCAL_KINEMATICS_SPECS: list[tuple[str, str, str, str, str]] = [
+    ("piston_x_m", "m", "x", "free_piston_local_kinematics", "Kolbenposition"),
+    ("piston_distance_from_tdc_m", "m", "s", "free_piston_local_kinematics", "Hub ab OT"),
+    ("piston_v_m_per_s", "m/s", "v", "free_piston_local_kinematics", "Kolbengeschwindigkeit"),
+]
+
 _CONNECTION_SPECS: list[tuple[str, str, str, str, str]] = [
     ("valve_lift_m", "m", "h_valve", "connection_geometry", "Ventilhub"),
     ("slot_height_m", "m", "h_slot", "connection_geometry", "Slot-Höhe"),
@@ -205,6 +211,12 @@ def _build_signal_entries(volume_defs: list[tuple[str, str]], connection_defs: l
     for name, vol_type in volume_defs:
         for suffix, unit, short_name, source, default_name in _VOLUME_BASE_SPECS:
             entries.append(_signal_entry(f"{name}_{suffix}", unit, short_name, source, f"{name}: {default_name}", "volumes", "state", "state"))
+        if has_free_piston and vol_type in {"cylinder", "bounce_chamber"}:
+            for suffix, unit, short_name, source, default_name in _FREE_PISTON_LOCAL_KINEMATICS_SPECS:
+                entries.append(_signal_entry(
+                    f"{name}_{suffix}", unit, short_name, source,
+                    f"{name}: {default_name}", "free_piston", "mechanics", "state",
+                ))
         if vol_type == "cylinder":
             for suffix, unit, short_name, source, default_name in _CYLINDER_EXTRA_SPECS:
                 entries.append(_signal_entry(

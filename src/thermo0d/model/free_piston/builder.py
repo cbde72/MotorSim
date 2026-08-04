@@ -188,6 +188,19 @@ def _validate_ignition_ref(builder, ref_name: str):
 
 
 def _initial_cylinder_burned_fraction_0to1(fp, cylinder_vol: CylinderVolumeConfig | None = None) -> float:
+    # Named cylinder volumes own their thermodynamic composition.  The global
+    # free-piston combustion_state is retained only for the legacy synthetic
+    # cylinder path; applying it to every named cylinder destroys asymmetric
+    # restart states (for example cylinder_1 != cylinder_2).
+    if cylinder_vol is not None:
+        if hasattr(cylinder_vol, "resolved_initial_burned_fraction_0to1"):
+            value = float(cylinder_vol.resolved_initial_burned_fraction_0to1)
+        elif getattr(cylinder_vol, "initial_burned_mass_percent", None) is not None:
+            value = float(cylinder_vol.initial_burned_mass_percent) / 100.0
+        else:
+            value = float(getattr(cylinder_vol, "initial_burned_fraction_0to1", 0.0) or 0.0)
+        return min(max(value, 0.0), 1.0)
+
     combustion_state = getattr(getattr(fp, "initial_conditions", None), "combustion_state", None)
     if combustion_state is not None:
         if hasattr(combustion_state, "resolved_burned_fraction_0to1"):
@@ -196,15 +209,7 @@ def _initial_cylinder_burned_fraction_0to1(fp, cylinder_vol: CylinderVolumeConfi
             value = float(getattr(combustion_state, "burned_fraction_0to1", 0.0) or 0.0)
         if getattr(combustion_state, "burned_mass_percent", None) is not None or abs(value) > 1.0e-15 or cylinder_vol is None:
             return min(max(value, 0.0), 1.0)
-    if cylinder_vol is None:
-        return 0.0
-    if hasattr(cylinder_vol, "resolved_initial_burned_fraction_0to1"):
-        value = float(cylinder_vol.resolved_initial_burned_fraction_0to1)
-    elif getattr(cylinder_vol, "initial_burned_mass_percent", None) is not None:
-        value = float(cylinder_vol.initial_burned_mass_percent) / 100.0
-    else:
-        value = float(getattr(cylinder_vol, "initial_burned_fraction_0to1", 0.0) or 0.0)
-    return min(max(value, 0.0), 1.0)
+    return 0.0
 
 
 def _wall_temperature_zones(cfg: CycleAverageWallTemperatureConfig):
@@ -629,6 +634,15 @@ def _resolve_combustion_timing_for_free_piston(combustion_cfg, nominal_stroke_m:
             raise ValueError('hign_m/hign_mm must be <= free-piston nominal stroke')
         ref_type = AngleReference.COMPRESSION_TDC
         start_mode_enum = CombStartMode.HIGN_POSITION
+    elif start_mode == 'expansion_distance_from_tdc':
+        has_m = getattr(combustion_cfg, 'hign_m', None) is not None
+        start_value = float(combustion_cfg.hign_m) if has_m else float(combustion_cfg.hign_mm) * 1.0e-3
+        if start_value <= 0.0:
+            raise ValueError('hign_m/hign_mm must resolve to > 0')
+        if nominal_stroke_m > 1.0e-18 and start_value > nominal_stroke_m + 1.0e-12:
+            raise ValueError('hign_m/hign_mm must be <= free-piston nominal stroke')
+        ref_type = AngleReference.COMPRESSION_TDC
+        start_mode_enum = CombStartMode.EXPANSION_DISTANCE_FROM_TDC
     else:
         start_value = float(combustion_cfg.start_deg)
         start_mode_enum = CombStartMode.ANGLE

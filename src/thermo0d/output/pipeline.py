@@ -15,6 +15,7 @@ from thermo0d.app.paths import PathManager
 from thermo0d.model.free_piston.cycle_metrics import count_ut_ot_ut_cycles, find_last_ut_ot_ut_turning_points
 from thermo0d.output.console import ConsoleArtifactReporter, ConsoleProgressReporter, ConsoleTimingReporter
 from thermo0d.output.geometry_report import write_geometry_readme
+from thermo0d.output.info_box import required_info_box_signal_keys
 from thermo0d.output.plot_layout import ensure_default_plot10_yaml, ensure_default_plot_yaml, render_plot_project
 from thermo0d.output.reconstruction import SignalReconstructionService
 
@@ -893,6 +894,9 @@ class PipelinePostprocessingService:
                     key = str(item.get("signal_key", "") or "").strip()
                     if key:
                         keys.add(key)
+                    active_key = str(item.get("show_while_positive_signal", "") or "").strip()
+                    if active_key:
+                        keys.add(active_key)
                 for box_name in ("text_box", "info_box"):
                     box = subplot.get(box_name)
                     if not isinstance(box, dict):
@@ -905,11 +909,29 @@ class PipelinePostprocessingService:
                             key = str(metric.get(field, "") or "").strip()
                             if key:
                                 keys.add(key)
+                        where_key = str(metric.get("where_signal", "") or "").strip()
+                        if where_key:
+                            keys.add(where_key)
+                        where_keys = metric.get("where_signal_any")
+                        if isinstance(where_keys, list):
+                            keys.update(str(item).strip() for item in where_keys if str(item).strip())
                         if str(metric.get("kind", "") or "").lower().strip() == "imep":
                             cylinder = str(metric.get("cylinder", "") or "").strip()
                             if cylinder:
                                 keys.add(f"{cylinder}_p_Pa")
                                 keys.add(f"{cylinder}_V_m3")
+                point_markers = subplot.get("point_markers") if isinstance(subplot.get("point_markers"), list) else []
+                for marker in point_markers:
+                    if not isinstance(marker, dict):
+                        continue
+                    for field in ("signal_key", "x_signal", "where_signal"):
+                        key = str(marker.get(field, "") or "").strip()
+                        if key:
+                            keys.add(key)
+                    where_keys = marker.get("where_signal_any")
+                    if isinstance(where_keys, list):
+                        keys.update(str(item).strip() for item in where_keys if str(item).strip())
+                keys.update(required_info_box_signal_keys(subplot))
         return keys
 
     @staticmethod
@@ -1271,7 +1293,14 @@ class PipelinePostprocessingService:
         if theta_targets.size == 0:
             return None
         sample_t = np.interp(theta_targets, theta_unique, t_seg[unique_idx])
-        axis_values = axis_min_deg + (axis_max_deg - axis_min_deg) * (theta_targets / 360.0)
+        if str(getattr(fp, "kinematics_type", "linear") or "linear") == "oscillating_rotary":
+            # For rotary machines the generalized position state is the actual
+            # mechanical angle q [rad].  Keep theta_targets only as the uniform
+            # UT-OT-UT sampling coordinate; the exported/plotted angle must
+            # follow the real outward and return motion.
+            axis_values = np.rad2deg(np.interp(sample_t, t_arr, x_arr))
+        else:
+            axis_values = axis_min_deg + (axis_max_deg - axis_min_deg) * (theta_targets / 360.0)
         return sample_t, axis_values
 
     def _sample_last_ut_ot_ut_columns(
@@ -1301,6 +1330,7 @@ class PipelinePostprocessingService:
                 sampled_columns[key] = np.rint(np.interp(sample_t, t_source, np.asarray(values, dtype=np.float64))).astype(np.int64)
                 continue
             sampled_columns[key] = np.interp(sample_t, t_source, np.asarray(values, dtype=np.float64))
+        sampled_columns["last_cycle_time_s"] = sample_t - float(sample_t[0])
         return sampled_columns
 
     def _write_last_ut_ot_ut_csv(
@@ -1320,7 +1350,19 @@ class PipelinePostprocessingService:
         if sampled_columns is None:
             ConsoleArtifactReporter.print_status("pipeline:csv:last-ut-ot-ut", "warn", reason="no-full-ut-ot-ut-cycle")
             return None
-        return self._write_csv(self._last_ut_ot_ut_output_path(cfg, csv_path), keys, sampled_columns, specs, cfg)
+        export_keys = list(keys)
+        insert_at = export_keys.index("t_s") + 1 if "t_s" in export_keys else 0
+        export_keys.insert(insert_at, "last_cycle_time_s")
+        export_specs = dict(specs)
+        export_specs["last_cycle_time_s"] = SignalSpec(
+            "last_cycle_time_s",
+            "s",
+            SIGNAL_RECONSTRUCTED,
+            "time",
+            "last_cycle_time",
+            "last_ut_ot_ut",
+        )
+        return self._write_csv(self._last_ut_ot_ut_output_path(cfg, csv_path), export_keys, sampled_columns, export_specs, cfg)
 
     def _render_plots(
         self,
@@ -1331,6 +1373,8 @@ class PipelinePostprocessingService:
         specs: dict[str, SignalSpec],
         t: np.ndarray,
         y: np.ndarray,
+        csv_path: str | None = None,
+        last_ut_ot_ut_csv_path: str | None = None,
     ) -> tuple[list[str], list[str]]:
         del specs
         if not layout_entries:
@@ -1342,16 +1386,18 @@ class PipelinePostprocessingService:
                 ConsoleArtifactReporter.print_status(layout_path.name, "warn", elapsed_s=0.0, reason="layout-missing")
                 continue
             layout_keys = self._plot_layout_signal_keys(layout_path)
-            row_keys = ["t_s", "cycle_index", "theta_deg", "theta_local_deg"]
+            row_keys = ["t_s", "last_cycle_time_s", "cycle_index", "theta_deg", "theta_local_deg"]
             row_keys.extend(sorted(key for key in layout_keys if key not in row_keys))
             window = str(entry.window or "all").strip().lower()
             plot_columns = columns
+            source_csv_path = csv_path
             if window in {"last_ut_ot_ut", "last-complete-cycle", "last_complete_cycle"}:
                 sampled = self._sample_last_ut_ot_ut_columns(cfg, keys=row_keys, columns=columns, t=t, y=y)
                 if sampled is None:
                     ConsoleArtifactReporter.print_status(layout_path.name, "warn", elapsed_s=0.0, reason="no-full-ut-ot-ut-cycle")
                     continue
                 plot_columns = sampled
+                source_csv_path = last_ut_ot_ut_csv_path or csv_path
             output_dir = self._plot_output_dir(cfg, window=window)
             rows = self._columns_to_rows(row_keys, plot_columns)
             if not rows:
@@ -1364,7 +1410,7 @@ class PipelinePostprocessingService:
             prefix = "__".join(prefix_parts)
             ConsoleProgressReporter.print(f"Pipeline Plot: rendere {layout_path.name}")
             started = perf_counter()
-            rendered_paths = render_plot_project(rows, layout_path, output_dir=output_dir, prefix=prefix, run_config_path=self.config_path)
+            rendered_paths = render_plot_project(rows, layout_path, output_dir=output_dir, prefix=prefix, run_config_path=self.config_path, source_csv_path=source_csv_path)
             elapsed = perf_counter() - started
             generated.extend(rendered_paths)
             used_layouts.append(str(layout_path))
@@ -1535,6 +1581,8 @@ class PipelinePostprocessingService:
                 specs=specs,
                 t=t,
                 y=y,
+                csv_path=csv_path,
+                last_ut_ot_ut_csv_path=last_ut_ot_ut_csv_path,
             )
             timings["pipeline:plots"] = perf_counter() - started
             ConsoleTimingReporter.print("pipeline:plots", timings["pipeline:plots"], plots=len(generated_plot_paths))
@@ -1650,6 +1698,8 @@ def run_pipeline_from_raw_archive(raw_path: str | Path, pipeline_config_path: st
             specs=specs,
             t=t,
             y=y,
+            csv_path=csv_path,
+            last_ut_ot_ut_csv_path=last_ut_ot_ut_csv_path,
         )
         timings["offline:plots"] = perf_counter() - started
 
