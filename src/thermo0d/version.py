@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-VERSION = (7, 1, 127)
+VERSION = (7, 1, 129)
 __version__ = ".".join(str(x) for x in VERSION)
 CURRENT_CONFIG_SCHEMA_VERSION = 8
 

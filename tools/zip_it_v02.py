@@ -88,7 +88,7 @@ def backup_with_filters():
     EBENEN_HOCH = 1  # Wie viele Ebenen über dem Skript liegt das Projekt-Root?
 
     # Erlaubte Dateiendungen
-    EXTENSIONS = ('.py', '.md', '.json', '.yaml', '.txt', '.html', '.css')
+    EXTENSIONS = ('.py', '.md', '.json', '.yaml', '.txt', '.html', '.css', '.npz', '.xlsx')
 
     # Ordner, die komplett ignoriert werden
     IGNORE_DIRS = {'tests','test_cases','Results','results','.git', '__pycache__', '.venv', 'venv', '.vscode', '.idea', 'out', '.pytest_cache', 'htmlcov'}
