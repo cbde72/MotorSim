@@ -282,6 +282,9 @@ def _sanitize_mode_dependent_fields_inplace(state: dict[str, Any]) -> None:
         elif start_mode == "hign_position":
             combustion.pop("start_deg", None)
             combustion.pop("start_hub_m", None)
+        elif start_mode == "expansion_distance_from_tdc":
+            combustion.pop("start_deg", None)
+            combustion.pop("start_hub_m", None)
 
         duration_mode = combustion.get("duration_mode")
         if duration_mode is None:
@@ -1272,6 +1275,8 @@ class PropertyPanel(QWidget):
                 self._meta_spec(f"{prefix}.start_hub_m", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.start_mode", "compression_hub")], tab="Combustion"),
                 self._meta_spec(f"{prefix}.hign_m", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.start_mode", "hign_position")], tab="Combustion"),
                 self._meta_spec(f"{prefix}.hign_mm", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.start_mode", "hign_position")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.hign_m", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.start_mode", "expansion_distance_from_tdc")], tab="Combustion"),
+                self._meta_spec(f"{prefix}.hign_mm", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.start_mode", "expansion_distance_from_tdc")], tab="Combustion"),
                 self._meta_spec(f"{prefix}.duration_mode", visible_if=(f"{prefix}.model", ("vibe", "hcci_diesel")), tab="Combustion"),
                 self._meta_spec(f"{prefix}.duration_deg", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.duration_mode", "angle")], tab="Combustion"),
                 self._meta_spec(f"{prefix}.duration_hub_m", visible_if=[(f"{prefix}.model", "vibe"), (f"{prefix}.duration_mode", "compression_hub")], tab="Combustion"),

@@ -8,6 +8,7 @@ import numpy as np
 from thermo0d.config.constants import AngleReference, CombCol, CombDurationMode, ConnCol, ConnectionType, EndpointKind, FeatureCol, VolumeCol, VolumeType, WallCol, WallTemperatureCol, WallTemperatureZone
 from thermo0d.model.free_piston.forces import compute_load_info
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_equivalent_linear_kinematics, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
+from thermo0d.model.free_piston.generator_map import lookup_generator_torque_map
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
 from thermo0d.model.free_piston.combustion_latch import free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector
 from thermo0d.physics.flow import de_st_venant_wantzel_signed
@@ -962,7 +963,7 @@ def _compute_free_piston_rhs_numba(
             comb_matrix,
             evap_matrix,
             wall_bore_by_vol[i],
-            wall_ups_by_vol[i],
+            abs(v_eff_m_per_s) if vol_type == VOL_BOUNCE_CHAMBER else wall_ups_by_vol[i],
             pressures[i],
             temperatures[i],
             volumes[i],
@@ -1653,7 +1654,7 @@ def _compute_free_piston_rhs_python(t_s: float, y: np.ndarray, bundle) -> np.nda
             bundle.comb_matrix,
             bundle.evap_matrix,
             float(wall_bore_by_vol[i]),
-            float(wall_ups_by_vol[i]),
+            abs(float(v_eff_m_per_s)) if vol_type == VOL_BOUNCE_CHAMBER else float(wall_ups_by_vol[i]),
             pressures[i],
             temperatures[i],
             volumes[i],
@@ -1890,6 +1891,25 @@ def _compute_free_piston_rhs_python(t_s: float, y: np.ndarray, bundle) -> np.nda
         if bool(getattr(fp, 'load_motor_assist_until_soc', True)) and motor_assist_soc_seen:
             assist_threshold = 0.0
             assist_force = 0.0
+        if str(fp.load_model) == 'generator_torque_map':
+            map_value = lookup_generator_torque_map(
+                fp.generator_torque_map,
+                q,
+                q_dot,
+                float(getattr(fp, 'rotary_angle_min_rad', 0.0) or 0.0),
+                float(getattr(fp, 'rotary_angle_max_rad', 0.0) or 0.0),
+            )
+            safety_info = compute_load_info(
+                'generator_controlled', fp.load_damping_Ns_per_m, q_v_m_per_s,
+                x_m=q_m, x_min_m=x_min_m, x_max_m=x_max_m,
+                max_damping_Ns_per_m=fp.load_max_damping_Ns_per_m,
+                control_zone_m=fp.load_control_zone_m,
+            )
+            safety_force_N = -float(safety_info.force_signed_N)
+            force_net_without_map_N = force_gas_N + force_bounce_N + force_friction_N + safety_force_N
+            dy_dt[q_idx] = q_dot
+            dy_dt[qv_idx] = float((force_net_without_map_N * generalized_load_scale + map_value.torque_Nm) / generalized_inertia)
+            continue
         load_info = compute_load_info(
             fp.load_model,
             fp.load_damping_Ns_per_m,
@@ -2116,6 +2136,8 @@ def compute_free_piston_rhs(t_s: float, y: np.ndarray, bundle) -> np.ndarray:
     fp = bundle.free_piston
     if fp is None:
         raise ValueError('bundle.free_piston must be present for free_piston RHS')
+    if str(getattr(fp, 'load_model', 'none')) == 'generator_torque_map':
+        return _compute_free_piston_rhs_python(t_s, y, bundle)
     if bool(getattr(bundle, '_free_piston_numba_disabled', False)):
         return _compute_free_piston_rhs_python(t_s, y, bundle)
     static = _free_piston_static_numba_args(bundle)

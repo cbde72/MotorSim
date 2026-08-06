@@ -194,6 +194,9 @@ def _sanitize_mode_dependent_fields_inplace(state: dict[str, Any]) -> None:
         elif start_mode == "hign_position":
             combustion.pop("start_deg", None)
             combustion.pop("start_hub_m", None)
+        elif start_mode == "expansion_distance_from_tdc":
+            combustion.pop("start_deg", None)
+            combustion.pop("start_hub_m", None)
 
         duration_mode = combustion.get("duration_mode")
         if duration_mode is None:

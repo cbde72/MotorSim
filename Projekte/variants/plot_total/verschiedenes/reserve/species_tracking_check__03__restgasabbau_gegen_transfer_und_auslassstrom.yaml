@@ -1,0 +1,52 @@
+name: Residual-gas reduction vs. transfer and exhaust flow
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Species - Scavengwirkung
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Residual-gas reduction vs. transfer and exhaust flow
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_mass
+      title: Residual gas [mg]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_flow
+      title: Mass flow [g/s]
+      side: right
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: cylinder_1_m_residual_kg
+      label: residual mass
+      axis_id: ax_mass
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_scavenging_transfer_in_kg_per_s
+      label: transfer in
+      axis_id: ax_flow
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_scavenging_exhaust_out_kg_per_s
+      label: exhaust out
+      axis_id: ax_flow
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.6
+    show_title: true

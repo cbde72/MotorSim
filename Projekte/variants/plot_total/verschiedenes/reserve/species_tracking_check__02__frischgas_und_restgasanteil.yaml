@@ -1,0 +1,57 @@
+name: Fresh-gas and residual-gas fractions
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Species - Cylinder Fractione
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Fresh-gas and residual-gas fractions
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_frac
+      title: Fraction [-]
+      side: left
+      color: '#111111'
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 1.05
+    series:
+    - signal_key: cylinder_1_share_fresh_gas_0to1
+      label: fresh gas share
+      axis_id: ax_frac
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_share_residual_0to1
+      label: residual share
+      axis_id: ax_frac
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_share_burned_0to1
+      label: burned share
+      axis_id: ax_frac
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_share_air_0to1
+      label: air share
+      axis_id: ax_frac
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.6
+    show_title: true

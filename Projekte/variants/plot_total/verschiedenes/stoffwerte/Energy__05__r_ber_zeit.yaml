@@ -1,0 +1,33 @@
+name: R over time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: R_t
+  rows: 1
+  cols: 1
+  subplots:
+  - title: R over time
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    y_axes:
+    - id: ax_R
+      title: R [J/(kg K)]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: cylinder_1_R_J_per_kgK
+      label: Cylinder R
+      axis_id: ax_R
+      color: '#7DD3C7'
+      line_style: '-'
+      line_width: 1.6
+    - signal_key: compressor_1_R_J_per_kgK
+      label: Bounce R
+      axis_id: ax_R
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.6
+    show_title: true

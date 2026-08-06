@@ -1,0 +1,55 @@
+name: Volume vs time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.0
+figures:
+- title: Volume
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Volume vs time
+    plot_type: line
+    x_signal: t_s
+    x_title: time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_v
+      title: Volume [cm³]
+      side: left
+      color: '#111111'
+      limit_mode: data
+    series:
+    - signal_key: cylinder_1_V_m3
+      label: Combustion Chamber 1
+      axis_id: ax_v
+      color: '#FF0000'
+      line_style: --
+      line_width: 1.0
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: cylinder_2_V_m3
+      label: Combustion Chamber 2
+      axis_id: ax_v
+      color: '#FF8C00'
+      line_style: --
+      line_width: 1.0
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: compressor_1_V_m3
+      label: Compression Chamber 1
+      axis_id: ax_v
+      color: '#B0C4DE'
+      line_style: --
+      line_width: 1.0
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: compressor_2_V_m3
+      label: Compression Chamber 2
+      axis_id: ax_v
+      color: '#7B68EE'
+      line_style: --
+      line_width: 1.0
+      scale_factor: 1000000.0
+      unit_preset: raw
+    show_title: true

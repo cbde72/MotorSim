@@ -1,0 +1,60 @@
+name: Velocity, acceleration and piston position over time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: V-a-s
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Velocity, acceleration and piston position over time
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    y_axes:
+    - id: ax_vel
+      title: Velocity [m/s]
+      side: left
+      color: '#111111'
+    - id: ax_acc
+      title: Acceleration [m/s²]
+      side: right
+      color: '#111111'
+    - id: ax_x3
+      title: Piston position [mm] (+54.035 = OT, -54.035 = UT)
+      side: right
+      color: '#111111'
+      limit_mode: manual
+      y_min: -60.0
+      y_max: 60.0
+    series:
+    - signal_key: free_piston_v_m_per_s
+      label: Velocity
+      axis_id: ax_vel
+      color: '#111111'
+      line_style: --
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.35
+    - signal_key: free_piston_a_m_per_s2
+      label: Acceleration
+      axis_id: ax_acc
+      color: '#111111'
+      line_style: --
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.35
+    - signal_key: free_piston_x_m
+      label: Piston position
+      axis_id: ax_x3
+      color: '#111111'
+      line_style: --
+      scale_factor: -1000.0
+      unit_preset: raw
+      offset: 54.035
+      line_width: 1.35
+    show_title: true

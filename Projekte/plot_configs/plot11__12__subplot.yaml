@@ -1,17 +1,7 @@
 name: Subplot
 style_sheet: ../plot_style_sheet.yaml
 style:
-  background_color: '#ffffff'
-  axes_facecolor: '#ffffff'
-  text_color: '#202020'
-  grid_color: '#d8d8d8'
-  legend_facecolor: '#ffffff'
-  legend_edgecolor: '#9aa0a6'
-  default_line_width: 1.8
-  default_marker_size: 4.5
-  font_size: 10
-  title_size: 12
-  grid_alpha: 0.65
+  default_line_width: 1.6
 figures:
 - id: 821646e3d067
   title: Figure 11
@@ -22,7 +12,7 @@ figures:
     title: Subplot
     plot_type: line
     x_signal: cylinder_theta_deg
-    x_title: Kurbelwinkel [deg]
+    x_title: Crank angle [deg]
     x_unit_preset: raw
     x_scale_factor: 1.0
     x_offset: 0.0
@@ -31,10 +21,10 @@ figures:
     x_max: 720.0
     y_axes:
     - id: 88ec00f5f927
-      title: Hubvolumen [cm³]
+      title: Displacement volume [cm³]
       side: right
       spine_offset: 0.05
-      color: '#666666'
+      color: '#111111'
       visible: true
       limit_mode: manual
       y_min: 0.0
@@ -47,7 +37,7 @@ figures:
       title: Valve Lift [m]
       side: right
       spine_offset: 0.15000000000000002
-      color: '#000000'
+      color: '#111111'
       visible: true
       limit_mode: data
       y_min: 0.0
@@ -60,7 +50,7 @@ figures:
       title: Pressure
       side: left
       spine_offset: 0.0
-      color: '#000000'
+      color: '#111111'
       visible: true
       limit_mode: data
       y_min: 0.0
@@ -72,13 +62,13 @@ figures:
     series:
     - id: 6ddcb915562e
       signal_key: cylinder_V_m3
-      label: Hubvolumen
+      label: Displacement volume
       axis_id: 88ec00f5f927
       visible: true
-      color: '#808080'
+      color: '#7DD3C7'
       line_style: --
       marker: ''
-      line_width: 1.8
+      line_width: 1.05
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1000000.0
@@ -89,10 +79,10 @@ figures:
       label: exhaust_valve_valve_lift_m
       axis_id: a98ff3aabc43
       visible: true
-      color: '#ff0000'
+      color: '#D92D20'
       line_style: --
       marker: ''
-      line_width: 0.8
+      line_width: 1.05
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1.0
@@ -103,10 +93,10 @@ figures:
       label: intake_valve_valve_lift_m
       axis_id: a98ff3aabc43
       visible: true
-      color: '#5555ff'
+      color: '#175CD3'
       line_style: --
       marker: ''
-      line_width: 0.8
+      line_width: 1.05
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1.0
@@ -117,7 +107,7 @@ figures:
       label: Pressure [bar]
       axis_id: 5850276f243e
       visible: true
-      color: '#000000'
+      color: '#66B3FF'
       line_style: '-'
       marker: ''
       line_width: 1.8
@@ -128,10 +118,10 @@ figures:
       series_type: line
     - id: c1910fddc721
       signal_key: exhaust_plenum_p_Pa
-      label: Sammler (Abgas)
+      label: Plenum (Abgas)
       axis_id: 5850276f243e
       visible: true
-      color: '#e377c2'
+      color: '#D92D20'
       line_style: '-'
       marker: ''
       line_width: 1.8
@@ -142,10 +132,10 @@ figures:
       series_type: line
     - id: 4fac24404ef6
       signal_key: intake_plenum_p_Pa
-      label: Sammler (Intake)
+      label: Plenum (Intake)
       axis_id: 5850276f243e
       visible: true
-      color: '#1f77b4'
+      color: '#175CD3'
       line_style: '-'
       marker: ''
       line_width: 1.8
@@ -368,3 +358,4 @@ figures:
     legend_visible: true
     legend_position: upper right
     show_grid: true
+    show_title: true

@@ -1,14 +1,14 @@
-name: Effektive Öffnungsquerschnitte über Kolbenweg
+name: Effektive Opening areae over piston position
 style_sheet: ../plot_style_sheet.yaml
 figures:
-- title: Free-Piston Slots und Aeff über Kolbenweg
+- title: Free-piston slots and effective areas over piston position
   rows: 1
   cols: 1
   subplots:
-  - title: Effektive Öffnungsquerschnitte über Kolbenweg
+  - title: Effektive Opening areae over piston position
     plot_type: line
     x_signal: free_piston_x_m
-    x_title: Kolbenweg [mm] (+54 = OT, -54 = UT)
+    x_title: Piston position [mm] (+54 = OT, -54 = UT)
     x_unit_preset: raw
     x_scale_factor: -1000.0
     x_offset: 54.04
@@ -20,30 +20,37 @@ figures:
       color: '#111111'
     series:
     - signal_key: transfer_slot_A_eff_forward_m2
-      label: Transfer A_eff vorwärts
+      label: Transfer A_eff forward
       axis_id: ax_ax
-      color: '#175cd3'
-      line_style: '-'
+      color: '#175CD3'
+      line_style: --
       scale_factor: 1000000.0
       unit_preset: raw
+      line_width: 1.05
     - signal_key: transfer_slot_A_eff_reverse_m2
-      label: Transfer A_eff rückwärts
+      label: Transfer A_eff reverse
       axis_id: ax_ax
-      color: '#5da9ff'
+      color: '#175CD3'
       line_style: --
       scale_factor: 1000000.0
       unit_preset: raw
+      line_width: 1.05
     - signal_key: exhaust_slot_A_eff_forward_m2
-      label: Auslass A_eff vorwärts
+      label: Exhaust A_eff forward
       axis_id: ax_ax
-      color: '#b42318'
-      line_style: '-'
-      scale_factor: 1000000.0
-      unit_preset: raw
-    - signal_key: exhaust_slot_A_eff_reverse_m2
-      label: Auslass A_eff rückwärts
-      axis_id: ax_ax
-      color: '#f97066'
+      color: '#D92D20'
       line_style: --
       scale_factor: 1000000.0
       unit_preset: raw
+      line_width: 1.05
+    - signal_key: exhaust_slot_A_eff_reverse_m2
+      label: Exhaust A_eff reverse
+      axis_id: ax_ax
+      color: '#D92D20'
+      line_style: --
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.05
+    show_title: true
+style:
+  default_line_width: 1.6

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Free-Piston GenSet V33 – CAD-Geometrieparameter</title>
+  <style>
+    :root{--ink:#182230;--muted:#596579;--line:#d7dee9;--blue:#175cd3;--blue2:#eff8ff;--green:#067647;--greenbg:#ecfdf3;--amber:#b54708;--amberbg:#fffaeb;--red:#b42318;--redbg:#fef3f2;--nav:#101828;--paper:#fff;--bg:#f3f6fa}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.58 Inter,Segoe UI,Arial,sans-serif}
+    .page{display:grid;grid-template-columns:285px minmax(0,1030px);gap:32px;max-width:1380px;margin:auto;padding:25px}
+    aside{position:sticky;top:20px;height:calc(100vh - 40px);overflow:auto;background:var(--nav);color:#eef4ff;border-radius:18px;padding:23px;box-shadow:0 12px 35px #10182826}
+    aside h1{font-size:20px;line-height:1.25;margin:8px 0}aside p{font-size:12.5px;color:#abb8cd}nav a{display:block;color:#d0d9e8;text-decoration:none;padding:7px 9px;border-radius:7px;font-size:13px}nav a:hover{background:#27344a;color:#fff}
+    main{min-width:0}.hero,.card{background:var(--paper);border:1px solid var(--line);border-radius:17px;box-shadow:0 7px 24px #1018280d}.hero{padding:38px;margin-bottom:22px;background:linear-gradient(135deg,#fff 58%,#e8f2ff)}
+    .hero h1{font-size:34px;line-height:1.15;margin:10px 0}.card{padding:29px 33px;margin-bottom:22px}h2{font-size:23px;margin:0 0 13px}h3{font-size:17px;margin:25px 0 8px}.eyebrow{color:var(--blue);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.13em}.muted{color:var(--muted)}
+    code{font:12.5px/1.5 Consolas,monospace;background:#eef2f7;color:#243b64;padding:2px 5px;border-radius:5px}table{border-collapse:collapse;width:100%;margin:14px 0 22px;font-size:13.2px}th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f8fafc;color:#344054;font-size:11.5px;text-transform:uppercase;letter-spacing:.045em}
+    .yes,.derived,.check,.no{display:inline-block;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:750;white-space:nowrap}.yes{color:var(--green);background:var(--greenbg)}.derived{color:var(--blue);background:var(--blue2)}.check{color:var(--amber);background:var(--amberbg)}.no{color:var(--red);background:var(--redbg)}
+    .box{padding:14px 16px;border:1px solid #b2ddff;background:var(--blue2);border-radius:9px;margin:13px 0}.warn{background:var(--amberbg);border-color:#fedf89}.danger{background:var(--redbg);border-color:#fecdca}
+    .eq{overflow:auto;border-left:4px solid var(--blue);background:#f7faff;border-radius:0 9px 9px 0;padding:14px 17px;margin:13px 0}.eq math{font-size:1.13rem}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.mini{padding:15px;border:1px solid var(--line);border-radius:10px;background:#fafcff}.mini strong{display:block;margin-bottom:5px}.num{font-variant-numeric:tabular-nums;white-space:nowrap}.small{font-size:12px}.source{padding-top:15px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+    @media(max-width:900px){.page{display:block;padding:12px}aside{position:relative;height:auto;margin-bottom:18px}nav{columns:2}.hero,.card{padding:23px}.grid{grid-template-columns:1fr}}
+    @media print{body{background:white}.page{display:block;max-width:none;padding:0}aside{display:none}.hero,.card{box-shadow:none;border:0;border-top:1px solid #aaa;border-radius:0;break-inside:avoid}.hero{border:0}}
+  </style>
+</head>
+<body>
+<div class="page">
+  <aside>
+    <div class="eyebrow">Thermo0D · V33</div>
+    <h1>CAD-Geometrieparameter</h1>
+    <p>Zeichnungs- und CAD-Maße für das Free-Piston-GenSet V33.</p>
+    <nav>
+      <a href="#umfang">1 · Umfang und Legende</a>
+      <a href="#hauptmechanik">2 · Hauptmechanik</a>
+      <a href="#zylinder">3 · Arbeitszylinder</a>
+      <a href="#kompressor">4 · Kompressorkammern</a>
+      <a href="#kanaele">5 · Ventile und Kanäle</a>
+      <a href="#slots">6 · Steuerfenster</a>
+      <a href="#plena">7 · Receiver und Abgasplena</a>
+      <a href="#waende">8 · Wand- und Wärmeflächen</a>
+      <a href="#massen">9 · CAD-Masseneigenschaften</a>
+      <a href="#abgeleitet">10 · Abgeleitete Größen</a>
+      <a href="#konflikte">11 · Prüfpunkte</a>
+      <a href="#checkliste">12 · CAD-Checkliste</a>
+    </nav>
+  </aside>
+
+  <main>
+    <header class="hero">
+      <div class="eyebrow">Geometrie-Datenblatt · Stand der lokalen V33-Konfiguration</div>
+      <h1>Free-Piston GenSet V33: alle CAD-relevanten Eingabeparameter</h1>
+      <p class="muted">Diese Seite listet direkte Zeichnungsmaße, aus CAD ableitbare Volumina/Flächen sowie CAD-Masseneigenschaften auf. Modellkennwerte wie Durchflussbeiwerte, Temperaturen, Drücke und Verbrennungsparameter sind bewusst getrennt und nicht als CAD-Geometrie bezeichnet.</p>
+    </header>
+
+    <section class="card" id="umfang">
+      <h2>1. Gültigkeit und Klassifikation</h2>
+      <table><thead><tr><th>Kennzeichen</th><th>Bedeutung</th></tr></thead><tbody>
+        <tr><td><span class="yes">CAD-Maß</span></td><td>Direkt aus Zeichnung oder 3D-Modell messbar, beispielsweise Durchmesser, Länge, Winkel oder Radius.</td></tr>
+        <tr><td><span class="derived">CAD-abgeleitet</span></td><td>Über CAD-Analyse oder eine Formel aus mehreren Zeichnungsmaßen bestimmbar, beispielsweise eingeschlossenes Volumen, Oberfläche oder Trägheitsmoment.</td></tr>
+        <tr><td><span class="check">prüfen</span></td><td>Geometrisch relevant, aber in V33 als Modell-/Ersatzwert hinterlegt oder widersprüchlich. Vor Freigabe mit CAD abgleichen.</td></tr>
+        <tr><td><span class="no">kein CAD-Maß</span></td><td>Physikalischer Modellkennwert; nicht aus einer reinen Geometriezeichnung ablesbar.</td></tr>
+      </tbody></table>
+      <div class="box"><strong>Instanzen:</strong> Die Geometrievorlagen gelten symmetrisch für <code>cylinder_1</code>/<code>cylinder_2</code>, <code>compressor_1</code>/<code>compressor_2</code>, <code>receiver_1</code>/<code>receiver_2</code> und <code>exhaust_plenum_1</code>/<code>exhaust_plenum_2</code>.</div>
+    </section>
+
+    <section class="card" id="hauptmechanik">
+      <h2>2. Hauptmechanik und Bewegungsgeometrie</h2>
+      <table><thead><tr><th>Parameter / YAML-Pfad</th><th>V33-Wert</th><th>CAD-Quelle</th><th>Status</th></tr></thead><tbody>
+        <tr><td>Kolbendurchmesser<br><code>free_piston.mechanics.piston_diameter_m</code></td><td class="num">60,5 mm</td><td>Zylinder-/Kolbenzeichnung: wirksamer Gasdruckdurchmesser</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td>Minimaler äquivalenter Hub<br><code>x_min_m</code></td><td class="num">0 mm</td><td>Koordinatendefinition am OT, kein absolutes Baumaß</td><td><span class="check">Referenz</span></td></tr>
+        <tr><td>Maximaler äquivalenter Hub<br><code>x_max_m</code></td><td class="num">108,07 mm</td><td>Abstand zwischen mechanischen Endlagen OT–UT</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td>Minimalwinkel<br><code>angle_min_deg</code></td><td class="num">−9,0°</td><td>Rotations-Endlage relativ zur Nullstellung</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td>Maximalwinkel<br><code>angle_max_deg</code></td><td class="num">+9,0°</td><td>Rotations-Endlage relativ zur Nullstellung</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td>Effektiver Radius<br><code>effective_radius_m</code></td><td class="num">343,997494 mm</td><td>Abstand Drehachse–wirksame Hub-/Kraftlinie</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td>Verdichtungsverhältnis Arbeitszylinder<br><code>mechanics.compression_ratio</code></td><td class="num">50 : 1</td><td>Aus UT- und OT-Brennraumvolumen</td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+      </tbody></table>
+      <div class="eq"><math display="block"><mrow><mi>H</mi><mo>=</mo><msub><mi>r</mi><mtext>eff</mtext></msub><mfenced><mrow><msub><mi>φ</mi><mtext>max</mtext></msub><mo>−</mo><msub><mi>φ</mi><mtext>min</mtext></msub></mrow></mfenced><mo>=</mo><mn>108.07</mn><mspace width=".3em"/><mi mathvariant="normal">mm</mi></mrow></math></div>
+      <p class="small muted">Die Winkel müssen für die Formel in Radiant eingesetzt werden. V33 verwendet eine Bogenlängenabbildung und keine Sinus-/Kurbeltriebfunktion.</p>
+    </section>
+
+    <section class="card" id="zylinder">
+      <h2>3. Arbeitszylinder und Brennraum</h2>
+      <table><thead><tr><th>Geometrische Größe</th><th>V33-Wert</th><th>Zeichnungsdefinition</th><th>Status</th></tr></thead><tbody>
+        <tr><td>Wirksamer Kolben-/Zylinderdurchmesser</td><td class="num">60,5 mm</td><td>Gasdruckwirksame Bohrung; globaler Mechanikparameter</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td>Arbeitshub OT–UT</td><td class="num">108,07 mm</td><td>Axialer Kolbenweg zwischen den modellierten Endlagen</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td>Verdichtungsverhältnis</td><td class="num">50 : 1</td><td><math><mrow><mi>ε</mi><mo>=</mo><msub><mi>V</mi><mtext>UT</mtext></msub><mo>/</mo><msub><mi>V</mi><mtext>OT</mtext></msub></mrow></math></td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+        <tr><td>Kolbenfläche</td><td class="num">2874,754 mm²</td><td>Kreisfläche aus 60,5 mm</td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+        <tr><td>Hubvolumen je Zylinder</td><td class="num">310,67 cm³</td><td>Kolbenfläche × 108,07 mm</td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+        <tr><td>Rest-/Brennraumvolumen am OT</td><td class="num">ca. 6,34 cm³</td><td>Gesamtes eingeschlossenes Gasvolumen bei OT</td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+        <tr><td>Volumen bei UT</td><td class="num">ca. 317,01 cm³</td><td>Restvolumen + Hubvolumen</td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+      </tbody></table>
+      <div class="eq"><math display="block"><mtable columnalign="right left"><mtr><mtd><msub><mi>A</mi><mi>p</mi></msub></mtd><mtd><mo>=</mo><mfrac><mi>π</mi><mn>4</mn></mfrac><msubsup><mi>d</mi><mi>p</mi><mn>2</mn></msubsup></mtd></mtr><mtr><mtd><msub><mi>V</mi><mi>h</mi></msub></mtd><mtd><mo>=</mo><msub><mi>A</mi><mi>p</mi></msub><mi>H</mi></mtd></mtr><mtr><mtd><msub><mi>V</mi><mi>c</mi></msub></mtd><mtd><mo>=</mo><mfrac><msub><mi>V</mi><mi>h</mi></msub><mrow><mi>ε</mi><mo>−</mo><mn>1</mn></mrow></mfrac></mtd></mtr></mtable></math></div>
+      <div class="box danger"><strong>CAD-Konflikt in der YAML:</strong> Unter <code>cylinder_free_piston.kinematics</code> stehen zusätzlich <code>bore_m: 1.0745</code>, <code>stroke_m: 1.08</code> und <code>conrod_m: 1.12</code>. Das entspräche 1074,5 / 1080 / 1120 mm und passt nicht zur aktiven Free-Piston-Geometrie. Im Free-Piston-RHS werden diese geerbten <code>crank_slider</code>-Werte nicht für Hub oder Kolbenfläche verwendet. Sie dürfen nicht als V33-CAD-Sollmaße interpretiert werden.</div>
+    </section>
+
+    <section class="card" id="kompressor">
+      <h2>4. Kompressorkammern</h2>
+      <p>Die Vorlage <code>compressor_bounce</code> wird für beide Kompressoren verwendet.</p>
+      <table><thead><tr><th>Parameter / YAML-Pfad</th><th>V33-Wert</th><th>CAD-Definition</th><th>Status</th></tr></thead><tbody>
+        <tr><td>Kammerdurchmesser<br><code>chamber_diameter_m</code></td><td class="num">70,0 mm</td><td>Wirksamer Verdichterkolben-/Kammerdurchmesser</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td>Kammer-/Hublänge<br><code>chamber_length_m</code></td><td class="num">108,07 mm</td><td>Wirksamer axialer Kompressionsweg</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td>Verdichtungsverhältnis<br><code>compression_ratio</code></td><td class="num">16 : 1</td><td>Maximalvolumen / Minimalvolumen</td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+        <tr><td>Wirksame Kompressorfläche</td><td class="num">3848,451 mm²</td><td>Kreisfläche aus 70 mm</td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+        <tr><td>Verdrängungsvolumen</td><td class="num">ca. 415,90 cm³</td><td>Fläche × 108,07 mm</td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+        <tr><td>Minimalvolumen</td><td class="num">ca. 27,73 cm³</td><td><math><mrow><msub><mi>V</mi><mtext>Hub</mtext></msub><mo>/</mo><mfenced><mrow><mi>ε</mi><mo>−</mo><mn>1</mn></mrow></mfenced></mrow></math></td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+        <tr><td>Maximalvolumen</td><td class="num">ca. 443,63 cm³</td><td>Minimalvolumen + Verdrängungsvolumen</td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+      </tbody></table>
+      <div class="box warn"><strong>Im CAD prüfen:</strong> Das reale Tot-/Restvolumen muss alle Taschen, Ventilräume, Kanäle bis zur Modellgrenze und Dichtspalte enthalten. Nur Zylinderfläche × geometrische Länge reicht hierfür oft nicht aus.</div>
+    </section>
+
+    <section class="card" id="kanaele">
+      <h2>5. Rückschlagventile und Abgasdrosseln</h2>
+      <table><thead><tr><th>Bauteil</th><th>Instanzen / Pfad</th><th>Geometrischer Wert</th><th>Im CAD messen</th></tr></thead><tbody>
+        <tr><td>Kompressor-Einlass-Rückschlagventil</td><td><code>compressor_in_check_valve</code><br>Strang 1 und 2</td><td class="num">Durchmesser 55,0 mm<br>Fläche ca. 2375,83 mm²</td><td><span class="yes">Freier Sitz-/Öffnungsdurchmesser</span></td></tr>
+        <tr><td>Kompressor-Auslass-Rückschlagventil</td><td><code>compressor_out_check_valve</code><br>Strang 1 und 2</td><td class="num">Durchmesser 55,3 mm<br>Fläche ca. 2401,82 mm²</td><td><span class="yes">Freier Sitz-/Öffnungsdurchmesser</span></td></tr>
+        <tr><td>Abgasdrossel</td><td><code>exhaust_bleed</code><br>Strang 1 und 2</td><td class="num">Durchmesser 14,0 mm<br>Fläche ca. 153,94 mm²</td><td><span class="yes">Kleinster freier Querschnitt</span></td></tr>
+      </tbody></table>
+      <div class="box warn"><strong>Geometrie versus Strömungswert:</strong> <code>discharge_coefficient</code>, <code>forward_cd</code>, <code>reverse_cd</code> und <code>cracking_pressure_Pa</code> sind keine reinen CAD-Maße. CAD liefert Querschnitt, Hub, Sitzwinkel und Kontur; der Durchflussbeiwert muss aus Messung, CFD oder Literatur kommen.</div>
+    </section>
+
+    <section class="card" id="slots">
+      <h2>6. Überström- und Auslassfenster</h2>
+      <div class="grid">
+        <div class="mini"><strong>Überströmfenster · je Zylinder</strong>6 identische Fenster<br>Breite: <b>26,0 mm</b><br>Höhe: <b>16,0 mm</b><br>Öffnungsbeginn: <b>92,07 mm ab OT</b><br>Eintrittswinkel: <b>0°</b><br>Öffnungsradius: <b>0 mm</b><br>Vollöffnungsradius: <b>0 mm</b></div>
+        <div class="mini"><strong>Auslassfenster · je Zylinder</strong>6 identische Fenster<br>Breite: <b>24,0 mm</b><br>Höhe: <b>18,0 mm</b><br>Öffnungsbeginn: <b>90,60 mm ab OT</b><br>Eintrittswinkel: <b>0°</b><br>Öffnungsradius: <b>0 mm</b><br>Vollöffnungsradius: <b>0 mm</b></div>
+      </div>
+      <table><thead><tr><th>YAML-Parameter</th><th>CAD-Bedeutung</th><th>Status</th></tr></thead><tbody>
+        <tr><td><code>distance_from_tdc_mm</code></td><td>Axialer Abstand von der definierten OT-Kolbenposition bis zur ersten freigegebenen Fensterkante.</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td><code>width_mm</code></td><td>Fensterbreite in Umfangs-/Tangentialrichtung.</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td><code>height_mm</code></td><td>Axiale Fensterhöhe zwischen Öffnungs- und Vollöffnungskante.</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td><code>number_of_identical_holes</code></td><td>Anzahl gleichartiger Fenster pro Zylinder.</td><td><span class="yes">CAD-Merkmal</span></td></tr>
+        <tr><td><code>entrance_angle_deg</code></td><td>Eintritts-/Leitwinkel der Kanalachse oder Strömungskontur.</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td><code>open_fillet_radius_m</code></td><td>Kantenradius im beginnenden Öffnungsbereich.</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td><code>full_fillet_radius_m</code></td><td>Kantenradius bei vollständig freigegebener Fensterkontur.</td><td><span class="yes">CAD-Maß</span></td></tr>
+        <tr><td><code>piston_height_if_crankcase_m</code></td><td>Zusätzliche Kolbenhöhenkorrektur für Kurbelgehäusebezug; in V33 0 mm.</td><td><span class="check">Bezug prüfen</span></td></tr>
+      </tbody></table>
+      <div class="eq"><math display="block"><mtable columnalign="right left"><mtr><mtd><msub><mi>A</mi><mtext>transfer,max</mtext></msub></mtd><mtd><mo>=</mo><mn>6</mn><mo>·</mo><mn>26</mn><mo>·</mo><mn>16</mn><mo>=</mo><mn>2496</mn><mspace width=".3em"/><msup><mi mathvariant="normal">mm</mi><mn>2</mn></msup></mtd></mtr><mtr><mtd><msub><mi>A</mi><mtext>exhaust,max</mtext></msub></mtd><mtd><mo>=</mo><mn>6</mn><mo>·</mo><mn>24</mn><mo>·</mo><mn>18</mn><mo>=</mo><mn>2592</mn><mspace width=".3em"/><msup><mi mathvariant="normal">mm</mi><mn>2</mn></msup></mtd></mtr></mtable></math></div>
+      <p class="small muted">Die Flächen sind ideale Rechteckflächen ohne Stege, Verrundungen, Zylinderkrümmung oder Schrägprojektion. Für eine genaue CAD-Auswertung ist die tatsächlich freigegebene Normalfläche zu verwenden.</p>
+    </section>
+
+    <section class="card" id="plena">
+      <h2>7. Receiver und Abgasplena</h2>
+      <table><thead><tr><th>Volumen</th><th>Instanzen</th><th>V33-Wert</th><th>CAD-Auswertung</th><th>Status</th></tr></thead><tbody>
+        <tr><td>Receiver-/Ladeluftvolumen</td><td><code>receiver_1</code>, <code>receiver_2</code></td><td class="num">0,00048 m³<br><b>480 cm³ je Receiver</b></td><td>Geschlossenes Fluidvolumen zwischen Kompressor-Auslassventil und Überströmfenster-Modellgrenze.</td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+        <tr><td>Abgasplenum</td><td><code>exhaust_plenum_1</code>, <code>exhaust_plenum_2</code></td><td class="num">0,00260279 m³<br><b>2602,79 cm³ je Plenum</b></td><td>Fluidvolumen zwischen Auslassfenster-Modellgrenze und 14-mm-Abgasdrossel.</td><td><span class="derived">CAD-abgeleitet</span></td></tr>
+      </tbody></table>
+      <div class="box"><strong>CAD-Methode:</strong> Modellgrenzen als Deckflächen schließen und das innere Fluidvolumen messen. Ventiltaschen, Rohrstutzen und Übergänge genau einmal einem 0D-Volumen zuordnen; Überschneidungen oder Lücken verfälschen Masse und Druckdynamik.</div>
+    </section>
+
+    <section class="card" id="waende">
+      <h2>8. Wandstärken und Wärmeübertragungsflächen</h2>
+      <table><thead><tr><th>Zone</th><th>Wandstärke</th><th>Fläche</th><th>CAD-Definition</th><th>Status</th></tr></thead><tbody>
+        <tr><td>Zylinderwand</td><td class="num">6,0 mm</td><td class="num">0,020541 m²<br>205,41 cm²</td><td>Mittlere Wärmeleitlänge und gasberührte Zylinderwandfläche</td><td><span class="yes">CAD / abgeleitet</span></td></tr>
+        <tr><td>Zylinderkopf</td><td class="num">10,0 mm</td><td class="num">0,002875 m²<br>28,75 cm²</td><td>Leitweg zur Kühlseite und gasberührte Kopffläche</td><td><span class="yes">CAD / abgeleitet</span></td></tr>
+        <tr><td>Kolbenboden</td><td class="num">12,0 mm</td><td class="num">0,002875 m²<br>28,75 cm²</td><td>Leitweg im Kolbenboden und gasberührte Kolbenfläche</td><td><span class="yes">CAD / abgeleitet</span></td></tr>
+        <tr><td>Globale Woschni-Wandfläche</td><td>–</td><td class="num">0,0300 m²<br>300 cm²</td><td>Effektive gesamte Wärmeübertragungsfläche des Zylinders</td><td><span class="check">Ersatzfläche</span></td></tr>
+      </tbody></table>
+      <div class="box warn"><strong>Abgleich erforderlich:</strong> Die Summe der drei Zonenflächen beträgt 0,026291 m² und ist nicht gleich der Woschni-Fläche von 0,0300 m². Das kann eine bewusste effektive Kalibrierung sein, sollte aber nicht ungeprüft als CAD-Fläche übernommen werden.</div>
+    </section>
+
+    <section class="card" id="massen">
+      <h2>9. Aus CAD bestimmbare Masseneigenschaften</h2>
+      <p>Diese Größen sind keine reinen Längenmaße, können aber mit Materialzuweisung direkt aus dem 3D-CAD-Modell ermittelt werden.</p>
+      <table><thead><tr><th>Parameter</th><th>V33-Wert</th><th>CAD-Auswertung</th><th>Status</th></tr></thead><tbody>
+        <tr><td>Bewegte Gesamtmasse<br><code>moving_mass_kg</code></td><td class="num">11,8 kg</td><td>Summe aller translatorisch bzw. äquivalent bewegten Komponenten einschließlich Kolben, Verbindungselementen und Rotoranteilen gemäß Modellgrenze.</td><td><span class="derived">CAD-Mass Property</span></td></tr>
+        <tr><td>Rotatorisches Massenträgheitsmoment<br><code>rotary_inertia_kg_m2</code></td><td class="num">1,396344455 kg·m²</td><td>Massenträgheitsmoment der gesamten schwingenden Baugruppe um die modellierte Drehachse.</td><td><span class="derived">CAD-Mass Property</span></td></tr>
+      </tbody></table>
+      <div class="box warn">Materialdichten, Schrauben, Lagerinnenringe, Generatorrotoranteile und mitbewegte Flüssigkeiten müssen entsprechend der mechanischen Modellgrenze enthalten sein. CAD und Simulationskoordinate müssen dieselbe Drehachse verwenden.</div>
+    </section>
+
+    <section class="card" id="abgeleitet">
+      <h2>10. Zusammenfassung der abgeleiteten Sollgrößen</h2>
+      <table><thead><tr><th>Größe</th><th>Ergebnis aus V33</th><th>Formel / Herkunft</th></tr></thead><tbody>
+        <tr><td>Rotationsspanne</td><td class="num">18° = 0,314159 rad</td><td><math><mrow><msub><mi>φ</mi><mtext>max</mtext></msub><mo>−</mo><msub><mi>φ</mi><mtext>min</mtext></msub></mrow></math></td></tr>
+        <tr><td>Äquivalenter Arbeitshub</td><td class="num">108,07 mm</td><td><math><mrow><msub><mi>r</mi><mtext>eff</mtext></msub><mi>Δφ</mi></mrow></math></td></tr>
+        <tr><td>Kolbenfläche Arbeitszylinder</td><td class="num">2874,754 mm²</td><td>Ø 60,5 mm</td></tr>
+        <tr><td>Hubvolumen Arbeitszylinder</td><td class="num">ca. 310,67 cm³</td><td>Kolbenfläche × Hub</td></tr>
+        <tr><td>Kompressorfläche</td><td class="num">3848,451 mm²</td><td>Ø 70,0 mm</td></tr>
+        <tr><td>Kompressor-Verdrängung</td><td class="num">ca. 415,90 cm³</td><td>Kompressorfläche × Hublänge</td></tr>
+        <tr><td>Maximale Überströmfläche</td><td class="num">2496 mm²</td><td>6 × 26 × 16 mm</td></tr>
+        <tr><td>Maximale Auslassfläche</td><td class="num">2592 mm²</td><td>6 × 24 × 18 mm</td></tr>
+        <tr><td>Auslassvorausöffnung</td><td class="num">1,47 mm</td><td>92,07 − 90,60 mm</td></tr>
+      </tbody></table>
+    </section>
+
+    <section class="card" id="konflikte">
+      <h2>11. CAD-Prüfpunkte vor Geometriefreigabe</h2>
+      <ol>
+        <li><strong>Aktive Bohrung bestätigen:</strong> 60,5 mm aus <code>free_piston.mechanics</code>; die geerbten 1074,5 mm sind kein plausibles V33-Baumaß.</li>
+        <li><strong>OT-Bezug definieren:</strong> Alle Fensterabstände und die 15-mm-Zündposition verwenden denselben lokalen OT-/Zylinderkopfbezug.</li>
+        <li><strong>Effektiven Radius prüfen:</strong> 343,997494 mm muss zusammen mit ±9° exakt 108,07 mm Bogenhub ergeben.</li>
+        <li><strong>Restvolumina messen:</strong> Arbeitszylinder und Kompressor einschließlich Taschen und angeschlossener Toträume bei beiden Endlagen auswerten.</li>
+        <li><strong>Fensterfläche normal zur Strömung:</strong> Krümmung, Kantenradien, Stege und Eintrittswinkel berücksichtigen.</li>
+        <li><strong>0D-Modellgrenzen festlegen:</strong> Receiver- und Abgasplenumvolumen ohne Doppelzählung aus CAD exportieren.</li>
+        <li><strong>Wärmeflächen harmonisieren:</strong> Zonenflächensumme 0,026291 m² gegenüber Woschni-Ersatzfläche 0,0300 m² klären.</li>
+        <li><strong>Masseneigenschaften aktualisieren:</strong> 11,8 kg und 1,396344455 kg·m² mit vollständiger Baugruppe und korrekter Drehachse verifizieren.</li>
+      </ol>
+    </section>
+
+    <section class="card" id="checkliste">
+      <h2>12. Kompakte CAD-Übergabecheckliste</h2>
+      <table><thead><tr><th>Zu liefern / zu messen</th><th>Sollwert V33</th><th>CAD-Ist</th><th>Geprüft</th></tr></thead><tbody>
+        <tr><td>Arbeitskolben-/Zylinderbohrung</td><td>60,5 mm</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Arbeitshub OT–UT</td><td>108,07 mm</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Rotationsendlagen</td><td>−9° / +9°</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Effektiver Radius</td><td>343,997494 mm</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Brennraumvolumen am OT / UT</td><td>ca. 6,34 / 317,01 cm³</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Kompressorbohrung / Hublänge</td><td>70,0 / 108,07 mm</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Kompressorvolumen min. / max.</td><td>ca. 27,73 / 443,63 cm³</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Einlass-/Auslass-Rückschlagventil</td><td>Ø 55,0 / 55,3 mm</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Überströmfenster</td><td>6 × 26 × 16 mm; 92,07 mm ab OT</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Auslassfenster</td><td>6 × 24 × 18 mm; 90,60 mm ab OT</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Abgasdrossel</td><td>Ø 14,0 mm</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Receiver je Strang</td><td>480 cm³</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Abgasplenum je Strang</td><td>2602,79 cm³</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Bewegte Masse</td><td>11,8 kg</td><td>________________</td><td>☐</td></tr>
+        <tr><td>Trägheitsmoment um Drehachse</td><td>1,396344455 kg·m²</td><td>________________</td><td>☐</td></tr>
+      </tbody></table>
+      <p class="source">Quelle: <code>Projekte/variants/free_piston_GenSet_V33.yaml</code>. Zahlen mit „ca.“ wurden aus den V33-Eingabewerten berechnet. Diese Seite dokumentiert den aktuellen Modellstand und ersetzt keine tolerierte Fertigungszeichnung.</p>
+    </section>
+  </main>
+</div>
+</body>
+</html>

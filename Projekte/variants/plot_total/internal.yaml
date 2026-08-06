@@ -3,17 +3,17 @@ versioning:
   config_schema_version: 8
   loaded_config_schema_version: 0
   migration_applied: true
-name: cylinder_1 Druck-Volumen - letzter UT-OT-UT-Zyklus
+name: cylinder_1 last UT-OT-UT- Cycle
 style_sheet: ../../plot_style_sheet.yaml
 figures:
 - title: last_ut_ot_ut_pv_cylinder_1
   rows: 1
   cols: 1
   subplots:
-  - title: cylinder_1 Druck-Volumen - letzter UT-OT-UT-Zyklus
+  - title: cylinder_1 last UT-OT-UT- Cycle
     plot_type: line
     x_signal: cylinder_1_V_m3
-    x_title: Zylindervolumen [cm3]
+    x_title: Volume [cm3]
     x_scale_factor: 1000000.0
     x_limit_mode: auto
     info_box:
@@ -22,14 +22,17 @@ figures:
       cylinder: cylinder_1
     y_axes:
     - id: p
-      title: Zylinderdruck [bar]
+      title: Cylinder pressure [bar]
       side: left
       color: '#111111'
     series:
     - signal_key: cylinder_1_p_Pa
       label: cylinder_1
       axis_id: p
-      color: '#b42318'
+      color: '#66B3FF'
       line_style: '-'
-      line_width: 2.0
+      line_width: 1.8
       scale_factor: 1.0e-05
+    show_title: true
+style:
+  default_line_width: 1.6

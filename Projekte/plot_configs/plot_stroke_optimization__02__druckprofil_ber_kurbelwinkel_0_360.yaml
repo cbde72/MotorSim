@@ -1,35 +1,36 @@
-name: Druckprofil über Kurbelwinkel (0°-360°)
+name: Pressureprofil over crank angle (0°-360°)
 style_sheet: ../plot_style_sheet.yaml
 figures:
-- title: Zylinderdruck vs. Kurbelwinkel
+- title: Cylinder pressure vs. crank angle
   rows: 1
   cols: 1
   subplots:
-  - title: Druckprofil über Kurbelwinkel (0°-360°)
+  - title: Pressureprofil over crank angle (0°-360°)
     x_signal: cylinder_0_theta_deg
-    x_title: Kurbelwinkel [°]
+    x_title: Crank angle [deg]
     y_axes:
     - id: pressure
-      title: Druck [bar]
+      title: Pressure [bar]
       side: left
+      color: '#111111'
     - id: volume
-      title: Volumen [cm³]
+      title: Volume [cm³]
       side: right
-      color: '#666666'
+      color: '#111111'
     series:
     - signal_key: cylinder_0_p_Pa
-      label: Druck
+      label: Pressure
       axis_id: pressure
-      color: '#ff7f0e'
+      color: '#66B3FF'
       line_style: '-'
-      line_width: 2.5
+      line_width: 1.8
       scale_factor: 1.0e-05
     - signal_key: cylinder_0_V_m3
-      label: Volumen
+      label: Volume
       axis_id: volume
-      color: '#2ca02c'
+      color: '#7DD3C7'
       line_style: --
-      line_width: 1.8
+      line_width: 1.05
       scale_factor: 1.0e6
     events:
     - x: 0.0
@@ -47,3 +48,6 @@ figures:
       color: '#2ca02c'
       line_style: ':'
       show_label: true
+    show_title: true
+style:
+  default_line_width: 1.6

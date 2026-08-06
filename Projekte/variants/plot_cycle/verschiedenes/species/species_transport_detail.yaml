@@ -1,0 +1,63 @@
+name: Total, air, burned-gas and residual-gas flow
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Species Transport - Slots
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Total, air, burned-gas and residual-gas flow
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_flow
+      title: Mass flow [g/s]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: transfer_slot_1_mdot_kg_per_s
+      label: transfer total
+      axis_id: ax_flow
+      color: '#175CD3'
+      line_style: -.
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.45
+    - signal_key: transfer_slot_1_mdot_air_kg_per_s
+      label: transfer air
+      axis_id: ax_flow
+      color: '#175CD3'
+      line_style: -.
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.45
+    - signal_key: exhaust_slot_1_mdot_kg_per_s
+      label: exhaust total
+      axis_id: ax_flow
+      color: '#D92D20'
+      line_style: -.
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.45
+    - signal_key: exhaust_slot_1_mdot_burned_kg_per_s
+      label: exhaust burned
+      axis_id: ax_flow
+      color: '#D92D20'
+      line_style: -.
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.45
+    - signal_key: exhaust_slot_1_mdot_residual_kg_per_s
+      label: exhaust residual
+      axis_id: ax_flow
+      color: '#D92D20'
+      line_style: -.
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.45
+    show_title: true

@@ -98,6 +98,7 @@ class CombStartMode(IntEnum):
     COMPRESSION_HUB = 2
     HIGN_POSITION = 3
     AUTOIGNITION = 4
+    EXPANSION_DISTANCE_FROM_TDC = 5
 
 
 class CombDurationMode(IntEnum):

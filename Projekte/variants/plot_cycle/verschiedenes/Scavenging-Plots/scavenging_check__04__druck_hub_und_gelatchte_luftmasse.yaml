@@ -1,0 +1,52 @@
+name: Pressure, stroke and latched air mass
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Scavenging — feedback on compression and peak
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Pressure, stroke and latched air mass
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_p
+      title: Pressure [bar]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_aux
+      title: Stroke [mm] / air mass [mg]
+      side: right
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: cylinder_1_p_Pa
+      label: cylinder p
+      axis_id: ax_p
+      color: '#66B3FF'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      unit_preset: raw
+      line_width: 1.8
+    - signal_key: free_piston_distance_from_tdc_m
+      label: dist to TDC
+      axis_id: ax_aux
+      color: '#111111'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.35
+    - signal_key: free_piston_combustion_mass_latched_kg
+      label: latched air mass
+      axis_id: ax_aux
+      color: '#667085'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    show_title: true

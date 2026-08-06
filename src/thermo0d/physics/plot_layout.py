@@ -736,16 +736,19 @@ def _draw_events(base_axis, subplot: dict[str, Any], y_axes_count: int) -> None:
                            bbox={"facecolor": facecolor, "edgecolor": edgecolor, "alpha": bg_alpha, "pad": 0.6})
 
 
-def render_plot_project(export_rows: list[dict[str, Any]], plot_path: str | Path, output_dir: str | Path | None = None, prefix: str = "", run_config_path: str | Path | None = None) -> list[str]:
+def render_plot_project(export_rows: list[dict[str, Any]], plot_path: str | Path, output_dir: str | Path | None = None, prefix: str = "", run_config_path: str | Path | None = None, source_csv_path: str | Path | None = None) -> list[str]:
     if not export_rows:
         return []
-    footer_text = ""
+    run_config_text = ""
     if run_config_path is not None:
         try:
-            footer_text = f"Config: {Path(run_config_path).name}"
+            run_config_text = f"Config: {Path(run_config_path).name}"
         except Exception:
-            footer_text = f"Config: {run_config_path}"
+            run_config_text = f"Config: {run_config_path}"
     plot_path = Path(plot_path).resolve()
+    plot_config_text = f"Plot: {plot_path.name}"
+    csv_text = f"CSV: {Path(source_csv_path).name}" if source_csv_path is not None else ""
+    footer_text = "\n".join(part for part in (run_config_text, plot_config_text, csv_text) if part)
     data = yaml.safe_load(plot_path.read_text(encoding="utf-8")) or {}
     figures = data.get("figures") if isinstance(data.get("figures"), list) else []
     out_dir = Path(output_dir).resolve() if output_dir is not None else (plot_path.parent / "results" / "plots").resolve()

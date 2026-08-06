@@ -1,0 +1,171 @@
+name: Combustion Cylinder 1 - Pressure and Port Areas over Time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: combustion_cylinder_1_pressure_and_port_areas_over_time
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Combustion Cylinder 1 - Pressure and Port Areas over Time
+    show_title: true
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    text_box:
+      enabled: true
+      source: data
+      title: Events
+      x: 0.02
+      y: 0.02
+      ha: left
+      va: bottom
+      font_size: 6.0
+      facecolor: '#ffffff'
+      edgecolor: '#111111'
+      alpha: 0.88
+      metrics:
+      - label: AO time
+        signal_key: last_cycle_time_s
+        mode: first_where
+        where_signal: exhaust_slot_1_A_geom_m2
+        where_gt: 0.0
+        unit: s
+        digits: 5
+        fixed: true
+      - label: AO angle
+        signal_key: theta_deg
+        mode: first_where
+        where_signal: exhaust_slot_1_A_geom_m2
+        where_gt: 0.0
+        unit: deg
+        digits: 2
+        fixed: true
+      - label: AO stroke
+        signal_key: cylinder_1_piston_x_m
+        mode: first_where
+        where_signal: exhaust_slot_1_A_geom_m2
+        where_gt: 0.0
+        scale_factor: 1000.0
+        unit: mm
+        digits: 2
+        fixed: true
+      - label: EO time
+        signal_key: last_cycle_time_s
+        mode: first_where
+        where_signal: transfer_slot_1_A_geom_m2
+        where_gt: 0.0
+        unit: s
+        digits: 5
+        fixed: true
+      - label: EO angle
+        signal_key: theta_deg
+        mode: first_where
+        where_signal: transfer_slot_1_A_geom_m2
+        where_gt: 0.0
+        unit: deg
+        digits: 2
+        fixed: true
+      - label: EO stroke
+        signal_key: cylinder_1_piston_x_m
+        mode: first_where
+        where_signal: transfer_slot_1_A_geom_m2
+        where_gt: 0.0
+        scale_factor: 1000.0
+        unit: mm
+        digits: 2
+        fixed: true
+      - label: SOI time
+        signal_key: last_cycle_time_s
+        mode: first_where
+        where_signal: cylinder_1_combustion_fuel_mass_latched_kg
+        where_gt: 0.0
+        unit: s
+        digits: 5
+        fixed: true
+      - label: SOI angle
+        signal_key: theta_deg
+        mode: first_where
+        where_signal: cylinder_1_combustion_fuel_mass_latched_kg
+        where_gt: 0.0
+        unit: deg
+        digits: 2
+        fixed: true
+      - label: SOI stroke
+        signal_key: cylinder_1_piston_x_m
+        mode: first_where
+        where_signal: cylinder_1_combustion_fuel_mass_latched_kg
+        where_gt: 0.0
+        scale_factor: 1000.0
+        unit: mm
+        digits: 2
+        fixed: true
+      - label: SOC time
+        signal_key: last_cycle_time_s
+        mode: first_where
+        where_signal_any:
+        - cylinder_1_combustion_active_0to1
+        - cylinder_1_added_energy_W
+        where_gt: 0.0
+        unit: s
+        digits: 5
+        fixed: true
+      - label: SOC angle
+        signal_key: theta_deg
+        mode: first_where
+        where_signal_any:
+        - cylinder_1_combustion_active_0to1
+        - cylinder_1_added_energy_W
+        where_gt: 0.0
+        unit: deg
+        digits: 2
+        fixed: true
+      - label: SOC stroke
+        signal_key: cylinder_1_piston_x_m
+        mode: first_where
+        where_signal_any:
+        - cylinder_1_combustion_active_0to1
+        - cylinder_1_added_energy_W
+        where_gt: 0.0
+        scale_factor: 1000.0
+        unit: mm
+        digits: 2
+        fixed: true
+    y_axes:
+    - id: pressure
+      title: Pressure [bar]
+      side: left
+      color: '#111111'
+    - id: port_area
+      title: Port Opening Area [mm²]
+      side: right
+      color: '#111111'
+    series:
+    - signal_key: cylinder_1_p_Pa
+      label: Cylinder Pressure
+      axis_id: pressure
+      color: '#66B3FF'
+      line_style: '-'
+      line_width: 1.8
+      scale_factor: 1.0e-05
+      unit_preset: raw
+    - signal_key: transfer_slot_1_A_geom_m2
+      label: Inlet Port Opening Area
+      axis_id: port_area
+      color: '#B22222'
+      line_style: '--'
+      line_width: 1.0
+      scale_factor: 1.0e6
+      unit_preset: raw
+    - signal_key: exhaust_slot_1_A_geom_m2
+      label: Exhaust Port Opening Area
+      axis_id: port_area
+      color: '#667085'
+      line_style: '--'
+      line_width: 1.0
+      scale_factor: 1.0e6
+      unit_preset: raw

@@ -1,0 +1,71 @@
+name: Cylinder Masses over time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Cylinder Masses over time
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Cylinder Masses over time
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_m_cyl
+      title: Mass [mg]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: cylinder_1_m_kg
+      label: Gas total
+      axis_id: ax_m_cyl
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_m_air_kg
+      label: Air
+      axis_id: ax_m_cyl
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_m_fuel_vapor_kg
+      label: Forcestoff vapor
+      axis_id: ax_m_cyl
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_m_fuel_liquid_kg
+      label: Forcestoff liquid
+      axis_id: ax_m_cyl
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_m_fuel_total_kg
+      label: Forcestoff total
+      axis_id: ax_m_cyl
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_m_burned_kg
+      label: Burned gas
+      axis_id: ax_m_cyl
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    show_title: true

@@ -1,0 +1,148 @@
+name: Piston lift, Massflow, Added Energy
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: energy
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Piston lift, Massflow, Added Energy
+    show_title: true
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    x_spans:
+    - signal_key: cylinder_1_added_energy_W
+      threshold: 1.0
+      active_when: above
+      color: '#FF0000'
+      alpha: 0.12
+      label: Combustion
+      show_label: false
+    - signal_key: free_piston_generator_power_W
+      threshold: 1.0
+      active_when: above
+      color: '#97FFFF'
+      alpha: 0.52
+      label: Load
+      show_label: false
+    y_axes:
+    - id: ax_x
+      title: Piston lift [mm] (+54 = OT, -54 = UT)
+      side: left
+      color: '#111111'
+      limit_mode: manual
+      y_min: -60.0
+      y_max: 60.0
+      min: -60.0
+      max: 60.0
+      axis_label_size: 8
+      tick_label_size: 6
+    - id: ax_mdot
+      title: Mass flow [kg/s]
+      side: right
+      color: '#111111'
+      axis_label_size: 8
+      tick_label_size: 6
+      limit_mode: manual
+      y_min: -0.5
+      y_max: 0.5
+      min: -0.5
+      max: 0.5
+    - id: ax_qzu
+      title: Added Energy [W]
+      side: right
+      color: '#111111'
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 350000.0
+      min: 0.0
+      max: 350000.0
+      axis_label_size: 8
+      tick_label_size: 6
+    y_lines:
+    - y: -54.0
+      axis_id: ax_x
+      label: UT
+      show_label: true
+      label_position: center
+      label_font_size: 6
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      color: '#000000'
+      line_style: --
+      line_width: 0.5
+      alpha: 0.95
+    - y: 54.0
+      axis_id: ax_x
+      label: OT
+      show_label: true
+      label_position: center
+      label_font_size: 6
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      color: '#000000'
+      line_style: --
+      line_width: 0.5
+      alpha: 0.95
+    - y: -38.0
+      axis_id: ax_x
+      label: Intake
+      show_label: true
+      label_position: above
+      label_offset_pt: 1
+      label_font_size: 4
+      color: '#0000FF'
+      line_style: dotted
+      line_width: 0.5
+      alpha: 0.9
+    - y: -36.0
+      axis_id: ax_x
+      label: Exhaust
+      show_label: true
+      label_position: below
+      label_offset_pt: 2
+      label_font_size: 4
+      color: '#FF0000'
+      line_style: dotted
+      line_width: 0.5
+      alpha: 0.9
+    series:
+    - signal_key: free_piston_x_m
+      label: Piston lift
+      axis_id: ax_x
+      color: '#111111'
+      line_style: --
+      line_width: 1.35
+      scale_factor: -1000.0
+      unit_preset: raw
+      offset: 54.04
+    - signal_key: transfer_slot_1_mdot_kg_per_s
+      label: Inflowing mass flow
+      axis_id: ax_mdot
+      color: '#175CD3'
+      line_style: -.
+      line_width: 1.45
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_1_mdot_kg_per_s
+      label: Outflowing mass flow
+      axis_id: ax_mdot
+      color: '#D92D20'
+      line_style: -.
+      line_width: 1.45
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_1_added_energy_W
+      label: Added Energy
+      axis_id: ax_qzu
+      color: '#C2185B'
+      line_style: '-'
+      line_width: 1.9
+      scale_factor: 1.0
+      unit_preset: raw

@@ -9,6 +9,9 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 import matplotlib
 
@@ -17,6 +20,8 @@ import matplotlib.pyplot as plt
 from matplotlib import transforms as mtransforms
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 import yaml
+
+from thermo0d.output.info_box import draw_info_box
 
 
 DEFAULT_CSV = ROOT / "Projekte" / "variants" / "results" / "free_piston_GenSet_V25" / "csv" / "signals.csv"
@@ -315,11 +320,26 @@ def _axis_for(base_axis, axes_by_id: dict[str, Any], axis_specs: list[dict[str, 
         return axes_by_id[axis_id]
     spec = next((item for item in axis_specs if str(item.get("id", "")) == axis_id), {})
     axis = base_axis if not axes_by_id else base_axis.twinx()
-    if axes_by_id and sum(1 for item in axes_by_id.values() if item is not base_axis) > 0:
-        right_count = sum(1 for item in axes_by_id.values() if item is not base_axis)
-        axis.spines["right"].set_position(("outward", 60 * right_count))
+    side = str(spec.get("side", "left" if not axes_by_id else "right") or "right").lower()
+    spine_offset = _safe_float(spec.get("spine_offset", 0.0), 0.0)
+    if side == "right":
+        axis.spines["right"].set_position(("axes", 1.0 + spine_offset))
+        axis.yaxis.set_label_position("right")
+        axis.yaxis.tick_right()
+        if axis is base_axis:
+            axis.spines["left"].set_visible(False)
+    else:
+        axis.spines["left"].set_position(("axes", -spine_offset))
+        axis.yaxis.set_label_position("left")
+        axis.yaxis.tick_left()
+        if axis is not base_axis:
+            axis.spines["left"].set_visible(True)
+            axis.spines["right"].set_visible(False)
     title = str(spec.get("title", "") or "")
-    axis.set_ylabel(title)
+    color = str(spec.get("color", "#111111") or "#111111")
+    axis.set_ylabel(title, color=color, labelpad=_safe_float(spec.get("label_pad", 4.0), 4.0))
+    axis.tick_params(axis="y", colors=color, pad=_safe_float(spec.get("tick_label_pad", 3.5), 3.5))
+    axis.spines["right" if side == "right" else "left"].set_color(color)
     axes_by_id[axis_id] = axis
     return axis
 
@@ -419,351 +439,15 @@ def _finite(row: dict[str, Any], key: str) -> float | None:
     return value if math.isfinite(value) else None
 
 
-def _first_finite(row: dict[str, Any], keys: list[str]) -> float | None:
-    for key in keys:
-        value = _finite(row, key)
-        if value is not None:
-            return value
-    return None
-
-
-def _column(rows: list[dict[str, Any]], key: str) -> list[float]:
-    values: list[float] = []
-    for row in rows:
-        value = _finite(row, key)
-        values.append(value if value is not None else float("nan"))
-    return values
-
-
-def _trapz(xs: list[float], ys: list[float], *, absolute: bool = False) -> float | None:
-    total = 0.0
-    used = False
-    for i in range(1, min(len(xs), len(ys))):
-        x0 = xs[i - 1]
-        x1 = xs[i]
-        y0 = ys[i - 1]
-        y1 = ys[i]
-        if not all(math.isfinite(v) for v in (x0, x1, y0, y1)):
-            continue
-        if x1 < x0:
-            continue
-        if absolute:
-            y0 = abs(y0)
-            y1 = abs(y1)
-        total += 0.5 * (y0 + y1) * (x1 - x0)
-        used = True
-    return total if used else None
-
-
-def _format_value(value: float | None, unit: str, digits: int = 2) -> str:
-    if value is None or not math.isfinite(value):
-        return "n/a"
-    if abs(value) >= 1000.0 or (abs(value) < 0.01 and value != 0.0):
-        return f"{value:.3g} {unit}".strip()
-    return f"{value:.{digits}f} {unit}".strip()
-
-
-def _metric_imep(rows: list[dict[str, Any]], metric: dict[str, Any]) -> float | None:
-    cylinder = str(metric.get("cylinder", "") or "").strip()
-    p_key = str(metric.get("pressure_signal", "") or (f"{cylinder}_p_Pa" if cylinder else "")).strip()
-    v_key = str(metric.get("volume_signal", "") or (f"{cylinder}_V_m3" if cylinder else "")).strip()
-    if not p_key or not v_key:
-        return None
-    p_values = _column(rows, p_key)
-    v_values = _column(rows, v_key)
-    work_j = _trapz(v_values, p_values)
-    finite_v = [value for value in v_values if math.isfinite(value)]
-    swept_volume = max(finite_v) - min(finite_v) if finite_v else None
-    if work_j is None or swept_volume is None or swept_volume <= 1.0e-18:
-        return None
-    return work_j / swept_volume / 1.0e5
-
-
-def _metric_value(rows: list[dict[str, Any]], metric: dict[str, Any], subplot: dict[str, Any]) -> float | None:
-    kind = str(metric.get("kind", "") or "").lower().strip()
-    if kind == "imep":
-        value = _metric_imep(rows, metric)
-    else:
-        key = str(metric.get("signal_key", "") or "").strip()
-        if not key:
-            return None
-        mode = str(metric.get("mode", "last") or "last").lower().strip()
-        if mode == "first_where":
-            raw_where_keys = metric.get("where_signal_any", None)
-            if isinstance(raw_where_keys, list):
-                where_keys = [str(item).strip() for item in raw_where_keys if str(item).strip()]
-            else:
-                where_keys = [str(metric.get("where_signal", "") or "").strip()]
-            where_gte_raw = metric.get("where_gte", metric.get("where_ge", None))
-            where_gte = _safe_float(where_gte_raw, 0.0) if where_gte_raw is not None else None
-            where_gt = _safe_float(metric.get("where_gt", 0.0), 0.0)
-            for row in rows:
-                if where_gte is not None:
-                    matches = any((where_value := _finite(row, where_key)) is not None and where_value >= where_gte for where_key in where_keys)
-                else:
-                    matches = any((where_value := _finite(row, where_key)) is not None and where_value > where_gt for where_key in where_keys)
-                if matches:
-                    value = _finite(row, key)
-                    break
-            else:
-                value = None
-            if value is None:
-                return None
-        else:
-            values = _column(rows, key)
-            finite_values = [item for item in values if math.isfinite(item)]
-            if not finite_values:
-                return None
-            if mode == "first":
-                value = finite_values[0]
-            elif mode == "min":
-                value = min(finite_values)
-            elif mode == "max":
-                value = max(finite_values)
-            elif mode == "mean":
-                value = sum(finite_values) / len(finite_values)
-            elif mode == "delta":
-                value = finite_values[-1] - finite_values[0]
-            elif mode == "integral":
-                x_key = str(metric.get("x_signal", "") or subplot.get("x_signal", "t_s") or "t_s")
-                value = _trapz(_column(rows, x_key), values, absolute=bool(metric.get("absolute", False)))
-            else:
-                value = finite_values[-1]
-    if value is None or not math.isfinite(value):
-        return None
-    if bool(metric.get("absolute", False)) and str(metric.get("mode", "") or "").lower() != "integral":
-        value = abs(value)
-    try:
-        value = value * float(metric.get("scale_factor", 1.0) or 1.0) + float(metric.get("offset", 0.0) or 0.0)
-    except Exception:
-        pass
-    return value if math.isfinite(value) else None
-
-
-def _format_metric_value(value: float | None, metric: dict[str, Any]) -> str:
-    unit = str(metric.get("unit", "") or "").strip()
-    try:
-        digits_raw = metric.get("digits", 2)
-        digits = int(2 if digits_raw is None else digits_raw)
-    except Exception:
-        digits = 2
-    if value is None or not math.isfinite(value):
-        return "n/a"
-    if bool(metric.get("fixed", False)):
-        return f"{value:.{max(0, digits)}f} {unit}".strip()
-    if bool(metric.get("scientific", False)):
-        return f"{value:.{max(0, digits)}e} {unit}".strip()
-    if abs(value) >= 1000.0 or (abs(value) < 0.01 and value != 0.0):
-        return f"{value:.{max(1, digits)}g} {unit}".strip()
-    return f"{value:.{max(0, digits)}f} {unit}".strip()
-
-
-def _readme_table_values(path: Path) -> dict[str, tuple[str, str]]:
-    values: dict[str, tuple[str, str]] = {}
-    if not path.exists() or not path.is_file():
-        return values
-    try:
-        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
-    except Exception:
-        return values
-    for line in lines:
-        text = line.strip()
-        if not text.startswith("|") or text.count("|") < 3:
-            continue
-        cells = [cell.strip().strip("`") for cell in text.strip("|").split("|")]
-        if len(cells) < 3 or not cells[0] or set(cells[0]) <= {"-"}:
-            continue
-        key, value, unit = cells[0], cells[1], cells[2]
-        if key.lower() in {"kennwert", "metric", "signal", "name"}:
-            continue
-        values[key] = (value, unit)
-    return values
-
-
-def _readme_values_for_box(info: dict[str, Any], plot_path: Path, output_dir: Path) -> dict[str, tuple[str, str]]:
-    candidates: list[Path] = []
-    configured = str(info.get("readme_path", "") or info.get("path", "") or "").strip()
-    if configured:
-        raw = Path(configured)
-        candidates.append(raw if raw.is_absolute() else (plot_path.parent / raw))
-        candidates.append(raw if raw.is_absolute() else (output_dir / raw))
-    candidates.extend([
-        output_dir / "README.md",
-        output_dir.parent / "README.md",
-        plot_path.parent / "README.md",
-        Path.cwd() / "README.md",
-    ])
-    seen: set[Path] = set()
-    for candidate in candidates:
-        try:
-            resolved = candidate.resolve()
-        except Exception:
-            resolved = candidate
-        if resolved in seen:
-            continue
-        seen.add(resolved)
-        values = _readme_table_values(resolved)
-        if values:
-            return values
-    return {}
-
-
-def _readme_info_text(info: dict[str, Any], readme_values: dict[str, tuple[str, str]]) -> str:
-    lines: list[str] = []
-    title = str(info.get("title", "") or "").strip()
-    if title:
-        lines.append(title)
-    metrics = info.get("metrics") if isinstance(info.get("metrics"), list) else []
-    for metric in metrics:
-        if not isinstance(metric, dict):
-            continue
-        key = str(metric.get("readme_key", "") or metric.get("key", "") or metric.get("signal_key", "") or "").strip()
-        if not key:
-            continue
-        label = str(metric.get("label", "") or key).strip()
-        value, unit = readme_values.get(key, ("n/a", str(metric.get("unit", "") or "").strip()))
-        unit = str(metric.get("unit", unit) if metric.get("unit", None) is not None else unit).strip()
-        separator = str(metric.get("separator", ": ") or ": ")
-        lines.append(f"{label}{separator}{value} {unit}".strip())
-    return "\n".join(lines)
-
-
-def _generic_info_text(rows: list[dict[str, Any]], subplot: dict[str, Any], info: dict[str, Any], plot_path: Path, output_dir: Path) -> str:
-    if str(info.get("source", "") or "").lower().strip() == "readme":
-        return _readme_info_text(info, _readme_values_for_box(info, plot_path, output_dir))
-    lines: list[str] = []
-    title = str(info.get("title", "") or "").strip()
-    if title:
-        lines.append(title)
-    metrics = info.get("metrics") if isinstance(info.get("metrics"), list) else []
-    for metric in metrics:
-        if not isinstance(metric, dict):
-            continue
-        label = str(metric.get("label", "") or metric.get("signal_key", "") or metric.get("kind", "") or "").strip()
-        if not label:
-            continue
-        separator = str(metric.get("separator", ": ") or ": ")
-        lines.append(f"{label}{separator}{_format_metric_value(_metric_value(rows, metric, subplot), metric)}")
-    return "\n".join(lines)
-
-
-def _combustion_start_row(rows: list[dict[str, Any]], cyl_name: str) -> dict[str, Any] | None:
-    candidates = [
-        f"{cyl_name}_combustion_active_0to1",
-        f"{cyl_name}_combustion_fraction_0to1",
-        f"{cyl_name}_added_energy_W",
-    ]
-    for row in rows:
-        for key in candidates:
-            value = _finite(row, key)
-            if value is not None and value > 1.0e-12:
-                return row
-    if rows:
-        return rows[len(rows) // 2]
-    return None
-
-
-def _pv_info_text(rows: list[dict[str, Any]], cyl_name: str) -> str:
-    t_s = _column(rows, "t_s")
-    p_pa = _column(rows, f"{cyl_name}_p_Pa")
-    volume = _column(rows, f"{cyl_name}_V_m3")
-    added_w = _column(rows, f"{cyl_name}_added_energy_W")
-    wall_w = _column(rows, f"{cyl_name}_wall_heat_W")
-    piston_work_j = _trapz(volume, p_pa)
-    added_energy_j = _trapz(t_s, added_w)
-    wall_heat_loss_j = _trapz(t_s, wall_w, absolute=True)
-    finite_p = [p for p in p_pa if math.isfinite(p)]
-    finite_v = [v for v in volume if math.isfinite(v)]
-    finite_t = [t for t in t_s if math.isfinite(t)]
-    duration_s = finite_t[-1] - finite_t[0] if len(finite_t) >= 2 and finite_t[-1] > finite_t[0] else None
-    frequency_hz = 1.0 / duration_s if duration_s and duration_s > 1.0e-15 else None
-    swept_volume = max(finite_v) - min(finite_v) if finite_v else None
-    pmi_bar = piston_work_j / swept_volume / 1.0e5 if piston_work_j is not None and swept_volume and swept_volume > 1.0e-18 else None
-    indicated_power_w = piston_work_j / duration_s if piston_work_j is not None and duration_s and duration_s > 1.0e-15 else None
-    pmax_bar = max(finite_p) * 1.0e-5 if finite_p else None
-    real_cr = max(finite_v) / min(finite_v) if finite_v and min(finite_v) > 1.0e-18 else None
-    soc_row = _combustion_start_row(rows, cyl_name)
-    soc_p_bar = None
-    soc_t_k = None
-    soc_lambda = None
-    soc_theta = None
-    restgas_percent = None
-    if soc_row is not None:
-        p_value = _first_finite(soc_row, [f"{cyl_name}_p_Pa", f"{cyl_name}_p_bar"])
-        if p_value is not None:
-            soc_p_bar = p_value * 1.0e-5 if f"{cyl_name}_p_Pa" in soc_row else p_value
-        soc_t_k = _first_finite(soc_row, [f"{cyl_name}_T_K"])
-        soc_lambda = _first_finite(soc_row, [f"{cyl_name}_thermo_lambda", f"{cyl_name}_lambda"])
-        soc_theta = _first_finite(soc_row, ["theta_deg", f"{cyl_name}_theta_deg"])
-        burned_share = _first_finite(soc_row, [f"{cyl_name}_share_burned_0to1"])
-        if burned_share is not None:
-            restgas_percent = 100.0 * max(0.0, min(1.0, burned_share))
-    wall_heat_pct = ""
-    piston_work_pct = ""
-    if added_energy_j is not None and added_energy_j > 0.0:
-        if wall_heat_loss_j is not None:
-            wall_heat_pct = f" ({round(wall_heat_loss_j / added_energy_j * 100):.0f}%)"
-        if piston_work_j is not None:
-            piston_work_pct = f" ({round(piston_work_j / added_energy_j * 100):.0f}%)"
-    return "\n".join([
-        f"Zugef. Energie: {_format_value(added_energy_j, 'J')}",
-        f"Wandwaermeverluste: {_format_value(wall_heat_loss_j, 'J')}{wall_heat_pct}",
-        f"Kolbenarbeit: {_format_value(piston_work_j, 'J')}{piston_work_pct}",
-        "",
-        f"Brennbeginn theta: {_format_value(soc_theta, 'deg')}",
-        f"Druck Brennbeginn: {_format_value(soc_p_bar, 'bar')}",
-        f"Temperatur Brennbeginn: {_format_value(soc_t_k, 'K')}",
-        f"Lambda (SOC): {_format_value(soc_lambda, '-', 3)}",
-        f"Frequenz: {_format_value(frequency_hz, 'Hz')}",
-        f"Innere Leistung: {_format_value(indicated_power_w / 1000.0 if indicated_power_w is not None else None, 'kW')}",
-        f"pmi: {_format_value(pmi_bar, 'bar')}",
-        f"pmax: {_format_value(pmax_bar, 'bar')}",
-        f"Restgasanteil: {_format_value(restgas_percent, '%', 1)}",
-        f"Verdichtung real: {_format_value(real_cr, '-', 1)}",
-    ])
-
-
-def _draw_info_box(axis, subplot: dict[str, Any], rows: list[dict[str, Any]], plot_path: Path, output_dir: Path) -> None:
-    info = subplot.get("text_box")
-    if not isinstance(info, dict) or not bool(info.get("enabled", False)):
-        info = subplot.get("info_box")
-    if not isinstance(info, dict) or not bool(info.get("enabled", False)):
-        return
-    kind = str(info.get("kind", "") or "")
-    if kind == "last_ut_ot_ut_pv":
-        cyl_name = str(info.get("cylinder", "cylinder_1") or "cylinder_1")
-        text = _pv_info_text(rows, cyl_name)
-    else:
-        text = _generic_info_text(rows, subplot, info, plot_path, output_dir)
-    if not text.strip():
-        return
-    axis.text(
-        float(info.get("x", 0.98) or 0.98),
-        float(info.get("y", 0.98) or 0.98),
-        text,
-        transform=axis.transAxes,
-        ha=str(info.get("ha", "right") or "right"),
-        va=str(info.get("va", "top") or "top"),
-        fontsize=float(info.get("font_size", 7.2) or 7.2),
-        linespacing=float(info.get("linespacing", 1.2) or 1.2),
-        bbox=dict(
-            boxstyle="square,pad=0.45",
-            facecolor=str(info.get("facecolor", "white") or "white"),
-            edgecolor=str(info.get("edgecolor", "black") or "black"),
-            linewidth=float(info.get("linewidth", 1.0) or 1.0),
-            alpha=float(info.get("alpha", 0.96) or 0.96),
-        ),
-    )
-
-
-def render_plot_project_from_rows(rows: list[dict[str, Any]], plot_path: Path, output_dir: Path, prefix: str, run_config_path: Path | None = None) -> list[str]:
+def render_plot_project_from_rows(rows: list[dict[str, Any]], plot_path: Path, output_dir: Path, prefix: str, run_config_path: Path | None = None, source_csv_path: Path | None = None) -> list[str]:
     data = yaml.safe_load(plot_path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         return []
     style = _style(data, plot_path)
     run_config_text = f"Config: {run_config_path.name}" if run_config_path is not None else ""
     plot_config_text = f"Plot: {plot_path.name}"
-    footer_text = "\n".join(part for part in (run_config_text, plot_config_text) if part)
+    csv_text = f"CSV: {source_csv_path.name}" if source_csv_path is not None else ""
+    footer_text = "\n".join(part for part in (run_config_text, plot_config_text, csv_text) if part)
     output_dir.mkdir(parents=True, exist_ok=True)
     rendered: list[str] = []
     figures = data.get("figures") if isinstance(data.get("figures"), list) else []
@@ -852,7 +536,7 @@ def render_plot_project_from_rows(rows: list[dict[str, Any]], plot_path: Path, o
                 base_axis.grid(True, alpha=float(style.get("grid_alpha", 0.3) or 0.3))
             if labels and bool(style.get("legend_visible", True)):
                 base_axis.legend([line for line, _ in labels], [label for _, label in labels], loc=str(style.get("legend_position", "best") or "best"), fontsize=float(style.get("tick_label_size", 8.0) or 8.0))
-            _draw_info_box(base_axis, subplot, rows, plot_path, output_dir)
+            draw_info_box(base_axis, subplot, rows, plot_path, output_dir)
             _apply_x_axis_layout(base_axis, subplot, rows, style)
             for axis_spec in axis_specs:
                 axis_id = str(axis_spec.get("id", ""))
@@ -917,7 +601,7 @@ def render_pipeline_csv_plots(csv_path: Path, plot_cfg_path: Path, outdir: Path,
     rendered: list[str] = []
     for plot_path in plot_paths:
         file_prefix = "__".join(part for part in (str(prefix).strip(), plot_path.stem.replace("-", "_")) if part)
-        rendered.extend(render_plot_project_from_rows(rows, plot_path, outdir, file_prefix, run_config_path=run_config_path))
+        rendered.extend(render_plot_project_from_rows(rows, plot_path, outdir, file_prefix, run_config_path=run_config_path, source_csv_path=csv_path))
     return rendered
 
 

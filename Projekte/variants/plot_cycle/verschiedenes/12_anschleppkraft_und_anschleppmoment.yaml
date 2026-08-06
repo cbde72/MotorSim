@@ -1,0 +1,46 @@
+name: Cranking force and cranking torque
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: anschleppkraft_und_anschleppmoment
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Cranking force and cranking torque
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    y_axes:
+    - id: force
+      title: Cranking force [N]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: torque
+      title: Cranking torque [Nm]
+      side: right
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: free_piston_generator_assist_force_N
+      label: Cranking force
+      axis_id: force
+      color: '#667085'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: free_piston_generator_assist_torque_Nm
+      label: Cranking torque
+      axis_id: torque
+      color: '#667085'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.6
+    show_title: true

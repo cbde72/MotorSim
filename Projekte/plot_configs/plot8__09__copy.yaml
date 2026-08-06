@@ -1,17 +1,7 @@
-name: ' Copy'
+name: Copy
 style_sheet: ../plot_style_sheet.yaml
 style:
-  background_color: '#ffffff'
-  axes_facecolor: '#ffffff'
-  text_color: '#202020'
-  grid_color: '#d8d8d8'
-  legend_facecolor: '#ffffff'
-  legend_edgecolor: '#9aa0a6'
-  default_line_width: 1.8
-  default_marker_size: 4.5
-  font_size: 10
-  title_size: 12
-  grid_alpha: 0.65
+  default_line_width: 1.6
 figures:
 - id: cca670cf54e5
   title: Wall Heat
@@ -19,10 +9,10 @@ figures:
   cols: 1
   subplots:
   - id: df6e1f0a9cfc
-    title: ' Copy'
+    title: Copy
     plot_type: line
     x_signal: cylinder_theta_deg
-    x_title: Kurbelwinkel [deg]
+    x_title: Crank angle [deg]
     x_unit_preset: raw
     x_scale_factor: 1.0
     x_offset: 0.0
@@ -31,7 +21,7 @@ figures:
     x_max: 720.0
     y_axes:
     - id: 61a544421fe5
-      title: Wandwärme [J]
+      title: Wall heat [J]
       side: left
       spine_offset: 0.0
       color: '#111111'
@@ -44,10 +34,10 @@ figures:
       major_grid: true
       minor_grid: false
     - id: 0ddfd8bef113
-      title: Ventilhub [mm]
+      title: Valve lift [mm]
       side: right
       spine_offset: 0.0
-      color: '#1f77b4'
+      color: '#111111'
       visible: true
       limit_mode: data
       y_min: 0.0
@@ -59,13 +49,13 @@ figures:
     series:
     - id: 5845f8d960a3
       signal_key: cylinder_wall_heat_cycle_J
-      label: Wandwärme (kumuliert)
+      label: Wall heat (cumulative)
       axis_id: 61a544421fe5
       visible: true
-      color: '#111111'
+      color: '#7DD3C7'
       line_style: '-'
       marker: ''
-      line_width: 1.8
+      line_width: 1.6
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1.0
@@ -73,13 +63,13 @@ figures:
       series_type: line
     - id: f0f9e0611057
       signal_key: intake_valve_valve_lift_m
-      label: Einlasshub
+      label: Intake valve lift
       axis_id: 0ddfd8bef113
       visible: true
-      color: '#0000ff'
+      color: '#175CD3'
       line_style: --
       marker: ''
-      line_width: 1.8
+      line_width: 1.05
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1000.0
@@ -87,13 +77,13 @@ figures:
       series_type: line
     - id: 51df7eb621da
       signal_key: exhaust_valve_valve_lift_m
-      label: Auslasshub
+      label: Exhaust valve lift
       axis_id: 0ddfd8bef113
       visible: true
-      color: '#ff0000'
+      color: '#D92D20'
       line_style: --
       marker: ''
-      line_width: 1.8
+      line_width: 1.05
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1000.0
@@ -313,3 +303,4 @@ figures:
     legend_visible: true
     legend_position: best
     show_grid: true
+    show_title: true

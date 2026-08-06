@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Free-Piston GenSet V32 – Bewegungsfunktion und Systemkopplung</title>
+  <style>
+    :root{--ink:#172033;--muted:#5b6578;--blue:#155eef;--cyan:#0891b2;--line:#d9e0ea;--paper:#fff;--wash:#f4f7fb;--nav:#101828;--ok:#067647;--warn:#b54708}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--wash);color:var(--ink);font:15.5px/1.65 Inter,Segoe UI,Arial,sans-serif}
+    .layout{display:grid;grid-template-columns:285px minmax(0,1000px);gap:34px;max-width:1350px;margin:auto;padding:26px}
+    aside{position:sticky;top:20px;height:calc(100vh - 40px);overflow:auto;background:var(--nav);color:#e6edf8;border-radius:18px;padding:24px;box-shadow:0 12px 35px #10182824}
+    aside h1{font-size:20px;line-height:1.25;margin:8px 0 6px}aside p{color:#aebbd0;font-size:13px}nav a{display:block;color:#cbd5e1;text-decoration:none;padding:7px 10px;border-radius:7px;font-size:13px}nav a:hover{background:#263247;color:white}
+    main{min-width:0}.hero,.card{background:var(--paper);border:1px solid var(--line);border-radius:17px;box-shadow:0 7px 24px #1018280c}
+    .hero{padding:40px;margin-bottom:22px;background:linear-gradient(135deg,#fff 60%,#eaf2ff)}.hero h1{font-size:34px;line-height:1.16;margin:10px 0}.eyebrow{color:var(--blue);text-transform:uppercase;letter-spacing:.12em;font-weight:750;font-size:12px}
+    .card{padding:30px 34px;margin:0 0 22px}h2{font-size:24px;margin:0 0 14px}h3{font-size:18px;margin:26px 0 8px}h4{font-size:15px;margin:20px 0 6px;color:#344054}p{margin:8px 0 14px}.muted{color:var(--muted)}
+    code{font:13px/1.5 Consolas,monospace;background:#eef2f7;color:#243b64;border-radius:5px;padding:2px 5px}pre{overflow:auto;background:#111827;color:#dbeafe;border-radius:10px;padding:17px;font:12.5px/1.55 Consolas,monospace}
+    table{width:100%;border-collapse:collapse;margin:14px 0 22px;font-size:13.5px}th,td{border-bottom:1px solid var(--line);text-align:left;vertical-align:top;padding:10px 9px}th{background:#f8fafc;color:#344054;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+    .eq{overflow:auto;margin:14px 0;padding:15px 18px;border-left:4px solid var(--blue);background:#f7faff;border-radius:0 9px 9px 0}.eq math{font-size:1.14rem}.callout{padding:14px 17px;border-radius:9px;background:#ecfdf3;border:1px solid #abefc6}.warn{background:#fffaeb;border-color:#fedf89}.tag{display:inline-block;padding:3px 8px;border-radius:999px;background:#e8f0ff;color:#174ea6;font-size:12px;font-weight:700}
+    .flow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:16px 0}.node{padding:8px 11px;border:1px solid #b8c7dd;background:white;border-radius:8px;font-size:12.5px}.arrow{color:var(--blue);font-weight:bold}.branch{padding:17px;border-radius:11px;background:#f8fafc;border:1px solid var(--line);margin:10px 0}
+    .cols{display:grid;grid-template-columns:1fr 1fr;gap:15px}.small{font-size:12.5px}.source{border-top:1px solid var(--line);padding-top:15px;color:var(--muted);font-size:12px}
+    @media(max-width:900px){.layout{display:block;padding:12px}aside{position:relative;height:auto;margin-bottom:18px}nav{columns:2}.cols{grid-template-columns:1fr}.hero,.card{padding:24px}}
+    @media print{body{background:white}.layout{display:block;max-width:none;padding:0}aside{display:none}.hero,.card{box-shadow:none;break-inside:avoid}.card{border:0;border-top:1px solid #bbb;border-radius:0}}
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <div class="eyebrow">Thermo0D · V32</div>
+    <h1>Bewegungsfunktion</h1>
+    <p>Technische Dokumentation auf Basis von <code>free_piston_GenSet_V32.yaml</code>.</p>
+    <nav>
+      <a href="#zweck">1 · Zweck und Gültigkeit</a>
+      <a href="#architektur">2 · Systemarchitektur</a>
+      <a href="#zustand">3 · Mechanischer Zustand</a>
+      <a href="#abbildung">4 · Winkel-Hub-Abbildung</a>
+      <a href="#spiegelung">5 · Spiegelkinematik</a>
+      <a href="#volumen">6 · Volumenfunktionen</a>
+      <a href="#kraefte">7 · Kräfte und Bewegung</a>
+      <a href="#gas">8 · Thermodynamische Kopplung</a>
+      <a href="#verbindungen">9 · Verbindungen</a>
+      <a href="#slots">10 · Schlitzsteuerung</a>
+      <a href="#yaml">11 · YAML-Semantik</a>
+      <a href="#parameter">12 · Parameterreferenz</a>
+      <a href="#ablauf">13 · Rechenablauf</a>
+      <a href="#hinweise">14 · Modellhinweise</a>
+    </nav>
+  </aside>
+
+  <main>
+    <header class="hero" id="zweck">
+      <div class="eyebrow">Berechnungsstand: GenSet V32 · Schema 8</div>
+      <h1>Freikolben-GenSet: vollständige Bewegungsfunktion und Fluidkopplung</h1>
+      <p class="muted">Diese Dokumentation beschreibt den tatsächlich implementierten Rechenweg der Variante V32: einen oszillierenden Rotationsfreiheitsgrad, zwei gespiegelte Arbeitszylinder, zwei gegenläufige Kompressorkammern sowie deren Rückschlagventil-, Receiver-, Überström- und Abgaspfade.</p>
+      <span class="tag">Native MathML</span> <span class="tag">eigenständiges HTML</span> <span class="tag">YAML-Parameterreferenz</span>
+    </header>
+
+    <section class="card" id="architektur">
+      <h2>1. Systemarchitektur</h2>
+      <p><code>modeling.architecture: free_piston</code> aktiviert den Freikolben-RHS. V32 besitzt <strong>einen</strong> generalisierten mechanischen Freiheitsgrad, aber jeweils zwei Arbeits- und Kompressorräume. Die Zuordnung erfolgt in der Reihenfolge der Volumenliste: erstes bewegtes Volumen mit Vorzeichen <code>+1</code>, zweites gleichartiges Volumen mit <code>−1</code>.</p>
+      <div class="cols">
+        <div class="branch"><strong>Strang 1</strong><div class="flow"><span class="node">ambient_in</span><span class="arrow">→</span><span class="node">compressor_1</span><span class="arrow">→</span><span class="node">receiver_1</span><span class="arrow">→</span><span class="node">cylinder_1</span><span class="arrow">→</span><span class="node">exhaust_plenum_1</span><span class="arrow">→</span><span class="node">ambient_out</span></div></div>
+        <div class="branch"><strong>Strang 2 (gespiegelt)</strong><div class="flow"><span class="node">ambient_in</span><span class="arrow">→</span><span class="node">compressor_2</span><span class="arrow">→</span><span class="node">receiver_2</span><span class="arrow">→</span><span class="node">cylinder_2</span><span class="arrow">→</span><span class="node">exhaust_plenum_2</span><span class="arrow">→</span><span class="node">ambient_out</span></div></div>
+      </div>
+      <div class="callout">Die beiden Stränge sind fluidisch voneinander getrennt. Sie koppeln ausschließlich über denselben mechanischen Winkelzustand und die gemeinsame Kraft-/Drehmomentbilanz.</div>
+    </section>
+
+    <section class="card" id="zustand">
+      <h2>2. Generalisierter mechanischer Zustand</h2>
+      <p>Für <code>kinematics_type: oscillating_rotary</code> sind die mechanischen Zustände kein Hub und keine lineare Geschwindigkeit, sondern Winkel und Winkelgeschwindigkeit:</p>
+      <div class="eq"><math display="block"><mrow><mi>q</mi><mo>=</mo><mi>φ</mi><mo>,</mo><mspace width="1em"/><mover><mi>q</mi><mo>˙</mo></mover><mo>=</mo><mi>ω</mi><mo>=</mo><mfrac><mrow><mi>d</mi><mi>φ</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac></mrow></math></div>
+      <p>Die YAML-Grenzen <code>angle_min_deg: −9</code> und <code>angle_max_deg: +9</code> werden intern in Radiant umgerechnet. Der äquivalente lineare Arbeitsbereich bleibt <code>x_min_m: 0</code> bis <code>x_max_m: 0.10807</code>.</p>
+      <table><thead><tr><th>Größe</th><th>V32-Wert</th><th>Bedeutung</th></tr></thead><tbody>
+        <tr><td><code>φmin</code> / <code>φmax</code></td><td>−9° / +9°</td><td>Mechanische Winkelgrenzen</td></tr>
+        <tr><td><code>reff</code></td><td>0,343997494 m</td><td>Effektiver Radius der Bogen-Hub-Abbildung</td></tr>
+        <tr><td><code>J</code></td><td>1,396344455 kg·m²</td><td>Generalisierte rotatorische Trägheit</td></tr>
+        <tr><td><code>x0</code> / <code>v0</code></td><td>0,054 m / −5,037844 m/s</td><td>Lineare Startvorgabe vor Rücktransformation</td></tr>
+      </tbody></table>
+      <p>Aus den linearen Startwerten bildet der Builder:</p>
+      <div class="eq"><math display="block"><mrow><msub><mi>φ</mi><mn>0</mn></msub><mo>=</mo><msub><mi>φ</mi><mtext>min</mtext></msub><mo>+</mo><mfrac><mrow><msub><mi>x</mi><mn>0</mn></msub><mo>−</mo><msub><mi>x</mi><mtext>min</mtext></msub></mrow><msub><mi>r</mi><mtext>eff</mtext></msub></mfrac><mo>,</mo><mspace width="1em"/><msub><mi>ω</mi><mn>0</mn></msub><mo>=</mo><mfrac><msub><mi>v</mi><mn>0</mn></msub><msub><mi>r</mi><mtext>eff</mtext></msub></mfrac></mrow></math></div>
+    </section>
+
+    <section class="card" id="abbildung">
+      <h2>3. Winkel-Hub-Abbildung</h2>
+      <p>Alle gasseitigen Modelle – Volumen, Schlitze, Verbrennung und Wandwärme – arbeiten weiter mit einer äquivalenten linearen Kolbenkoordinate. Für die positive Seite gilt:</p>
+      <div class="eq"><math display="block"><mtable columnalign="right left"><mtr><mtd><msub><mi>x</mi><mo>+</mo></msub></mtd><mtd><mo>=</mo><msub><mi>x</mi><mtext>min</mtext></msub><mo>+</mo><msub><mi>r</mi><mtext>eff</mtext></msub><mfenced><mrow><mi>φ</mi><mo>−</mo><msub><mi>φ</mi><mtext>min</mtext></msub></mrow></mfenced></mtd></mtr><mtr><mtd><msub><mi>v</mi><mo>+</mo></msub></mtd><mtd><mo>=</mo><msub><mi>r</mi><mtext>eff</mtext></msub><mi>ω</mi></mtd></mtr></mtable></math></div>
+      <p>Der konfigurierte Radius ist so gewählt, dass der Winkelbereich genau dem Hub entspricht:</p>
+      <div class="eq"><math display="block"><mrow><mi>H</mi><mo>=</mo><msub><mi>r</mi><mtext>eff</mtext></msub><mfenced><mrow><msub><mi>φ</mi><mtext>max</mtext></msub><mo>−</mo><msub><mi>φ</mi><mtext>min</mtext></msub></mrow></mfenced><mo>≈</mo><mn>0.10807</mn><mspace width=".3em"/><mi mathvariant="normal">m</mi></mrow></math></div>
+      <p>Damit ist die Abbildung eine lineare Bogenlängen-Abbildung <math><mrow><mi>s</mi><mo>=</mo><mi>r</mi><mi>φ</mi></mrow></math>, keine Sinus- oder Kurbeltriebkinematik. Die unter <code>volumes[*].kinematics.type: crank_slider</code> gespeicherten Geometriedaten bestimmen im Freikolben-RHS nicht die Bewegung.</p>
+    </section>
+
+    <section class="card" id="spiegelung">
+      <h2>4. Gespiegelte Bewegung der beiden Seiten</h2>
+      <p>Für <code>cylinder_1</code> und <code>compressor_1</code> ist das interne Bewegungszeichen <math><mrow><mi>s</mi><mo>=</mo><mo>+</mo><mn>1</mn></mrow></math>. Für die jeweils zweite Instanz ist <math><mrow><mi>s</mi><mo>=</mo><mo>−</mo><mn>1</mn></mrow></math>. Die negative Seite wird am Mittelpunkt des Winkelbereichs gespiegelt:</p>
+      <div class="eq"><math display="block"><mtable columnalign="right left"><mtr><mtd><msub><mi>φ</mi><mo>−</mo></msub></mtd><mtd><mo>=</mo><msub><mi>φ</mi><mtext>min</mtext></msub><mo>+</mo><msub><mi>φ</mi><mtext>max</mtext></msub><mo>−</mo><mi>φ</mi></mtd></mtr><mtr><mtd><msub><mi>ω</mi><mo>−</mo></msub></mtd><mtd><mo>=</mo><mo>−</mo><mi>ω</mi></mtd></mtr><mtr><mtd><msub><mi>x</mi><mo>−</mo></msub></mtd><mtd><mo>=</mo><msub><mi>x</mi><mtext>min</mtext></msub><mo>+</mo><msub><mi>r</mi><mtext>eff</mtext></msub><mfenced><mrow><msub><mi>φ</mi><mo>−</mo></msub><mo>−</mo><msub><mi>φ</mi><mtext>min</mtext></msub></mrow></mfenced></mtd></mtr><mtr><mtd><msub><mi>v</mi><mo>−</mo></msub></mtd><mtd><mo>=</mo><mo>−</mo><msub><mi>r</mi><mtext>eff</mtext></msub><mi>ω</mi></mtd></mtr></mtable></math></div>
+      <p>Äquivalent gilt für den Hub:</p>
+      <div class="eq"><math display="block"><mrow><msub><mi>x</mi><mo>−</mo></msub><mo>=</mo><msub><mi>x</mi><mtext>min</mtext></msub><mo>+</mo><msub><mi>x</mi><mtext>max</mtext></msub><mo>−</mo><msub><mi>x</mi><mo>+</mo></msub></mrow></math></div>
+      <div class="callout warn"><strong>Folge:</strong> Wenn Zylinder 1 zum UT läuft, läuft Zylinder 2 gleichzeitig zum OT. Dasselbe gilt für die Kompressoren. Die Startposition der zweiten Seite wird deshalb automatisch gespiegelt; sie wird nicht separat in der YAML angegeben.</div>
+    </section>
+
+    <section class="card" id="volumen">
+      <h2>5. Volumen- und Volumenänderungsfunktionen</h2>
+      <h3>5.1 Arbeitszylinder</h3>
+      <p>Der gemeinsame Kolbenquerschnitt folgt aus <code>free_piston.mechanics.piston_diameter_m</code>:</p>
+      <div class="eq"><math display="block"><mrow><msub><mi>A</mi><mi>p</mi></msub><mo>=</mo><mfrac><mi>π</mi><mn>4</mn></mfrac><msubsup><mi>d</mi><mi>p</mi><mn>2</mn></msubsup><mo>≈</mo><mn>2.8748</mn><mo>·</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>3</mn></mrow></msup><mspace width=".3em"/><msup><mi mathvariant="normal">m</mi><mn>2</mn></msup></mrow></math></div>
+      <div class="eq"><math display="block"><mtable columnalign="right left"><mtr><mtd><msub><mi>V</mi><mrow><mi>Z</mi><mo>,</mo><mi>i</mi></mrow></msub></mtd><mtd><mo>=</mo><msub><mi>V</mi><mtext>c</mtext></msub><mo>+</mo><msub><mi>A</mi><mi>p</mi></msub><mfenced><mrow><msub><mi>x</mi><mi>i</mi></msub><mo>−</mo><msub><mi>x</mi><mtext>min</mtext></msub></mrow></mfenced></mtd></mtr><mtr><mtd><msub><mover><mi>V</mi><mo>˙</mo></mover><mrow><mi>Z</mi><mo>,</mo><mi>i</mi></mrow></msub></mtd><mtd><mo>=</mo><msub><mi>A</mi><mi>p</mi></msub><msub><mi>v</mi><mi>i</mi></msub></mtd></mtr></mtable></math></div>
+      <p>Mit Verdichtungsverhältnis <math><mrow><mi>ε</mi><mo>=</mo><mn>50</mn></mrow></math>, Hub <math><mi>H</mi></math> und Hubvolumen <math><mrow><msub><mi>V</mi><mi>h</mi></msub><mo>=</mo><msub><mi>A</mi><mi>p</mi></msub><mi>H</mi></mrow></math> ist:</p>
+      <div class="eq"><math display="block"><mrow><msub><mi>V</mi><mtext>c</mtext></msub><mo>=</mo><mfrac><msub><mi>V</mi><mi>h</mi></msub><mrow><mi>ε</mi><mo>−</mo><mn>1</mn></mrow></mfrac></mrow></math></div>
+      <h3>5.2 Kompressorkammern (<code>bounce_chamber</code>)</h3>
+      <p>Die Kompressoren sind bewegte Gasräume. Ihr Volumen nimmt bei wachsendem lokalem Hub ab:</p>
+      <div class="eq"><math display="block"><mtable columnalign="right left"><mtr><mtd><msub><mi>A</mi><mi>K</mi></msub></mtd><mtd><mo>=</mo><mfrac><mi>π</mi><mn>4</mn></mfrac><msubsup><mi>d</mi><mi>K</mi><mn>2</mn></msubsup></mtd></mtr><mtr><mtd><msub><mi>V</mi><mrow><mi>K</mi><mo>,</mo><mi>i</mi></mrow></msub></mtd><mtd><mo>=</mo><msub><mi>V</mi><mrow><mi>K</mi><mo>,</mo><mtext>max</mtext></mrow></msub><mo>−</mo><msub><mi>A</mi><mi>K</mi></msub><mfenced><mrow><msub><mi>x</mi><mi>i</mi></msub><mo>−</mo><msub><mi>x</mi><mtext>min</mtext></msub></mrow></mfenced></mtd></mtr><mtr><mtd><msub><mover><mi>V</mi><mo>˙</mo></mover><mrow><mi>K</mi><mo>,</mo><mi>i</mi></mrow></msub></mtd><mtd><mo>=</mo><mo>−</mo><msub><mi>A</mi><mi>K</mi></msub><msub><mi>v</mi><mi>i</mi></msub></mtd></mtr></mtable></math></div>
+      <p><code>model: gas_exchange</code> bedeutet: Druck und Temperatur werden aus Masse und innerer Energie dynamisch berechnet und die Kammer darf über Connections be- und entladen werden. Der Parameter <code>polytropic_exponent</code> gehört zur Gasfeder-/Referenzgeometrie; der aktive Gasaustausch wird über die vollständige Energiebilanz integriert.</p>
+    </section>
+
+    <section class="card" id="kraefte">
+      <h2>6. Kraft-, Drehmoment- und Bewegungsgleichung</h2>
+      <p>Die Druckkräfte aller bewegten Räume werden mit ihrem Spiegelvorzeichen summiert. Der Kompressor wirkt aufgrund seiner entgegengesetzten Volumenrichtung mit zusätzlichem Minuszeichen:</p>
+      <div class="eq"><math display="block"><mtable columnalign="right left"><mtr><mtd><msub><mi>F</mi><mtext>Zyl</mtext></msub></mtd><mtd><mo>=</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><mtext>Zylinder</mtext></mrow><mrow></mrow></munderover><msub><mi>s</mi><mi>i</mi></msub><msub><mi>p</mi><mi>i</mi></msub><msub><mi>A</mi><mi>p</mi></msub></mtd></mtr><mtr><mtd><msub><mi>F</mi><mtext>Komp</mtext></msub></mtd><mtd><mo>=</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><mtext>Kompressor</mtext></mrow><mrow></mrow></munderover><mo>−</mo><msub><mi>s</mi><mi>i</mi></msub><msub><mi>p</mi><mi>i</mi></msub><msub><mi>A</mi><mi>K</mi></msub></mtd></mtr></mtable></math></div>
+      <h3>6.1 Reibung</h3>
+      <div class="eq"><math display="block"><mrow><msub><mi>F</mi><mtext>R</mtext></msub><mo>=</mo><mo>−</mo><mfenced><mrow><msub><mi>F</mi><mi>c</mi></msub><mi>sgn</mi><mfenced><mi>v</mi></mfenced><mo>+</mo><msub><mi>c</mi><mi>v</mi></msub><mi>v</mi></mrow></mfenced></mrow></math></div>
+      <p>V32 setzt <code>fc_N: 80</code> und <code>cv_Ns_per_m: 0</code>. Nahe <math><mrow><mi>v</mi><mo>=</mo><mn>0</mn></mrow></math> wird der Coulomb-Anteil numerisch auf null gesetzt.</p>
+      <h3>6.2 Generatorlast</h3>
+      <p><code>model: generator_controlled</code> erzeugt eine geschwindigkeitsproportionale Gegenkraft. Innerhalb der <code>control_zone_m: 0.01</code> nahe dem angefahrenen Endpunkt steigt die Dämpfung von <code>damping_Ns_per_m: 0</code> auf maximal <code>10000 Ns/m</code>.</p>
+      <div class="eq"><math display="block"><mtable columnalign="right left"><mtr><mtd><msub><mi>c</mi><mtext>eff</mtext></msub></mtd><mtd><mo>=</mo><msub><mi>c</mi><mn>0</mn></msub><mo>+</mo><mfenced><mrow><msub><mi>c</mi><mtext>max</mtext></msub><mo>−</mo><msub><mi>c</mi><mn>0</mn></msub></mrow></mfenced><msub><mi>w</mi><mtext>stop</mtext></msub></mtd></mtr><mtr><mtd><msub><mi>F</mi><mtext>Last</mtext></msub></mtd><mtd><mo>=</mo><mo>−</mo><msub><mi>c</mi><mtext>eff</mtext></msub><mi>v</mi></mtd></mtr></mtable></math></div>
+      <h3>6.3 Rotatorisches RHS</h3>
+      <p>Zunächst wird eine äquivalente lineare Nettokraft gebildet. Für die oszillierende Rotation wird daraus über den effektiven Radius ein Drehmoment:</p>
+      <div class="eq"><math display="block"><mtable columnalign="right left"><mtr><mtd><msub><mi>F</mi><mtext>net</mtext></msub></mtd><mtd><mo>=</mo><msub><mi>F</mi><mtext>Zyl</mtext></msub><mo>+</mo><msub><mi>F</mi><mtext>Komp</mtext></msub><mo>+</mo><msub><mi>F</mi><mtext>R</mtext></msub><mo>+</mo><msub><mi>F</mi><mtext>Last</mtext></msub></mtd></mtr><mtr><mtd><msub><mi>M</mi><mtext>net</mtext></msub></mtd><mtd><mo>=</mo><msub><mi>r</mi><mtext>eff</mtext></msub><msub><mi>F</mi><mtext>net</mtext></msub></mtd></mtr><mtr><mtd><mover><mi>φ</mi><mo>˙</mo></mover></mtd><mtd><mo>=</mo><mi>ω</mi></mtd></mtr><mtr><mtd><mover><mi>ω</mi><mo>˙</mo></mover></mtd><mtd><mo>=</mo><mfrac><msub><mi>M</mi><mtext>net</mtext></msub><mi>J</mi></mfrac><mo>=</mo><mfrac><mrow><msub><mi>r</mi><mtext>eff</mtext></msub><msub><mi>F</mi><mtext>net</mtext></msub></mrow><mi>J</mi></mfrac></mtd></mtr></mtable></math></div>
+      <div class="callout">Die YAML-Größe <code>moving_mass_kg: 11.8</code> bleibt für Lastmodellparameter und lineare Hilfsmodelle verfügbar. Bei <code>oscillating_rotary</code> ist in der eigentlichen Beschleunigungsgleichung jedoch <code>rotary_inertia_kg_m2</code> der Nenner.</div>
+    </section>
+
+    <section class="card" id="gas">
+      <h2>7. Thermodynamische Rückkopplung auf die Bewegung</h2>
+      <p>Für jedes dynamische Volumen werden mindestens Masse <math><mi>m</mi></math> und innere Energie <math><mi>U</mi></math> integriert. Aus idealem Gasgesetz und kalorischem Modell folgen:</p>
+      <div class="eq"><math display="block"><mtable columnalign="right left"><mtr><mtd><mi>T</mi></mtd><mtd><mo>=</mo><mfrac><mi>U</mi><mrow><mi>m</mi><msub><mi>c</mi><mi>v</mi></msub></mrow></mfrac></mtd></mtr><mtr><mtd><mi>p</mi></mtd><mtd><mo>=</mo><mfrac><mrow><mi>m</mi><mi>R</mi><mi>T</mi></mrow><mi>V</mi></mfrac></mtd></mtr><mtr><mtd><mover><mi>U</mi><mo>˙</mo></mover></mtd><mtd><mo>=</mo><munderover><mo>∑</mo><mtext>ein</mtext><mrow></mrow></munderover><mover><mi>m</mi><mo>˙</mo></mover><mi>h</mi><mo>−</mo><munderover><mo>∑</mo><mtext>aus</mtext><mrow></mrow></munderover><mover><mi>m</mi><mo>˙</mo></mover><mi>h</mi><mo>−</mo><mi>p</mi><mover><mi>V</mi><mo>˙</mo></mover><mo>+</mo><mover><mi>Q</mi><mo>˙</mo></mover><msub><mi></mi><mtext>Wand</mtext></msub><mo>+</mo><mover><mi>Q</mi><mo>˙</mo></mover><msub><mi></mi><mtext>Verbrennung</mtext></msub></mtd></mtr></mtable></math></div>
+      <p>Damit schließt sich die Kopplungsschleife: <strong>Winkel → lokaler Hub → Volumen/Schlitzfläche → Massen- und Energieströme → Druck → Kraft → Drehmoment → Winkelbeschleunigung.</strong></p>
+    </section>
+
+    <section class="card" id="verbindungen">
+      <h2>8. Zylinder- und Kompressorverbindungen</h2>
+      <table><thead><tr><th>Connection</th><th>Von → nach</th><th>Typ / Funktion</th></tr></thead><tbody>
+        <tr><td><code>compressor_1_in_cv</code><br><code>compressor_2_in_cv</code></td><td>ambient_in → compressor_i</td><td><code>check_valve</code>, Ø 55 mm, Cd 0,82, Öffnungsdruck 0 Pa: Ansaugen aus Umgebung.</td></tr>
+        <tr><td><code>compressor_1_out_cv</code><br><code>compressor_2_out_cv</code></td><td>compressor_i → receiver_i</td><td><code>check_valve</code>, Ø 55,3 mm, Cd 0,82, Öffnungsdruck 50 kPa: Ausschieben verdichteter Frischladung.</td></tr>
+        <tr><td><code>transfer_slot_1</code><br><code>transfer_slot_2</code></td><td>receiver_i → cylinder_i</td><td><code>slot</code>: kolbengesteuertes Überströmen/Spülen; 6 rechteckige Fenster.</td></tr>
+        <tr><td><code>exhaust_slot_1</code><br><code>exhaust_slot_2</code></td><td>cylinder_i → exhaust_plenum_i</td><td><code>slot</code>: kolbengesteuerter Auslass; 6 rechteckige Fenster.</td></tr>
+        <tr><td><code>exhaust_bleed_1</code><br><code>exhaust_bleed_2</code></td><td>exhaust_plenum_i → ambient_out</td><td><code>orifice</code>, Ø 14 mm, Cd 0,98 vorwärts/rückwärts: Abgasdrossel zur Umgebung.</td></tr>
+      </tbody></table>
+      <h3>8.1 Rückschlagventil</h3>
+      <p>Ein Rückschlagventil leitet nur in deklarierter Richtung, wenn der treibende Druckunterschied den Öffnungsdruck überschreitet:</p>
+      <div class="eq"><math display="block"><mrow><msub><mi>p</mi><mtext>from</mtext></msub><mo>−</mo><msub><mi>p</mi><mtext>to</mtext></msub><mo>&gt;</mo><msub><mi>Δp</mi><mtext>crack</mtext></msub></mrow></math></div>
+      <p>Die geometrische Querschnittsfläche ist <math><mrow><mi>A</mi><mo>=</mo><mi>π</mi><msup><mi>d</mi><mn>2</mn></msup><mo>/</mo><mn>4</mn></mrow></math>; der effektive Durchflussquerschnitt ist <math><mrow><msub><mi>C</mi><mi>d</mi></msub><mi>A</mi></mrow></math>. Der tatsächliche Massenstrom verwendet die kompressible Düsenfunktion des Strömungsmodells und wechselt bei kritischem Druckverhältnis in den abgeriegelten Zustand.</p>
+      <h3>8.2 Richtung versus mögliche Rückströmung</h3>
+      <p><code>from_volume</code> und <code>to_volume</code> definieren die positive Bilanzrichtung. Bei <code>slot</code> und <code>orifice</code> ist physikalische Rückströmung möglich und nutzt <code>reverse_cd</code>. Beim <code>check_valve</code> sperrt dagegen der Verbindungstyp die Rückrichtung.</p>
+    </section>
+
+    <section class="card" id="slots">
+      <h2>9. Kolbengesteuerte Schlitzfunktion</h2>
+      <p>V32 verwendet <code>opening_mode: by_distance</code>. Maßgeblich ist für jeden Zylinder der lokale, bereits gespiegelte Abstand vom OT:</p>
+      <div class="eq"><math display="block"><mrow><msub><mi>h</mi><mi>i</mi></msub><mo>=</mo><mi>clip</mi><mfenced><mrow><msub><mi>x</mi><mi>i</mi></msub><mo>,</mo><msub><mi>x</mi><mtext>min</mtext></msub><mo>,</mo><msub><mi>x</mi><mtext>max</mtext></msub></mrow></mfenced><mo>−</mo><msub><mi>x</mi><mtext>min</mtext></msub></mrow></math></div>
+      <p>Ein rechteckiger Schlitz beginnt zu öffnen, sobald <math><mrow><msub><mi>h</mi><mi>i</mi></msub><mo>&gt;</mo><msub><mi>h</mi><mtext>open</mtext></msub></mrow></math>. Ohne Verrundung ergibt sich näherungsweise:</p>
+      <div class="eq"><math display="block"><mrow><msub><mi>A</mi><mtext>slot</mtext></msub><mo>=</mo><mi>N</mi><msub><mi>b</mi><mtext>slot</mtext></msub><mi>clip</mi><mfenced><mrow><msub><mi>h</mi><mi>i</mi></msub><mo>−</mo><msub><mi>h</mi><mtext>open</mtext></msub><mo>,</mo><mn>0</mn><mo>,</mo><msub><mi>h</mi><mtext>slot</mtext></msub></mrow></mfenced></mrow></math></div>
+      <table><thead><tr><th>Schlitz</th><th>Öffnungsabstand</th><th>Geometrie</th><th>Max. Fläche</th></tr></thead><tbody>
+        <tr><td>Auslass</td><td>90,6 mm ab OT</td><td>6 × 24 mm × 18 mm</td><td>2592 mm²</td></tr>
+        <tr><td>Überströmung</td><td>92,07 mm ab OT</td><td>6 × 26 mm × 16 mm</td><td>2496 mm²</td></tr>
+      </tbody></table>
+      <p>Der Auslass öffnet somit 1,47 mm früher als der Überströmschlitz. Beide verwenden konstante Vorwärts- und Rückwärtsbeiwerte von 0,95. <code>opening_angle_deg: null</code> ist bewusst wirkungslos, weil die Öffnung distanzbasiert definiert ist.</p>
+    </section>
+
+    <section class="card" id="yaml">
+      <h2>10. Bedeutung von <code>name</code>, <code>ref</code>, <code>type</code> und <code>model</code></h2>
+      <table><thead><tr><th>Schlüssel</th><th>Rolle</th><th>Beispiel aus V32</th></tr></thead><tbody>
+        <tr><td><code>name</code></td><td>Eindeutiger Instanzname in <code>environment</code>, <code>volumes</code> oder <code>connections</code>. Connection-Endpunkte referenzieren diesen Namen.</td><td><code>name: compressor_1</code></td></tr>
+        <tr><td><code>ref</code></td><td>Verweis auf eine Vorlage unter <code>preprocessing.submodels</code>. Die Vorlage liefert gemeinsame Defaultwerte; Werte an der Instanz überschreiben bzw. konkretisieren sie.</td><td><code>ref: compressor_bounce</code></td></tr>
+        <tr><td><code>type</code></td><td>Strukturelle Klasse des Objekts; entscheidet, welcher Builder- und Bilanzpfad verwendet wird.</td><td><code>type: bounce_chamber</code></td></tr>
+        <tr><td><code>model</code></td><td>Physikalische Ausprägung innerhalb eines Typs oder Submodells.</td><td><code>model: gas_exchange</code></td></tr>
+        <tr><td><code>from_volume</code></td><td>Startknoten und positive Stromrichtung einer Connection.</td><td><code>from_volume: compressor_1</code></td></tr>
+        <tr><td><code>to_volume</code></td><td>Zielknoten der Connection.</td><td><code>to_volume: receiver_1</code></td></tr>
+      </tbody></table>
+      <h3>10.1 Auflösung einer Vorlage</h3>
+      <pre>preprocessing:
+  submodels:
+    volumes:
+      compressor_bounce:       # Ziel des ref
+        type: bounce_chamber   # strukturelle Klasse
+        model: gas_exchange    # aktive physikalische Variante
+        chamber_diameter_m: 0.07
+
+  volumes:
+    - name: compressor_1       # konkrete Instanz / Connection-Knoten
+      ref: compressor_bounce   # übernimmt die Vorlage
+      initial_pressure_Pa: 101134.77  # instanzspezifischer Startwert</pre>
+      <div class="callout warn"><strong>Wichtig:</strong> In der aufgelösten V32-Datei stehen viele geerbte Felder zusätzlich direkt in der Instanz. Maßgeblich ist der Instanzwert. <code>ref</code> ist keine Fluidverbindung; Fluidverbindungen entstehen ausschließlich durch Einträge in <code>preprocessing.connections</code>.</div>
+    </section>
+
+    <section class="card" id="parameter">
+      <h2>11. Parameterreferenz der Bewegungs- und Kopplungsfunktion</h2>
+      <h3>11.1 Mechanik</h3>
+      <table><thead><tr><th>YAML-Pfad</th><th>Einheit / Typ</th><th>Wirkung</th></tr></thead><tbody>
+        <tr><td><code>free_piston.initial_conditions.x0_m</code></td><td>m</td><td>Lokaler Start-Hub von Seite 1; Seite 2 wird gespiegelt.</td></tr>
+        <tr><td><code>free_piston.initial_conditions.v0_m_per_s</code></td><td>m/s</td><td>Lineare Startgeschwindigkeit; intern durch <code>reff</code> geteilt.</td></tr>
+        <tr><td><code>mechanics.kinematics_type</code></td><td>Enum</td><td><code>oscillating_rotary</code> aktiviert φ/ω-Zustand und Bogenabbildung.</td></tr>
+        <tr><td><code>mechanics.moving_mass_kg</code></td><td>kg</td><td>Translatorische Bezugsmasse für Hilfs-/Lastmodelle; nicht die rotatorische Hauptträgheit.</td></tr>
+        <tr><td><code>mechanics.piston_diameter_m</code></td><td>m</td><td>Bestimmt Kolbenfläche, Zylindervolumen und Gasdruckkraft.</td></tr>
+        <tr><td><code>mechanics.compression_ratio</code></td><td>–</td><td>Bestimmt Zylinder-Restvolumen.</td></tr>
+        <tr><td><code>mechanics.x_min_m / x_max_m</code></td><td>m</td><td>Äquivalente lineare Grenzen OT/UT.</td></tr>
+        <tr><td><code>mechanics.angle_min_deg / angle_max_deg</code></td><td>°</td><td>Generalisierte Winkelgrenzen.</td></tr>
+        <tr><td><code>mechanics.effective_radius_m</code></td><td>m</td><td>Transformation zwischen Winkel und Hub sowie Kraft und Drehmoment.</td></tr>
+        <tr><td><code>mechanics.rotary_inertia_kg_m2</code></td><td>kg·m²</td><td>Trägheit in <math><mrow><mover><mi>ω</mi><mo>˙</mo></mover><mo>=</mo><mi>M</mi><mo>/</mo><mi>J</mi></mrow></math>.</td></tr>
+      </tbody></table>
+      <h3>11.2 Kompressoren und Plena</h3>
+      <table><thead><tr><th>Parameter</th><th>Wirkung</th></tr></thead><tbody>
+        <tr><td><code>type: bounce_chamber</code></td><td>Kennzeichnet ein bewegtes, mechanisch kraftwirksames Gegenvolumen.</td></tr>
+        <tr><td><code>model: gas_exchange</code></td><td>Erlaubt Massen- und Energietransport über Orifices/Rückschlagventile.</td></tr>
+        <tr><td><code>chamber_diameter_m</code></td><td>Bestimmt wirksame Kompressorfläche und Druckkraft.</td></tr>
+        <tr><td><code>chamber_length_m</code></td><td>Geometrische Hublänge zur Ableitung von Hub- und Maximalvolumen.</td></tr>
+        <tr><td><code>compression_ratio</code></td><td>Bestimmt minimales und maximales Kammervolumen.</td></tr>
+        <tr><td><code>chamber_volume0_m3: null</code></td><td>Kein manueller Legacy-Wert; Volumen wird aus Geometrie abgeleitet.</td></tr>
+        <tr><td><code>p0_Pa: null</code></td><td>Kein erzwungener Gasfeder-Referenzdruck; wird bei Bedarf konsistent abgeleitet.</td></tr>
+        <tr><td><code>initial_pressure_Pa / initial_temperature_K</code></td><td>Bestimmen initiale Masse und Energie jeder Kammer.</td></tr>
+        <tr><td><code>fixed_volume_m3</code></td><td>Konstantes Receiver- bzw. Abgasplenumvolumen; keine mechanische Kraftwirkung.</td></tr>
+      </tbody></table>
+      <h3>11.3 Connection-Parameter</h3>
+      <table><thead><tr><th>Parameter</th><th>Gültig für</th><th>Bedeutung</th></tr></thead><tbody>
+        <tr><td><code>diameter_mm</code></td><td>check_valve, orifice</td><td>Geometrischer Durchmesser des Strömungsquerschnitts.</td></tr>
+        <tr><td><code>discharge_coefficient</code></td><td>check_valve</td><td>Durchflussbeiwert des freigegebenen Vorwärtsstroms.</td></tr>
+        <tr><td><code>cracking_pressure_Pa</code></td><td>check_valve</td><td>Mindestdruckdifferenz zum Öffnen.</td></tr>
+        <tr><td><code>forward_cd / reverse_cd</code></td><td>slot, orifice</td><td>Richtungsabhängige Durchflussbeiwerte.</td></tr>
+        <tr><td><code>opening_mode</code></td><td>slot</td><td>V32: <code>by_distance</code>, also hub- statt winkelgesteuert.</td></tr>
+        <tr><td><code>distance_from_tdc_mm</code></td><td>slot</td><td>Lokaler Hub, bei dem die Schlitzkante erreicht wird.</td></tr>
+        <tr><td><code>width_mm / height_mm</code></td><td>slot</td><td>Abmessungen eines einzelnen rechteckigen Fensters.</td></tr>
+        <tr><td><code>number_of_identical_holes</code></td><td>slot</td><td>Multiplikator für die geometrische Gesamtfläche.</td></tr>
+        <tr><td><code>source_of_data: rectangle</code></td><td>slot</td><td>Analytische Rechteckgeometrie statt externer Kennlinie.</td></tr>
+      </tbody></table>
+    </section>
+
+    <section class="card" id="ablauf">
+      <h2>12. Rechenablauf pro RHS-Auswertung</h2>
+      <ol>
+        <li>Mechanischen Zustand <math><mrow><mi>φ</mi><mo>,</mo><mi>ω</mi></mrow></math> aus dem Zustandsvektor lesen.</li>
+        <li>Für jedes bewegte Volumen anhand des automatisch vergebenen Vorzeichens lokalen Hub und lokale Geschwindigkeit bilden.</li>
+        <li>Zylinder- und Kompressorvolumina sowie <math><mover><mi>V</mi><mo>˙</mo></mover></math> berechnen.</li>
+        <li>Aus <math><mrow><mi>m</mi><mo>,</mo><mi>U</mi><mo>,</mo><mi>V</mi></mrow></math> Druck und Temperatur jedes Volumens rekonstruieren.</li>
+        <li>Rückschlagventile, Schlitze und Orifices auswerten; Masse, Enthalpie und Spezies bilanzieren.</li>
+        <li>pV-Arbeit, Wandwärme und Verbrennung in die Energiebilanzen eintragen.</li>
+        <li>Alle Zylinder- und Kompressordruckkräfte mit den Spiegelvorzeichen summieren.</li>
+        <li>Reibung und Generatorgegenkraft addieren.</li>
+        <li>Lineare Nettokraft mit <code>effective_radius_m</code> in Drehmoment umrechnen und <math><mover><mi>ω</mi><mo>˙</mo></mover></math> bestimmen.</li>
+      </ol>
+    </section>
+
+    <section class="card" id="hinweise">
+      <h2>13. Modellgrenzen und wichtige Hinweise</h2>
+      <ul>
+        <li>Die Spiegelzuordnung ist derzeit <strong>reihenfolgebasiert</strong>: erster/zweiter Zylinder und erster/zweiter Bounce-Raum erhalten +/−. Es gibt dafür in V32 keinen expliziten YAML-Schlüssel.</li>
+        <li>Alle vier bewegten Räume hängen am selben mechanischen Freiheitsgrad. Separate Phasen oder unabhängige Kolbenbewegungen sind damit nicht darstellbar.</li>
+        <li><code>volumes[*].kinematics.type: crank_slider</code> ist eine geerbte/kompatible Volumenangabe. Im Free-Piston-Bewegungspfad ersetzt die globale Mechanik sie.</li>
+        <li>Die mechanischen Grenzen werden für die Volumenberechnung geklemmt; ein harter mechanischer Anschlag ist damit nicht automatisch ein eigenes Kontaktmodell.</li>
+        <li>Die ungleichen Startdrücke und -temperaturen der beiden Seiten führen bewusst zu einer anfänglich unsymmetrischen Kraftbilanz, obwohl Geometrie und Topologie gespiegelt sind.</li>
+      </ul>
+      <p class="source">Basis: <code>Projekte/variants/free_piston_GenSet_V32.yaml</code>. Implementierungsabgleich: <code>src/thermo0d/model/free_piston/geometry.py</code>, <code>builder.py</code>, <code>rhs.py</code> und <code>forces.py</code>. Die Dokumentation beschreibt den zum Erstellungszeitpunkt vorhandenen Quellstand.</p>
+    </section>
+  </main>
+</div>
+</body>
+</html>

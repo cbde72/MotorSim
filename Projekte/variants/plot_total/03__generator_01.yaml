@@ -1,0 +1,153 @@
+name: Generator map signals and stroke over time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.3
+figures:
+- title: generator_map_and_stroke
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Generator-Kennfeldsignale und Hub über der Zeit
+    plot_type: line
+    x_signal: t_s
+    x_title: Zeit [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: stroke
+      title: Hub [mm] (+45,6 = OT, -45,6 = UT)
+      side: left
+      color: '#111111'
+      limit_mode: manual
+      y_min: -50.0
+      y_max: 50.0
+      tick_step: 10.0
+      minor_tick_step: 2.0
+    - id: map_angle
+      title: Kennfeldwinkel [deg]
+      side: right
+      color: '#6A1B9A'
+      limit_mode: manual
+      y_min: -10.0
+      y_max: 10.0
+      spine_offset: 0.0
+      label_pad: 2
+      tick_label_pad: 2
+    - id: map_torque
+      title: Kennfelddrehmoment [Nm]
+      side: right
+      color: '#C62828'
+      limit_mode: manual
+      y_min: -1800.0
+      y_max: 1800.0
+      spine_offset: 0.08
+      label_pad: 2
+      tick_label_pad: 2
+    - id: map_voltage
+      title: Kennfeldspannung [V]
+      side: right
+      color: '#1565C0'
+      limit_mode: manual
+      y_min: -260.0
+      y_max: 260.0
+      spine_offset: 0.16
+      label_pad: 2
+      tick_label_pad: 2
+    - id: map_range
+      title: Außerhalb Kennfeld [0/1]
+      side: right
+      color: '#EF6C00'
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 1.1
+      spine_offset: 0.24
+      label_pad: 2
+      tick_label_pad: 2
+    - id: map_power
+      title: Elektrische Leistung [W]
+      side: right
+      color: '#2E7D32'
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 25000.0
+      spine_offset: 0.32
+      label_pad: 2
+      tick_label_pad: 2
+    y_lines:
+    - y: -45.553093
+      axis_id: stroke
+      show_label: true
+      label: UT 45,6 mm
+      label_font_size: 6.0
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      color: '#000000'
+      line_style: --
+      line_width: 0.4
+      alpha: 0.95
+    - y: 45.553093
+      axis_id: stroke
+      show_label: true
+      label: OT 45,6 mm
+      label_font_size: 6.0
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      color: '#000000'
+      line_style: --
+      line_width: 0.4
+      alpha: 0.95
+    series:
+    - signal_key: free_piston_x_m
+      label: Hub
+      axis_id: stroke
+      color: '#111111'
+      line_style: --
+      scale_factor: -1000.0
+      offset: 45.553093
+      unit_preset: raw
+      line_width: 1.4
+    - signal_key: free_piston_generator_map_angle_deg
+      label: Kennfeldwinkel
+      axis_id: map_angle
+      color: '#6A1B9A'
+      line_style: '-'
+      line_width: 1.2
+    - signal_key: free_piston_generator_map_torque_Nm
+      label: Gesamtes Kennfelddrehmoment
+      axis_id: map_torque
+      color: '#C62828'
+      line_style: '-'
+      line_width: 1.4
+    - signal_key: free_piston_generator_map_no_load_torque_Nm
+      label: Leerlaufdrehmoment
+      axis_id: map_torque
+      color: '#AD1457'
+      line_style: --
+      line_width: 1.1
+    - signal_key: free_piston_generator_map_load_torque_Nm
+      label: Lastdrehmoment
+      axis_id: map_torque
+      color: '#D84315'
+      line_style: dotted
+      line_width: 1.3
+    - signal_key: free_piston_generator_map_voltage_V
+      label: Kennfeldspannung
+      axis_id: map_voltage
+      color: '#1565C0'
+      line_style: '-'
+      line_width: 1.2
+    - signal_key: free_piston_generator_map_out_of_range_0to1
+      label: Außerhalb des Kennfelds
+      axis_id: map_range
+      color: '#EF6C00'
+      line_style: '-'
+      line_width: 1.5
+    - signal_key: free_piston_generator_electrical_power_W
+      label: Elektrische Generatorleistung
+      axis_id: map_power
+      color: '#2E7D32'
+      line_style: '-'
+      line_width: 1.5
+    show_title: true

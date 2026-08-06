@@ -1,30 +1,37 @@
 name: Ventilposition & Effektive Fläche
 style_sheet: ../plot_style_sheet.yaml
 figures:
-- title: Massenströme & Ventilposition
+- title: Mass flows & Ventilposition
   rows: 1
   cols: 1
   subplots:
   - title: Ventilposition & Effektive Fläche
     x_signal: cylinder_0_theta_deg
-    x_title: Kurbelwinkel [°]
+    x_title: Crank angle [deg]
     y_axes:
     - id: lift_ax
-      title: Ventilhub [mm]
+      title: Valve lift [mm]
       side: left
+      color: '#111111'
     - id: area_ax
-      title: Eff. Fläche [mm²]
+      title: Effective area [mm²]
       side: right
+      color: '#111111'
     series:
     - signal_key: connection_intake_valve_lift_mm
-      label: Einlasshub
+      label: Intake valve lift
       axis_id: lift_ax
-      color: '#175cd3'
-      line_style: '-'
+      color: '#175CD3'
+      line_style: --
       scale_factor: 1000.0
+      line_width: 1.05
     - signal_key: connection_exhaust_valve_lift_mm
-      label: Auslaßhub
+      label: Exhaust valve lift
       axis_id: lift_ax
-      color: '#b42318'
-      line_style: '-'
+      color: '#D92D20'
+      line_style: --
       scale_factor: 1000.0
+      line_width: 1.05
+    show_title: true
+style:
+  default_line_width: 1.6

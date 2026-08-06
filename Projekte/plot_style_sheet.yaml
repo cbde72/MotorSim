@@ -2,17 +2,17 @@ name: Shared thermo0d plot style
 style:
   preset_name: Light Engineering
   font_family: DejaVu Sans
-  font_size: 8
-  axis_label_size: 8
-  tick_label_size: 8
-  title_size: 9
-  figure_title_size: 10
+  font_size: 6
+  axis_label_size: 6
+  tick_label_size: 6
+  title_size: 6
+  figure_title_size: 6
   subplot_title_visible: true
   figure_title_visible: false
   grid_visible: true
   grid_alpha: 0.35
   legend_visible: true
-  legend_position: best
+  legend_position: upper left
   tight_layout: true
-  default_line_width: 1.35
-  default_marker_size: 4.0
+  default_line_width: 1.0
+  default_marker_size: 1.5

@@ -1,0 +1,94 @@
+name: Power cylinder 2
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: energy
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Power cylinder 2
+    show_title: true
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    y_axes:
+    - id: ax_x_2
+      title: Piston position [mm] (+54.035 = OT, -54.035 = UT)
+      side: left
+      color: '#111111'
+      limit_mode: manual
+      y_min: -60.0
+      y_max: 60.0
+      min: -60.0
+      max: 60.0
+    - id: ax_a_open_2
+      title: Opening area [mm²]
+      side: right
+      color: '#111111'
+    - id: ax_mdot_2
+      title: Mass flow [kg/s]
+      side: right
+      color: '#111111'
+    - id: ax_qzu_2
+      title: Qzu [W]
+      side: right
+      color: '#111111'
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 1000000.0
+      min: 0.0
+      max: 1000000.0
+    series:
+    - signal_key: cylinder_2_piston_distance_from_tdc_m
+      label: Piston position
+      axis_id: ax_x_2
+      color: '#111111'
+      line_style: --
+      line_width: 1.35
+      scale_factor: -1000.0
+      unit_preset: raw
+      offset: 54.035
+    - signal_key: transfer_slot_2_A_geom_m2
+      label: Transfer Opening area
+      axis_id: ax_a_open_2
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.6
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_2_A_geom_m2
+      label: Exhaust Opening area
+      axis_id: ax_a_open_2
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.6
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: transfer_slot_2_mdot_kg_per_s
+      label: Inflowing mass flow
+      axis_id: ax_mdot_2
+      color: '#175CD3'
+      line_style: -.
+      line_width: 1.45
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: exhaust_slot_2_mdot_kg_per_s
+      label: Outflowing mass flow
+      axis_id: ax_mdot_2
+      color: '#D92D20'
+      line_style: -.
+      line_width: 1.45
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_2_added_energy_W
+      label: Added energy
+      axis_id: ax_qzu_2
+      color: '#C2185B'
+      line_style: '-'
+      line_width: 1.9
+      scale_factor: 1.0
+      unit_preset: raw

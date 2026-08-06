@@ -1,0 +1,97 @@
+name: Masses over time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- id: d7b6b4a2a355
+  title: Free-piston masses of all volumes
+  rows: 1
+  cols: 1
+  subplots:
+  - id: 8b93cf469a0f
+    title: Masses over time
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: auto
+    x_min: 0.0
+    x_max: 720.0
+    y_axes:
+    - id: ax_m
+      title: Mass [mg]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: df11c9d16f18
+      signal_key: cylinder_1_m_kg
+      label: cylinder
+      axis_id: ax_m
+      visible: true
+      color: '#7DD3C7'
+      line_style: '-'
+      marker: ''
+      line_width: 1.6
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: 5fa4eafe9259
+      signal_key: compressor_1_m_kg
+      label: bounce
+      axis_id: ax_m
+      visible: true
+      color: '#667085'
+      line_style: '-'
+      marker: ''
+      line_width: 1.6
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: ea73d7e43cb8
+      signal_key: receiver_1_m_kg
+      label: receiver
+      axis_id: ax_m
+      visible: true
+      color: '#667085'
+      line_style: '-'
+      marker: ''
+      line_width: 1.6
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: 3cc2f008a60f
+      signal_key: exhaust_plenum_1_m_kg
+      label: exhaust_plenum
+      axis_id: ax_m
+      visible: true
+      color: '#667085'
+      line_style: '-'
+      marker: ''
+      line_width: 1.6
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    events: []
+    legend_visible: true
+    legend_position: best
+    show_grid: true
+    show_title: true

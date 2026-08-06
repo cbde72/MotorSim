@@ -10,7 +10,6 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from more_itertools import only
 import yaml
 
 from thermo0d.app.paths import PathManager
@@ -30,9 +29,10 @@ SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
         "--outdir", str(ROOT / "Projekte" / "variants" / "results" / "free_piston_GenSet_V25_reprocessed"),
     ],
     "free_piston_plots": [
-        "--simulation-config", str(ROOT / "Projekte" / "variants" / "free_piston_GenSet_V25.yaml"),
+        "--simulation-config", str(ROOT / "Projekte" / "variants" / "free_piston_GenSet_V45.yaml"),
         "--config", str(ROOT / "Projekte" / "variants" / "postprocessing.yaml"),
-        "--plots-cycle-only",
+        "--plots-only",
+        
     ],
 }
 
@@ -65,6 +65,11 @@ def parse_args(args_list: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--outdir", default=None, help="Optional output directory for regenerated CSV and summary files.")
     parser.add_argument("--plots", dest="plots", action="store_true", default=None, help="Render plot_CFG layouts from the generated pipeline CSV.")
     parser.add_argument("--no-plots", dest="plots", action="store_false", help="Only run the pipeline export, do not render plots.")
+    parser.add_argument(
+        "--plots-only",
+        action="store_true",
+        help="Regenerate plots directly from existing pipeline CSV files without rebuilding postprocessing data from the raw archive.",
+    )
     parser.add_argument(
         "--plots-cycle-only",
         "--cycle-plots-only",
@@ -157,14 +162,97 @@ def _render_configured_plots(
     return plots_outdir, rendered
 
 
+def _existing_pipeline_csv(result_dir: Path, *, cycle_only: bool) -> Path:
+    filename = "signals_last_ut_ot_ut.csv" if cycle_only else "signals.csv"
+    csv_path = (result_dir / "csv" / filename).resolve()
+    if not csv_path.is_file():
+        raise SystemExit(
+            f"[ERROR] Vorhandene Pipeline-CSV nicht gefunden: {csv_path}. "
+            "Ohne --plots-only starten, um die CSV aus dem Raw-Archiv neu aufzubauen."
+        )
+    return csv_path
+
+
+def _render_existing_plots_only(
+    *,
+    args: argparse.Namespace,
+    output_dir: Path,
+    config_data: dict[str, Any],
+) -> int:
+    plot_cfg = _plot_config_block(config_data)
+    run_config_path = Path(args.simulation_config).expanduser().resolve() if args.simulation_config else None
+
+    if args.plots_cycle_only:
+        cycle_cfg = _cycle_plot_config_block(plot_cfg)
+        csv_path = _existing_pipeline_csv(output_dir, cycle_only=True)
+        plots_outdir, rendered = _render_configured_plots(
+            csv_path=csv_path,
+            result_dir=output_dir,
+            plot_cfg=cycle_cfg,
+            args=args,
+            run_config_path=run_config_path,
+            config_path=args.config,
+            default_output_name="plots_pipeline_csv_last_ut_ot_ut",
+            default_prefix_suffix="last_ut_ot_ut",
+        )
+        print(f"[plots-only] csv={csv_path}")
+        print(f"[plots-only] plots_outdir={plots_outdir}")
+        print(f"[plots-only] plots={len(rendered)}")
+        return 0
+
+    if args.plots is False:
+        raise SystemExit("[ERROR] --plots-only kann nicht zusammen mit --no-plots verwendet werden.")
+
+    csv_path = _existing_pipeline_csv(output_dir, cycle_only=False)
+    plots_outdir, rendered = _render_configured_plots(
+        csv_path=csv_path,
+        result_dir=output_dir,
+        plot_cfg=plot_cfg,
+        args=args,
+        run_config_path=run_config_path,
+        config_path=args.config,
+        default_output_name=str(_default_plot_output_dir(csv_path).name),
+        default_prefix_suffix="pipeline",
+    )
+    print(f"[plots-only] csv={csv_path}")
+    print(f"[plots-only] plots_outdir={plots_outdir}")
+    print(f"[plots-only] plots={len(rendered)}")
+
+    cycle_cfg = _cycle_plot_config_block(plot_cfg)
+    if bool(cycle_cfg.get("enabled", False)):
+        cycle_csv_path = _existing_pipeline_csv(output_dir, cycle_only=True)
+        cycle_outdir, cycle_rendered = _render_configured_plots(
+            csv_path=cycle_csv_path,
+            result_dir=output_dir,
+            plot_cfg=cycle_cfg,
+            args=args,
+            run_config_path=run_config_path,
+            config_path=args.config,
+            default_output_name="plots_pipeline_csv_last_ut_ot_ut",
+            default_prefix_suffix="last_ut_ot_ut",
+        )
+        print(f"[plots-only] last_ut_ot_ut_csv={cycle_csv_path}")
+        print(f"[plots-only] last_ut_ot_ut_plots_outdir={cycle_outdir}")
+        print(f"[plots-only] last_ut_ot_ut_plots={len(cycle_rendered)}")
+    return 0
+
+
 def main(args_list: list[str] | None = None) -> int:
     args = parse_args(args_list)
     raw_path = Path(args.raw).expanduser().resolve() if args.raw else None
     output_dir = Path(args.outdir).expanduser().resolve() if args.outdir else None
-    if raw_path is None and args.simulation_config:
-        raw_path = _infer_raw_archive_from_simulation_config(args.simulation_config)
+    if args.simulation_config:
         if output_dir is None:
             output_dir = PathManager.resolve_output_dir(args.simulation_config).resolve()
+        if raw_path is None:
+            raw_path = _infer_raw_archive_from_simulation_config(args.simulation_config)
+    config_data = _load_pipeline_config_data(args.config)
+    if args.plots_only:
+        if output_dir is None and raw_path is not None and raw_path.parent.name.lower() == "raw":
+            output_dir = raw_path.parent.parent.resolve()
+        if output_dir is None:
+            raise SystemExit("[ERROR] --plots-only benötigt --simulation-config, --outdir oder ein Raw-Archiv im raw-Unterordner.")
+        return _render_existing_plots_only(args=args, output_dir=output_dir, config_data=config_data)
     if raw_path is None:
         raise SystemExit("[ERROR] Bitte --raw oder --simulation-config angeben.")
     if output_dir is None and raw_path.parent.name.lower() == "raw":
@@ -181,7 +269,6 @@ def main(args_list: list[str] | None = None) -> int:
     if artifacts.summary_text_path:
         print(f"[pipeline-offline] summary_text={artifacts.summary_text_path}")
     print(f"[pipeline-offline] signals={len(artifacts.signal_specs)}")
-    config_data = _load_pipeline_config_data(args.config)
     plot_cfg = _plot_config_block(config_data)
     plots_enabled = (
         True

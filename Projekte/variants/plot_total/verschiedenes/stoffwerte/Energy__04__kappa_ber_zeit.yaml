@@ -1,0 +1,33 @@
+name: kappa over time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: kappa_t
+  rows: 1
+  cols: 1
+  subplots:
+  - title: kappa over time
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    y_axes:
+    - id: ax_kappa
+      title: kappa [-]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: cylinder_1_kappa
+      label: Cylinder kappa
+      axis_id: ax_kappa
+      color: '#7DD3C7'
+      line_style: '-'
+      line_width: 1.6
+    - signal_key: compressor_1_kappa
+      label: Bounce kappa
+      axis_id: ax_kappa
+      color: '#667085'
+      line_style: '-'
+      line_width: 1.6
+    show_title: true

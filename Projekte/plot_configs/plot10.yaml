@@ -1,14 +1,14 @@
-name: Massenströme / Hubvolumen
+name: Mass flows / Displacement volume
 style_sheet: ../plot_style_sheet.yaml
 figures:
-- title: Massenströme / Hubvolumen
+- title: Mass flows / Displacement volume
   rows: 1
   cols: 1
   subplots:
   - title: ''
     plot_type: line
     x_signal: cylinder_theta_deg
-    x_title: Kurbelwinkel [deg]
+    x_title: Crank angle [deg]
     x_unit_preset: raw
     events:
     - x: 0.0
@@ -93,35 +93,41 @@ figures:
       show_label: true
     y_axes:
     - id: ax_mdot
-      title: Massenstrom [kg/s]
+      title: Mass flow [kg/s]
       side: left
       color: '#111111'
     - id: ax_vol
-      title: Hubvolumen [cm³]
+      title: Displacement volume [cm³]
       side: right
-      color: '#666666'
+      color: '#111111'
     series:
     - signal_key: cylinder_mdot_in_kg_per_s
-      label: Einströmender Massenstrom
+      label: Inflowing mass flow
       axis_id: ax_mdot
-      color: '#87cefa'
-      line_style: '-'
+      color: '#175CD3'
+      line_style: -.
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.45
     - signal_key: cylinder_mdot_out_kg_per_s
-      label: Ausströmender Massenstrom
+      label: Outflowing mass flow
       axis_id: ax_mdot
-      color: '#8b0000'
-      line_style: '-'
+      color: '#D92D20'
+      line_style: -.
       scale_factor: 1.0
       unit_preset: raw
+      line_width: 1.45
     - signal_key: cylinder_V_m3
-      label: Hubvolumen
+      label: Displacement volume
       axis_id: ax_vol
-      color: '#808080'
+      color: '#7DD3C7'
       line_style: --
       scale_factor: 1000000.0
       unit_preset: raw
+      line_width: 1.05
     x_limit_mode: manual
     x_min: 0.0
     x_max: 720.0
+    show_title: true
+style:
+  default_line_width: 1.6

@@ -1,0 +1,62 @@
+name: Pressure peak and piston stroke
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Last-cycle zoom — composition and peak
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Pressure peak and piston stroke
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.88
+    x_max: 1.0
+    y_axes:
+    - id: ax_p
+      title: Pressure [bar]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_hub
+      title: stroke [mm]
+      side: right
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: cylinder_1_p_Pa
+      label: cylinder p
+      axis_id: ax_p
+      color: '#66B3FF'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      unit_preset: raw
+      line_width: 1.8
+    - signal_key: receiver_1_p_Pa
+      label: receiver p
+      axis_id: ax_p
+      color: '#175CD3'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      unit_preset: raw
+      line_width: 1.8
+    - signal_key: exhaust_plenum_1_p_Pa
+      label: exhaust plenum p
+      axis_id: ax_p
+      color: '#D92D20'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      unit_preset: raw
+      line_width: 1.8
+    - signal_key: free_piston_distance_from_tdc_m
+      label: dist to TDC
+      axis_id: ax_hub
+      color: '#111111'
+      line_style: --
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.35
+    show_title: true

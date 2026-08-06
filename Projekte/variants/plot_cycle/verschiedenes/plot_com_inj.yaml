@@ -1,0 +1,109 @@
+name: Fuel metering and consumption
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- id: c5343d6934ed
+  title: Injection and combustion
+  rows: 1
+  cols: 1
+  subplots:
+  - id: 47e25f9cb015
+    title: Fuel metering and consumption
+    show_title: true
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    y_axes:
+    - id: ax_mass
+      title: Forcestoffmasse [mg]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    - id: ax_rate
+      title: Rate [g/s]
+      side: right
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: 772065e31e5e
+      signal_key: cylinder_1_combustion_fuel_mass_latched_kg
+      label: cyl1 fuel latched
+      axis_id: ax_mass
+      visible: true
+      color: '#7DD3C7'
+      line_style: '-'
+      marker: ''
+      line_width: 1.6
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: 98e26c7307eb
+      signal_key: cylinder_2_combustion_fuel_mass_latched_kg
+      label: cyl2 fuel latched
+      axis_id: ax_mass
+      visible: true
+      color: '#087A6A'
+      line_style: '-'
+      marker: ''
+      line_width: 1.6
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: 121051cf2e44
+      signal_key: cylinder_1_m_fuel_vapor_kg
+      label: cyl1 fuel vapor
+      axis_id: ax_mass
+      visible: true
+      color: '#7DD3C7'
+      line_style: '-'
+      marker: ''
+      line_width: 1.6
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    - id: 8d29da1149e4
+      signal_key: cylinder_2_m_fuel_vapor_kg
+      label: cyl2 fuel vapor
+      axis_id: ax_mass
+      visible: true
+      color: '#087A6A'
+      line_style: '-'
+      marker: ''
+      line_width: 1.6
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000000.0
+      offset: 0.0
+      series_type: line
+    events: []
+    y_lines: []
+    legend_visible: true
+    legend_position: best
+    show_grid: true

@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Thermo0D – Verbrennungs- und Zündmodelle</title>
+  <style>
+    :root{--ink:#17212b;--muted:#607080;--line:#d8e0e7;--paper:#fff;--soft:#f4f7f9;--accent:#b43b23;--blue:#185d83;--ok:#176b4d;--warn:#8a5a00}
+    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;background:var(--soft);color:var(--ink);font:16px/1.58 system-ui,-apple-system,"Segoe UI",sans-serif}
+    header{background:linear-gradient(125deg,#142b3b,#185d83);color:white;padding:3.2rem max(5vw,1.3rem) 2.7rem} header p{max-width:72rem;color:#d9e9f2;font-size:1.08rem}
+    main{max-width:1180px;margin:auto;padding:2rem 1rem 5rem}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:1rem}.card,section{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:1.35rem;margin:0 0 1.25rem;box-shadow:0 2px 8px #17212b0a}
+    h1{font-size:clamp(2rem,4vw,3.35rem);margin:0}.eyebrow{letter-spacing:.13em;text-transform:uppercase;font-weight:700;color:#a8d9f3}h2{color:var(--blue);margin-top:0;border-bottom:2px solid #e6edf1;padding-bottom:.45rem}h3{color:#27485b;margin-top:1.8rem}h4{margin-bottom:.3rem}
+    nav{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:3;padding:.75rem 1rem;overflow:auto;white-space:nowrap}nav a{color:var(--blue);margin-right:1rem;text-decoration:none;font-weight:650}
+    table{border-collapse:collapse;width:100%;font-size:.93rem;margin:1rem 0}th,td{border:1px solid var(--line);padding:.6rem .7rem;text-align:left;vertical-align:top}th{background:#eaf1f5;color:#183b50}tr:nth-child(even) td{background:#fafcfd}
+    code{background:#edf1f4;border-radius:4px;padding:.08rem .3rem;color:#8c2f1d}pre{background:#14212b;color:#eaf4fa;padding:1rem;border-radius:8px;overflow:auto;line-height:1.45}pre code{background:none;color:inherit;padding:0}
+    .tag{display:inline-block;border-radius:999px;padding:.15rem .55rem;margin:.1rem;font-size:.82rem;font-weight:700;background:#e4f1f7;color:#145473}.tag.ok{background:#dff2e9;color:var(--ok)}.tag.warn{background:#fff0cf;color:var(--warn)}
+    .note{border-left:4px solid var(--blue);background:#eef7fb;padding:.8rem 1rem;margin:1rem 0}.warning{border-color:#d48a00;background:#fff8e8}.formula{overflow:auto;background:#f8fafb;border:1px solid var(--line);border-radius:8px;padding:.9rem;margin:.8rem 0;text-align:center}math{font-size:1.12rem}.small{font-size:.88rem;color:var(--muted)}dt{font-weight:700;color:#23475b}dd{margin-bottom:.55rem}a{color:#12608c}@media print{nav{position:static}.card,section{box-shadow:none;break-inside:avoid}body{background:white}header{background:#173b50!important;print-color-adjust:exact}}
+  </style>
+</head>
+<body>
+<header><div class="eyebrow">Thermo0D · Code-Referenz</div><h1>Verbrennungs- und Zündmodelle</h1><p>Vollständige Dokumentation der im aktuellen Code konfigurierbaren Modelle, Parameter, Formeln und Kombinationsregeln. Stand: 5. August 2026. Maßgeblich sind <code>src/thermo0d/config/models.py</code>, <code>physics/combustion.py</code> und <code>model/free_piston/combustion_latch.py</code>.</p></header>
+<nav><a href="#ueberblick">Überblick</a><a href="#vibe">Vibe</a><a href="#hcci">HCCI-Diesel</a><a href="#zuendung">Zündmodelle</a><a href="#beck-tuning">Beck-Tuning</a><a href="#coolflame">Cool Flame</a><a href="#parameter">Parameter</a><a href="#beispiele">YAML-Beispiele</a></nav>
+<main>
+<section id="ueberblick"><h2>1. Modellübersicht und Verfügbarkeit</h2>
+<div class="grid">
+ <div class="card"><h3><code>none</code></h3><p>Keine Wärmefreisetzung. Sinnvoll für Cold-Flow, Gaswechsel und Referenzläufe.</p><span class="tag ok">classic</span><span class="tag ok">free_piston</span></div>
+ <div class="card"><h3><code>vibe</code></h3><p>Vorgegebener Vibe-/Wiebe-Brennverlauf über Winkel, Hub oder Zeit. Der Start ist geometrisch oder winkelbasiert vorgegeben.</p><span class="tag ok">classic</span><span class="tag ok">free_piston</span></div>
+ <div class="card"><h3><code>hcci_diesel</code></h3><p>Selbstzündendes Diesel-HCCI-Modell. SOC folgt aus Zündverzug und Livengood-Wu-Integral; Hauptverbrennung zeitbasiert.</p><span class="tag warn">free_piston</span></div>
+</div>
+<table><thead><tr><th>Ebene</th><th>Auswahlwerte</th><th>Wirkung</th></tr></thead><tbody>
+<tr><td><code>combustion.model</code></td><td><code>none</code>, <code>vibe</code>, <code>hcci_diesel</code></td><td>Oberstes Verbrennungsmodell eines Volumens.</td></tr>
+<tr><td><code>hcci_diesel.ignition_model</code> bzw. <code>ignition.model</code></td><td><code>livengood_wu</code>, <code>tabulated_livengood_wu</code>, <code>beck_2003_1_arrhenius</code>, <code>beck_2003_two_stage</code></td><td>Berechnung der lokalen Zündverzugszeit.</td></tr>
+<tr><td><code>hcci_diesel.burn_model</code></td><td><code>wiebe_autoignition</code>, <code>vibe-beck</code></td><td>Zeitlicher Hauptbrennverlauf nach SOC. Im aktuellen Code verwenden beide dieselbe zeitbasierte Vibe-Kernfunktion.</td></tr>
+<tr><td><code>cool_flame_burn_model</code></td><td><code>gamma</code>, <code>vibe-beck_CF</code>, <code>vibe-beck</code> (Alias)</td><td>Form der optionalen Vorreaktions-Wärmefreisetzung.</td></tr>
+</tbody></table>
+<div class="note"><strong>Globale Freigabe:</strong> Zusätzlich muss <code>preprocessing.features.combustion: true</code> gesetzt sein. Das lokale Modell wird am Volume unter <code>combustion</code> oder über <code>preprocessing.submodels.combustion</code> und eine <code>ref</code> eingebunden. Separate Zündmodelle liegen in <code>preprocessing.submodels.ignition</code>.</div></section>
+
+<section id="vibe"><h2>2. Vibe-Verbrennungsmodell</h2><p>Die normierte Fortschrittsvariable <var>z</var> liegt im aktiven Fenster zwischen 0 und 1. Je nach <code>duration_mode</code> ist sie Winkel-, Hub- oder Zeitfortschritt.</p>
+<div class="formula"><math display="block"><mrow><msub><mi>x</mi><mi>b</mi></msub><mo>=</mo><mn>1</mn><mo>−</mo><mi>exp</mi><mo>(</mo><mo>−</mo><mi>a</mi><msup><mi>z</mi><mrow><mi>m</mi><mo>+</mo><mn>1</mn></mrow></msup><mo>)</mo></mrow></math></div>
+<div class="formula"><math display="block"><mrow><mfrac><mrow><mi>d</mi><msub><mi>x</mi><mi>b</mi></msub></mrow><mrow><mi>d</mi><mi>z</mi></mrow></mfrac><mo>=</mo><mi>a</mi><mo>(</mo><mi>m</mi><mo>+</mo><mn>1</mn><mo>)</mo><msup><mi>z</mi><mi>m</mi></msup><mi>exp</mi><mo>(</mo><mo>−</mo><mi>a</mi><msup><mi>z</mi><mrow><mi>m</mi><mo>+</mo><mn>1</mn></mrow></msup><mo>)</mo></mrow></math></div>
+<div class="formula"><math display="block"><mrow><mover><mi>Q</mi><mo>˙</mo></mover><mo>=</mo><msub><mi>Q</mi><mrow><mi>cycle</mi></mrow></msub><mfrac><mrow><mi>d</mi><msub><mi>x</mi><mi>b</mi></msub></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac></mrow></math></div>
+<p>Bei Winkelsteuerung gilt <math><mi>z</mi><mo>=</mo><mi>Δθ</mi><mo>/</mo><msub><mi>Δθ</mi><mi>b</mi></msub></math>, bei Zeitsteuerung <math><mi>z</mi><mo>=</mo><mo>(</mo><mi>t</mi><mo>−</mo><msub><mi>t</mi><mi>SOC</mi></msub><mo>)</mo><mo>/</mo><msub><mi>Δt</mi><mi>b</mi></msub></math>. Außerhalb des Fensters ist die Rate null; am Ende meldet der Code <math><msub><mi>x</mi><mi>b</mi></msub><mo>=</mo><mn>1</mn></math>. Innerhalb des Fensters nähert die eigentliche Vibe-Funktion bei <var>z</var>=1 den Wert <math><mn>1</mn><mo>−</mo><msup><mi>e</mi><mrow><mo>−</mo><mi>a</mi></mrow></msup></math> an.</p>
+<h3>Energie</h3><div class="formula"><math display="block"><mrow><msub><mi>Q</mi><mi>cycle</mi></msub><mo>=</mo><msub><mi>m</mi><mi>fuel</mi></msub><mo>·</mo><mi>LHV</mi><mo>·</mo><msub><mi>η</mi><mi>comb</mi></msub></mrow></math></div>
+<p>Alternativ wird <code>added_energy_per_cycle_J</code> direkt verwendet. Bei <code>energy_coupling: stroke_ratio</code> erfolgt zusätzlich:</p><div class="formula"><math display="block"><mrow><msub><mi>Q</mi><mi>eff</mi></msub><mo>=</mo><msub><mi>Q</mi><mi>base</mi></msub><msup><mrow><mo>(</mo><mfrac><msub><mi>s</mi><mi>real</mi></msub><msub><mi>s</mi><mi>ref</mi></msub></mfrac><mo>)</mo></mrow><mi>n</mi></msup></mrow></math></div>
+<h3>Start- und Dauermodi</h3><table><thead><tr><th>Modus</th><th>Pflichtfeld</th><th>Bedeutung / Einschränkung</th></tr></thead><tbody>
+<tr><td><code>start_mode: angle</code></td><td><code>start_deg</code></td><td>Start in gewählter <code>angle_reference</code>; classic und free_piston.</td></tr>
+<tr><td><code>compression_hub</code></td><td><code>start_hub_m ≥ 0</code></td><td>Weg ab BDC in Kompressionsrichtung; free_piston.</td></tr>
+<tr><td><code>hign_position</code></td><td>genau eines aus <code>hign_m</code>/<code>hign_mm</code>, &gt;0</td><td>Feste Kolbenposition relativ zu Kopf/OT; verlangt zeitbasierte Dauer.</td></tr>
+<tr><td><code>expansion_distance_from_tdc</code></td><td>genau eines aus <code>hign_m</code>/<code>hign_mm</code>, &gt;0</td><td>Gerichteter Abstand nach OT in Expansion; verlangt zeitbasierte Dauer.</td></tr>
+<tr><td><code>duration_mode: angle</code></td><td><code>duration_deg &gt; 0</code></td><td>Winkelbasiertes Fenster.</td></tr>
+<tr><td><code>compression_hub</code></td><td><code>duration_hub_m &gt; 0</code></td><td>Hubfenster in Kompressionsrichtung.</td></tr>
+<tr><td><code>time</code></td><td>genau eines aus <code>duration_s</code>/<code>duration_ms</code>, &gt;0</td><td>Zeitfenster ab gelatchtem SOC.</td></tr></tbody></table></section>
+
+<section id="hcci"><h2>3. HCCI-Diesel: Ablauf</h2>
+<ol><li>Beim Schließen des Slots wird aus eingeschlossener Luftmasse, Ziel-Lambda und stöchiometrischem AFR die Kraftstoffmasse gelatcht.</li><li>Nur innerhalb des Akkumulationsfensters sowie oberhalb <code>start_temperature_min_K</code> und <code>start_pressure_min_Pa</code> wird der Zündverzug ausgewertet.</li><li>Das Livengood-Wu-Integral wächst, bis es 1 erreicht. Dieser Zeitpunkt ist SOC.</li><li>Die Hauptenergie wird über <code>duration_s</code> oder <code>duration_ms</code> nach dem gewählten <code>burn_model</code> freigesetzt.</li><li>Bei Zweistufenmodell kann vorher eine Cool-Flame-Stufe ausgelöst werden.</li></ol>
+<div class="formula"><math display="block"><mrow><mi>λ</mi><mo>=</mo><mfrac><msub><mi>m</mi><mi>air</mi></msub><mrow><msub><mi>m</mi><mi>fuel</mi></msub><mo>·</mo><msub><mi>AFR</mi><mi>st</mi></msub></mrow></mfrac><mspace width="2em"/><mo>⇒</mo><mspace width="2em"/><msub><mi>m</mi><mi>fuel</mi></msub><mo>=</mo><mfrac><msub><mi>m</mi><mi>air</mi></msub><mrow><mi>λ</mi><mo>·</mo><msub><mi>AFR</mi><mi>st</mi></msub></mrow></mfrac></mrow></math></div>
+<div class="formula"><math display="block"><mrow><mi>I</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><msubsup><mo>∫</mo><msub><mi>t</mi><mn>0</mn></msub><mi>t</mi></msubsup><mfrac><mrow><mi>d</mi><mi>t</mi></mrow><mrow><msub><mi>τ</mi><mi>ign</mi></msub><mo>(</mo><mi>p</mi><mo>,</mo><mi>T</mi><mo>,</mo><mi>λ</mi><mo>,</mo><msub><mi>x</mi><mi>res</mi></msub><mo>)</mo></mrow></mfrac><mo>;</mo><mspace width="1em"/><mi>SOC</mi><mspace width=".5em"/><mi>wenn</mi><mspace width=".5em"/><mi>I</mi><mo>≥</mo><mn>1</mn></mrow></math></div>
+<h3>3.1 Verfügbare HCCI-Zündmodelle</h3>
+<table><thead><tr><th><code>ignition.model</code> / <code>ignition_model</code></th><th>Berechnung</th><th>Typischer Einsatz</th><th>Besonderheiten</th></tr></thead><tbody>
+<tr><td><code>livengood_wu</code></td><td>Generische analytische Zündverzugskorrelation aus Druck, Temperatur, Lambda und Restgas; SOC bei Livengood-Wu-Integral ≥ 1.</td><td>Einfacher Startpunkt ohne Messwerttabelle oder Beck-Parametersatz.</td><td>Nutzen von <code>tau_A_s</code>, Druckexponent, Aktivierungstemperatur, Lambda- und Restgasfaktor.</td></tr>
+<tr><td><code>tabulated_livengood_wu</code></td><td>Vierdimensionale Interpolation von <math><msub><mi>τ</mi><mi>ign</mi></msub></math> über Temperatur, Druck, Lambda und EGR/Restgas; danach dasselbe Integral.</td><td>Kalibrierte Mess-, 3D-CFD- oder Chemiekinetik-Daten.</td><td>Benötigt <code>ignition_delay_table_npz</code>; außerhalb der Achsen Randwertbegrenzung plus Diagnose.</td></tr>
+<tr><td><code>beck_2003_1_arrhenius</code></td><td>Eine Arrhenius-Stufe mit Druck-, Sauerstoffverdünnungs- und Aktivierungsterm.</td><td>Diesel-HCCI-Hauptzündung ohne getrennte Cool Flame.</td><td>In der V54-HCCI-Datei gewählt; bevorzugt als separates <code>ignition: {ref: ...}</code> einbinden.</td></tr>
+<tr><td><code>beck_2003_two_stage</code></td><td>Getrennte Cool-Flame- und Hot-Flame-Akkumulation mit kraftstoffabhängigen Beck-Datensätzen.</td><td>Zweistufige Niedertemperatur-/Hauptzündung.</td><td>Ermöglicht eine separate Cool-Flame-Wärmefreisetzung vor dem Hauptbrand.</td></tr>
+</tbody></table>
+
+<h3>3.2 Verfügbare HCCI-Hauptbrennmodelle</h3>
+<table><thead><tr><th><code>burn_model</code></th><th>Verlauf nach SOC</th><th>Parameter</th><th>Aktueller Implementierungsstand</th></tr></thead><tbody>
+<tr><td><code>wiebe_autoignition</code></td><td>Zeitbasierter Vibe-/Wiebe-Verlauf ab dem berechneten SOC.</td><td><code>duration_s</code> oder <code>duration_ms</code>, <code>a</code>, <code>m</code></td><td>Ruft die allgemeine zeitbasierte Vibe-Kernfunktion auf.</td></tr>
+<tr><td><code>vibe-beck</code></td><td>Als Beck-kompatibler zeitbasierter Vibe-Brennverlauf bezeichnet.</td><td><code>duration_s</code> oder <code>duration_ms</code>, <code>a</code>, <code>m</code></td><td>Verwendet derzeit mathematisch dieselbe zeitbasierte Vibe-Kernfunktion wie <code>wiebe_autoignition</code>.</td></tr>
+</tbody></table>
+<div class="note"><strong>Folge für die Modellwahl:</strong> Der Zündzeitpunkt wird ausschließlich durch das Zündmodell und das Livengood-Wu-Integral bestimmt. Das <code>burn_model</code> verändert aktuell nicht SOC, sondern beschreibt Wärmefreisetzung und Massenumsetzung nach SOC. Weil beide Hauptbrennmodellnamen momentan dieselbe Kernformel verwenden, entsteht bei identischen Werten für Dauer, <code>a</code> und <code>m</code> derselbe Hauptbrennverlauf.</div>
+
+<h3>3.3 Cool-Flame-Brennmodelle</h3>
+<p>Diese zusätzliche Auswahl ist nur für <code>beck_2003_two_stage</code> relevant und wird mit <code>cool_flame_enabled: true</code> aktiviert.</p>
+<table><thead><tr><th><code>cool_flame_burn_model</code></th><th>Form</th><th>Hinweis</th></tr></thead><tbody>
+<tr><td><code>gamma</code></td><td>Glatter Gamma-Puls mit dynamisch berechnetem Peak und Peakzeitpunkt.</td><td>Default und robuste Wahl für die Vorstufe.</td></tr>
+<tr><td><code>vibe-beck_CF</code></td><td>Empirischer Beck-Cool-Flame-Verlauf.</td><td>Spezielle CF-Formel; der Builder verwendet dafür intern den Formwert <code>m = 1.7</code>.</td></tr>
+<tr><td><code>vibe-beck</code></td><td>Alias für die Beck-Cool-Flame-Auswahl.</td><td>Aus Kompatibilitätsgründen zulässig; für neue Konfigurationen ist <code>vibe-beck_CF</code> eindeutiger.</td></tr>
+</tbody></table>
+
+<h3>3.4 Zulässige und empfohlene Kombinationen</h3>
+<table><thead><tr><th>Zündmodell</th><th><code>wiebe_autoignition</code></th><th><code>vibe-beck</code></th><th>Empfehlung</th></tr></thead><tbody>
+<tr><td><code>livengood_wu</code></td><td><span class="tag ok">zulässig</span></td><td><span class="tag ok">zulässig</span></td><td><code>wiebe_autoignition</code> als neutrale, verständliche Bezeichnung.</td></tr>
+<tr><td><code>tabulated_livengood_wu</code></td><td><span class="tag ok">zulässig</span></td><td><span class="tag ok">zulässig</span></td><td><code>wiebe_autoignition</code>, sofern keine Beck-Kalibrierkonvention benötigt wird.</td></tr>
+<tr><td><code>beck_2003_1_arrhenius</code></td><td><span class="tag ok">zulässig</span></td><td><span class="tag ok">zulässig</span></td><td><code>vibe-beck</code> für semantisch passende Beck-Konfiguration; rechnerisch derzeit gleichwertig.</td></tr>
+<tr><td><code>beck_2003_two_stage</code></td><td><span class="tag ok">zulässig</span></td><td><span class="tag ok">zulässig</span></td><td><code>vibe-beck</code> plus gewünschtes Cool-Flame-Modell.</td></tr>
+</tbody></table>
+<div class="note warning"><strong>Schema versus sinnvolle Kombination:</strong> Das Schema erlaubt jedes der vier Zündmodelle mit beiden Hauptbrennmodellen. Eine separate Cool Flame wird zur Laufzeit jedoch nur für <code>beck_2003_two_stage</code> aktiviert. Bei allen anderen Zündmodellen haben die Cool-Flame-Felder keine aktive Zweistufenwirkung.</div>
+<h3>3.5 Kurze Auswahlhilfe</h3><ul><li><strong>Einfaches analytisches HCCI:</strong> <code>livengood_wu</code> + <code>wiebe_autoignition</code>.</li><li><strong>Zündverzug aus Kennfeld:</strong> <code>tabulated_livengood_wu</code> + <code>wiebe_autoignition</code>.</li><li><strong>Beck-Hauptzündung ohne Vorstufe:</strong> <code>beck_2003_1_arrhenius</code> + <code>vibe-beck</code>.</li><li><strong>Zweistufige Diesel-HCCI-Zündung:</strong> <code>beck_2003_two_stage</code> + <code>vibe-beck</code> + <code>cool_flame_enabled: true</code> + <code>gamma</code> oder <code>vibe-beck_CF</code>.</li></ul>
+<div class="note warning"><strong>Architekturgrenze:</strong> <code>hcci_diesel</code> wird im Free-Piston-Builder umgesetzt. Das klassische Kurbeltriebmodell nutzt den generischen Vibe-Quellterm und ist für dieses HCCI-Latch nicht der vorgesehene Laufzeitpfad.</div></section>
+
+<section id="zuendung"><h2>4. Zündverzugsmodelle</h2>
+<h3>4.1 <code>livengood_wu</code> – generische Korrelation</h3>
+<div class="formula"><math display="block"><mrow><msub><mi>τ</mi><mi>ign</mi></msub><mo>=</mo><msub><mi>A</mi><mi>τ</mi></msub><msup><mrow><mo>(</mo><mfrac><msub><mi>p</mi><mi>ref</mi></msub><mi>p</mi></mfrac><mo>)</mo></mrow><msub><mi>n</mi><mi>p</mi></msup><mi>exp</mi><mo>(</mo><mfrac><msub><mi>T</mi><mi>a</mi></msub><mi>T</mi></mfrac><mo>)</mo><msup><mrow><mo>(</mo><mfrac><mi>λ</mi><msub><mi>λ</mi><mi>ref</mi></msub></mfrac><mo>)</mo></mrow><msub><mi>n</mi><mi>λ</mi></msup><mo>[</mo><mn>1</mn><mo>+</mo><mo>(</mo><msub><mi>f</mi><mi>res</mi></msub><mo>−</mo><mn>1</mn><mo>)</mo><msub><mi>x</mi><mi>res</mi></msub><mo>]</mo></mrow></math></div>
+<p>Das Ergebnis wird auf <code>max_ignition_delay_s</code> begrenzt. <code>tau_activation_energy_J_per_kg</code> ist im generischen Pfad konfigurierbar, die Laufzeitkorrelation nutzt dort jedoch <code>tau_activation_temperature_K</code>.</p>
+<h3>4.2 <code>tabulated_livengood_wu</code></h3><p>Vierdimensionale lineare Interpolation einer NPZ-Tabelle über Temperatur, Druck, Lambda und EGR/Restgas. Erwartete Arrays: <code>temperature_K</code>, <code>pressure_bar</code>, <code>lambda</code> (bzw. unterstützte Phi-Konvention beim Laden), <code>egr_rate</code> und ein Zündverzugs-Gitter in Sekunden. Werte außerhalb der Achsen werden an den Rand geklemmt und diagnostisch als außerhalb des Tabellenbereichs markiert.</p>
+<div class="formula"><math display="block"><mrow><mi>τ</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>k</mi><mo>,</mo><mi>l</mi></mrow><mrow><mn>2</mn><mo>×</mo><mn>2</mn><mo>×</mo><mn>2</mn><mo>×</mo><mn>2</mn></mrow></munderover><msub><mi>w</mi><mrow><mi>i</mi><mi>j</mi><mi>k</mi><mi>l</mi></mrow></msub><msub><mi>τ</mi><mrow><mi>i</mi><mi>j</mi><mi>k</mi><mi>l</mi></mrow></msub></mrow></math></div>
+<h3>4.3 <code>beck_2003_1_arrhenius</code></h3>
+<div class="formula"><math display="block"><mrow><msub><mi>τ</mi><mi>ign</mi></msub><mo>=</mo><msub><mi>c</mi><mn>1</mn></msub><msup><mrow><mo>(</mo><mfrac><mi>p</mi><msub><mi>p</mi><mn>0</mn></msub></mfrac><mo>)</mo></mrow><msub><mi>c</mi><mn>2</mn></msup><mfrac><msub><mi>O</mi><mrow><mn>2</mn><mo>,</mo><mi>air</mi></mrow></msub><msub><mi>O</mi><mrow><mn>2</mn><mo>,</mo><mi>charge</mi></mrow></msub><mi>exp</mi><mo>(</mo><mfrac><msub><mi>E</mi><mi>a</mi></msub><mrow><mi>p</mi><mi>V</mi><mo>/</mo><mi>m</mi></mrow></mfrac><mo>)</mo></mrow></math></div>
+<p>Ist keine positive Aktivierungsenergie gesetzt, ersetzt der Code den letzten Faktor durch <math><mi>exp</mi><mo>(</mo><msub><mi>T</mi><mi>a</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></math>. Die Ladungs-Sauerstoffkonzentration wird aus Luft- und verbrannter Masse approximiert:</p>
+<div class="formula"><math display="block"><mrow><msub><mi>O</mi><mrow><mn>2</mn><mo>,</mo><mi>charge</mi></mrow></msub><mo>=</mo><msub><mi>O</mi><mrow><mn>2</mn><mo>,</mo><mi>air</mi></mrow></msub><mfrac><msub><mi>m</mi><mi>air</mi></msub><mrow><msub><mi>m</mi><mi>air</mi></msub><mo>+</mo><msub><mi>m</mi><mi>burned</mi></msub></mrow></mfrac></mrow></math></div>
+<h3>4.4 <code>beck_2003_two_stage</code></h3><p>Verwendet für Hot Flame dieselbe Beck-Korrelation und ergänzt kraftstoffabhängige Aktivierungsenergien sowie eine optionale Cool-Flame-Vorstufe. Verfügbare Kraftstoffdatensätze: <code>CEC-Ref.</code>, <code>n-Heptan</code>, <code>Naphtha 1</code>, <code>Naphtha 2</code>, <code>Kerosin 1</code>, <code>Kerosin 2</code>, <code>Kerosin 3</code>, <code>Diesel 1</code>, <code>Diesel 2</code>.</p></section>
+
+<section id="beck-tuning"><h2>5. Beck-Zündung kalibrieren und Temperaturanstieg verstehen</h2>
+<p>Für die zeitliche Verschiebung gilt grundsätzlich: Eine kleinere lokale Zündverzugszeit <math><msub><mi>τ</mi><mi>ign</mi></msub></math> lässt das Livengood-Wu-Integral schneller wachsen und führt damit zu einer früheren Zündung. Eine größere Verzugszeit verschiebt SOC nach spät.</p>
+<div class="formula"><math display="block"><mrow><mi>I</mi><mo>(</mo><mi>t</mi><mo>+</mo><mi>Δt</mi><mo>)</mo><mo>=</mo><mi>I</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>+</mo><mfrac><mi>Δt</mi><msub><mi>τ</mi><mi>ign</mi></msub></mfrac><mo>,</mo><mspace width="2em"/><mi>SOC</mi><mspace width=".4em"/><mi>wenn</mi><mspace width=".4em"/><mi>I</mi><mo>≥</mo><mn>1</mn></mrow></math></div>
+
+<h3>5.1 Wirksame Stellgrößen für frühere oder spätere Zündung</h3>
+<table><thead><tr><th>Parameter</th><th>Frühere Zündung</th><th>Spätere Zündung</th><th>Hinweis</th></tr></thead><tbody>
+<tr><td><code>beck_c1_s</code></td><td>verkleinern</td><td>vergrößern</td><td>Bevorzugter Parameter für eine weitgehend gleichmäßige Verschiebung; <math><msub><mi>τ</mi><mi>ign</mi></msub><mo>∝</mo><msub><mi>c</mi><mn>1</mn></msub></math>.</td></tr>
+<tr><td><code>beck_c2</code></td><td>stärker negativ</td><td>weniger negativ, Richtung 0</td><td>Ändert zusätzlich die Empfindlichkeit gegenüber dem Druckverlauf.</td></tr>
+<tr><td><code>tau_activation_energy_J_per_kg</code></td><td>verkleinern</td><td>vergrößern</td><td>Wegen des Exponentialterms sehr empfindlich; zunächst nur etwa ±2…5&nbsp;% variieren.</td></tr>
+<tr><td><code>residual_slowdown_factor</code></td><td>Richtung 1,0</td><td>erhöhen</td><td>Wirkt nur bei vorhandenem Restgas; Schemawert mindestens 1.</td></tr>
+<tr><td><code>start_temperature_min_K</code></td><td>senken</td><td>erhöhen</td><td>Gate für den Beginn der Akkumulation, kein Parameter der Beck-Formel.</td></tr>
+<tr><td><code>start_pressure_min_Pa</code></td><td>senken</td><td>erhöhen</td><td>Gate für den Beginn der Akkumulation.</td></tr>
+<tr><td><code>max_ignition_delay_s</code></td><td>kleinerer Deckel kann vorziehen</td><td>größerer Deckel begrenzt später</td><td>Numerische/physikalische Obergrenze; nicht als primärer Fitparameter empfohlen.</td></tr>
+<tr><td><code>accumulation_start_mode</code> und Startabstand</td><td>Akkumulationsfenster früher öffnen</td><td>Fenster später öffnen</td><td>Mit <code>piston_distance_from_tdc</code> lässt sich der Start geometrisch begrenzen.</td></tr>
+</tbody></table>
+<div class="note"><strong>Empfohlene Reihenfolge:</strong> Zuerst ausschließlich <code>beck_c1_s</code> in Schritten von etwa ±10&nbsp;% verändern. Erst wenn die Druckabhängigkeit über verschiedene Betriebspunkte nicht passt, <code>beck_c2</code> kalibrieren. Die Aktivierungsenergie verändert die Temperaturempfindlichkeit stark und sollte zuletzt sowie nur in kleinen Schritten angepasst werden.</div>
+<pre><code># Beispiel aus der V54-basierten HCCI-Konfiguration
+# früher:
+beck_c1_s: 1.2e-05
+
+# Ausgangswert:
+beck_c1_s: 1.47044752e-05
+
+# später:
+beck_c1_s: 1.8e-05</code></pre>
+<p>Für den Druckexponenten gilt bei Zylinderdrücken oberhalb des Referenzdrucks beispielhaft:</p>
+<pre><code># frühere/stärker druckabhängige Zündung
+beck_c2: -1.4
+
+# Ausgangswert
+beck_c2: -1.2
+
+# spätere/schwächer druckabhängige Zündung
+beck_c2: -1.0</code></pre>
+
+<h3>5.2 Im gewählten Beck-Pfad unwirksame oder ungeeignete Stellgrößen</h3>
+<table><thead><tr><th>Parameter</th><th>Verhalten im aktuellen Code</th></tr></thead><tbody>
+<tr><td><code>tau_activation_temperature_K</code></td><td>Nur Fallback, wenn <code>tau_activation_energy_J_per_kg</code> fehlt oder nicht positiv ist. Bei gesetzter positiver Aktivierungsenergie ohne Wirkung.</td></tr>
+<tr><td><code>tau_reference_pressure_Pa</code></td><td>Kompatibilitätsfeld des generischen Livengood-Wu-Modells; im Beck-2003-1-Arrhenius-Pfad ohne Wirkung.</td></tr>
+<tr><td><code>tau_reference_lambda</code></td><td>Im Beck-Pfad ohne Wirkung, weil Beck stattdessen den O₂-Verdünnungsterm verwendet.</td></tr>
+<tr><td><code>lambda_slowdown_exponent</code></td><td>Im Beck-Pfad ohne Wirkung.</td></tr>
+<tr><td><code>beck_reference_o2_percent</code></td><td>Kürzt sich in der aktuellen Implementierung rechnerisch aus dem Quotienten heraus. Die Restgasverdünnung bleibt über das Verhältnis aus Luft- und verbrannter Masse wirksam.</td></tr>
+<tr><td><code>beck_reference_pressure_bar</code></td><td>Mathematisch wirksam, sollte aber normalerweise bei 1,0&nbsp;bar festgehalten und nicht als Fitparameter verwendet werden.</td></tr>
+</tbody></table>
+<div class="formula"><math display="block"><mrow><msub><mi>O</mi><mrow><mn>2</mn><mo>,</mo><mi>charge</mi></mrow></msub><mo>=</mo><msub><mi>O</mi><mrow><mn>2</mn><mo>,</mo><mi>ref</mi></mrow></msub><mfrac><msub><mi>m</mi><mi>air</mi></msub><mrow><msub><mi>m</mi><mi>air</mi></msub><mo>+</mo><msub><mi>m</mi><mi>burned</mi></msub></mrow></mfrac><mspace width="1em"/><mo>⇒</mo><mspace width="1em"/><mfrac><msub><mi>O</mi><mrow><mn>2</mn><mo>,</mo><mi>ref</mi></mrow></msub><msub><mi>O</mi><mrow><mn>2</mn><mo>,</mo><mi>charge</mi></mrow></msub><mo>=</mo><mfrac><mrow><msub><mi>m</mi><mi>air</mi></msub><mo>+</mo><msub><mi>m</mi><mi>burned</mi></msub></mrow><msub><mi>m</mi><mi>air</mi></msub></mfrac></mrow></math></div>
+
+<h3>5.3 Umsetzung der Temperaturerhöhung bei der ersten Zündung</h3>
+<p>Beim Erreichen von <math><mi>I</mi><mo>≥</mo><mn>1</mn></math> setzt der Latch lediglich den SOC-Zustand, die SOC-Zeit, das Ende des Brennfensters und die verfügbare Energie. Es gibt <strong>keinen unmittelbaren Temperatursprung</strong> und keine direkt vorgeschriebene Zündtemperatur.</p>
+<ol><li><code>runtime_soc_active_by_vol</code> wird aktiviert und <code>runtime_soc_time_by_vol_s</code> auf die aktuelle Zeit gesetzt.</li><li>Die aus Kraftstoffmasse, LHV und Wirkungsgrad gelatchte Energie wird als <code>runtime_soc_energy_by_vol_J</code> gespeichert.</li><li>Ab SOC erzeugt der zeitbasierte Vibe-Verlauf eine Wärmefreisetzungsleistung <math><mover><mi>Q</mi><mo>˙</mo></mover><msub><mi></mi><mi>comb</mi></msub></math>.</li><li>Diese Leistung erhöht über die Energie-ODE kontinuierlich die innere Energie. Aus Energie, Masse und Zusammensetzung werden Temperatur und anschließend Druck neu berechnet.</li></ol>
+<div class="formula"><math display="block"><mrow><mfrac><mrow><mi>d</mi><mi>U</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mo>−</mo><mi>p</mi><mfrac><mrow><mi>d</mi><mi>V</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>+</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>wall</mi></msub><mo>+</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>comb</mi></msub><mo>−</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>evap</mi></msub><mo>+</mo><mtext>Enthalpieströme</mtext></mrow></math></div>
+<div class="formula"><math display="block"><mrow><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>comb</mi></msub><mo>=</mo><msub><mi>Q</mi><mi>cycle</mi></msub><mfrac><mrow><mi>d</mi><msub><mi>x</mi><mi>b</mi></msub></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>,</mo><mspace width="2em"/><msub><mi>Q</mi><mi>cycle</mi></msub><mo>=</mo><msub><mi>m</mi><mi>fuel</mi></msub><mo>·</mo><mi>LHV</mi><mo>·</mo><msub><mi>η</mi><mi>comb</mi></msub></mrow></math></div>
+<p>Bei konstantem <math><msub><mi>c</mi><mi>v</mi></msub></math> entspräche die Rekonstruktion näherungsweise <math><mi>T</mi><mo>=</mo><mi>U</mi><mo>/</mo><mo>(</mo><mi>m</mi><msub><mi>c</mi><mi>v</mi></msub><mo>)</mo></math>. Mit <code>thermo_model: promo</code> nutzt der Code dagegen zusammensetzungsabhängige Stoffwerte aus Luft, Kraftstoffdampf und verbrannter Masse.</p>
+<div class="note warning"><strong>Kein Sprung am SOC:</strong> Bei <code>m: 2.0</code> ist die Vibe-Wärmefreisetzungsrate exakt am SOC zunächst null und steigt danach kontinuierlich an. <code>duration_ms</code> beeinflusst vor allem die Steilheit und Spitzenleistung des Temperaturanstiegs; <code>beck_c1_s</code> beeinflusst dagegen primär dessen Startzeitpunkt.</div>
+<table><thead><tr><th>Ziel</th><th>Primäre Parameter</th></tr></thead><tbody>
+<tr><td>SOC nach früh/spät verschieben</td><td><code>beck_c1_s</code>, danach gegebenenfalls <code>beck_c2</code> und Aktivierungsenergie</td></tr>
+<tr><td>Temperaturanstieg schneller/langsamer machen</td><td><code>duration_ms</code>, anschließend <code>a</code> und <code>m</code></td></tr>
+<tr><td>Gesamten Temperatur- und Druckanstieg verändern</td><td><code>lambda_target</code>, <code>combustion_efficiency_0to1</code>, <code>lhv_J_per_kg</code></td></tr>
+</tbody></table></section>
+
+<section id="coolflame"><h2>6. Brennverläufe nach Zündung und Cool Flame</h2>
+<h3><code>wiebe_autoignition</code> und <code>vibe-beck</code></h3><p>Beide Hauptbrennmodelle rufen derzeit den zeitbasierten Vibe-Verlauf aus Abschnitt 2 auf. <code>vibe-beck</code> ist damit eine semantische Auswahl für Beck-Kalibrierungen, besitzt im aktuellen Rechenkern aber keine abweichende Formel.</p>
+<h3><code>gamma</code> für Cool Flame</h3><div class="formula"><math display="block"><mrow><mover><mi>Q</mi><mo>˙</mo></mover><mo>=</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>max</mi></msub><msup><mi>x</mi><mi>m</mi></msup><mi>exp</mi><mo>[</mo><mi>m</mi><mo>(</mo><mn>1</mn><mo>−</mo><mi>x</mi><mo>)</mo><mo>]</mo><mo>,</mo><mspace width="1em"/><mi>x</mi><mo>=</mo><mfrac><mrow><mi>t</mi><mo>−</mo><msub><mi>t</mi><mi>CF</mi></msub></mrow><msub><mi>t</mi><mi>peak</mi></msub></mfrac></mrow></math></div>
+<h3><code>vibe-beck_CF</code> (und Alias <code>vibe-beck</code>)</h3><div class="formula"><math display="block"><mrow><mover><mi>Q</mi><mo>˙</mo></mover><mo>=</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>max</mi></msub><msup><mi>x</mi><mi>m</mi></msup><mi>exp</mi><mo>[</mo><mfrac><mi>m</mi><mrow><mi>m</mi><mo>+</mo><mn>1</mn></mrow></mfrac><mo>(</mo><mn>1</mn><mo>−</mo><msup><mi>x</mi><mrow><mi>m</mi><mo>+</mo><mn>1</mn></mrow></msup><mo>)</mo><mo>]</mo></mrow></math></div>
+<p>Die Cool-Flame-Energie ist nominell <math><msub><mi>Q</mi><mi>CF</mi></msub><mo>=</mo><msub><mi>f</mi><mi>CF</mi></msub><msub><mi>Q</mi><mi>cycle</mi></msub></math>. Beim dynamischen Beck-Zweistufenpfad werden Peak und Dauer zusätzlich über die ausgewählten Kraftstoffkoeffizienten bestimmt; die konfigurierten <code>cool_flame_dqmax_c*</code> und <code>cool_flame_duration_c*</code> bilden die Regressionsparameter.</p></section>
+
+<section id="parameter"><h2>7. Vollständige Konfigurationsparameter</h2>
+<h3>7.1 Gemeinsame Auswahl und Vibe</h3><table><thead><tr><th>Parameter</th><th>Default / Bereich</th><th>Beschreibung</th></tr></thead><tbody>
+<tr><td><code>model</code></td><td>Pflicht</td><td><code>none</code>, <code>vibe</code> oder <code>hcci_diesel</code>.</td></tr>
+<tr><td><code>start_mode</code></td><td><code>angle</code></td><td>Vibe: <code>angle</code>, <code>compression_hub</code>, <code>hign_position</code>, <code>expansion_distance_from_tdc</code>.</td></tr>
+<tr><td><code>start_deg</code></td><td>bedingt Pflicht</td><td>Startwinkel bei <code>angle</code>.</td></tr><tr><td><code>start_hub_m</code></td><td>bedingt Pflicht, ≥0</td><td>Kompressionshub ab BDC.</td></tr><tr><td><code>hign_m</code>, <code>hign_mm</code></td><td>genau eines, &gt;0</td><td>Positionsbasierter Start in m oder mm.</td></tr>
+<tr><td><code>duration_mode</code></td><td>automatisch/optional</td><td><code>angle</code>, <code>compression_hub</code>, <code>time</code>; wird aus vorhandenen Dauerfeldern abgeleitet, falls nicht gesetzt.</td></tr><tr><td><code>duration_deg</code></td><td>bedingt Pflicht, &gt;0</td><td>Winkeldauer.</td></tr><tr><td><code>duration_hub_m</code></td><td>bedingt Pflicht, &gt;0</td><td>Hubdauer.</td></tr><tr><td><code>duration_s</code>, <code>duration_ms</code></td><td>genau eines bei Zeitmodus, &gt;0</td><td>Zeitdauer.</td></tr>
+<tr><td><code>a</code></td><td>Pflicht bei Vibe; &gt;0</td><td>Vibe-Vollständigkeits-/Formparameter.</td></tr><tr><td><code>m</code></td><td>Pflicht bei Vibe; ≥0</td><td>Vibe-Formexponent.</td></tr>
+<tr><td><code>angle_reference</code></td><td><code>compression_tdc</code></td><td><code>absolute</code>, <code>compression_tdc</code>, <code>gas_exchange_tdc</code>.</td></tr>
+<tr><td><code>fuel_mass_per_cycle_kg</code></td><td>optional, &gt;0</td><td>Kraftstoffmasse bei fester Energie.</td></tr><tr><td><code>lhv_J_per_kg</code></td><td>optional/bedingt Pflicht, &gt;0</td><td>Unterer Heizwert.</td></tr><tr><td><code>added_energy_per_cycle_J</code></td><td>optional, &gt;0</td><td>Direkte Alternative zum Paar Kraftstoffmasse + LHV.</td></tr>
+<tr><td><code>energy_coupling</code></td><td><code>none</code></td><td><code>none</code> oder <code>stroke_ratio</code>.</td></tr><tr><td><code>stroke_reference_m</code></td><td>bedingt Pflicht, &gt;0</td><td>Referenzhub für <code>stroke_ratio</code>.</td></tr><tr><td><code>stroke_exponent</code></td><td>1.0; ≥0</td><td>Exponent der Hub-Energieskalierung.</td></tr>
+<tr><td><code>fueling_mode</code></td><td><code>fixed_energy</code></td><td>Zusätzlich: <code>lambda_from_cylinder_mass_at_slot_close</code>, <code>lambda_from_cylinder_air_at_slot_close_vapor_injector</code>.</td></tr><tr><td><code>lambda_target</code></td><td>bedingt Pflicht, &gt;0</td><td>Ziel-Luftverhältnis für Lambda-Modi.</td></tr><tr><td><code>afr_stoich_kg_air_per_kg_fuel</code></td><td>14.5; &gt;0</td><td>Stöchiometrisches AFR.</td></tr><tr><td><code>combustion_efficiency_0to1</code></td><td>1.0; (0,1]</td><td>Freigesetzter chemischer Energieanteil.</td></tr>
+<tr><td><code>injection_duration_s</code>, <code>injection_duration_ms</code></td><td>genau eines im Vapor-Injector-Modus, &gt;0</td><td>Einspritzdauer.</td></tr><tr><td><code>slot_open_threshold_m2</code></td><td>1e−7; ≥0</td><td>Flächenschwelle „Slot offen“.</td></tr><tr><td><code>slot_closed_threshold_m2</code></td><td>1e−9; 0…open</td><td>Flächenschwelle „Slot geschlossen“.</td></tr><tr><td><code>compression_velocity_threshold_m_per_s</code></td><td>0.02; ≥0</td><td>Mindestgeschwindigkeit für Kompressions-Latch.</td></tr><tr><td><code>hcci_diagnostics_ref</code></td><td>null / nicht leer</td><td>Zünd-Submodell nur als HCCI-Diagnose parallel zu Vibe.</td></tr>
+</tbody></table>
+<h3>7.2 HCCI-Diesel: Verbrennung und Gemisch</h3><table><thead><tr><th>Parameter</th><th>Default / Bereich</th><th>Beschreibung</th></tr></thead><tbody>
+<tr><td><code>ignition</code></td><td>null</td><td>Optional eingebettetes/aufgelöstes separates Zündmodell; hat Vorrang vor Legacy-Feldern.</td></tr><tr><td><code>ignition_model</code></td><td><code>livengood_wu</code></td><td>Legacy-/Direktauswahl der vier Zündmodelle.</td></tr><tr><td><code>burn_model</code></td><td><code>wiebe_autoignition</code></td><td><code>wiebe_autoignition</code> oder <code>vibe-beck</code>.</td></tr><tr><td><code>duration_mode</code></td><td>nur <code>time</code></td><td>HCCI-Hauptbrand ist ausschließlich zeitbasiert.</td></tr><tr><td><code>duration_s</code>/<code>duration_ms</code></td><td>genau eines, &gt;0</td><td>Hauptbrenndauer.</td></tr><tr><td><code>a</code>/<code>m</code></td><td>6.9 / 2.0</td><td>Hauptbrenn-Vibeparameter; a&gt;0, m≥0.</td></tr><tr><td><code>fueling_mode</code></td><td>nur <code>lambda_from_cylinder_mass_at_slot_close</code></td><td>HCCI-Kraftstoff aus eingeschlossener Zylindermasse.</td></tr><tr><td><code>lambda_target</code></td><td>Pflicht, &gt;0</td><td>Ziel-Lambda.</td></tr><tr><td><code>lhv_J_per_kg</code></td><td>Pflicht, &gt;0</td><td>Heizwert.</td></tr><tr><td><code>afr_stoich_kg_air_per_kg_fuel</code></td><td>14.5; &gt;0</td><td>Stöchiometrisches AFR.</td></tr><tr><td><code>combustion_efficiency_0to1</code></td><td>0.96; (0,1]</td><td>Verbrennungswirkungsgrad.</td></tr><tr><td><code>slot_open_threshold_m2</code>, <code>slot_closed_threshold_m2</code></td><td>1e−7 / 1e−9</td><td>Hysterese für Slot-Open/Close-Latch.</td></tr><tr><td><code>compression_velocity_threshold_m_per_s</code></td><td>0.02; ≥0</td><td>Kompressions-Gate.</td></tr>
+</tbody></table>
+<h3>7.3 Zündverzug (auch im separaten <code>ignition</code>-Submodell)</h3><table><thead><tr><th>Parameter</th><th>Default / Bereich</th><th>Beschreibung</th></tr></thead><tbody>
+<tr><td><code>model</code></td><td><code>livengood_wu</code></td><td>Bei separatem Zündblock; einer der vier Modellnamen.</td></tr><tr><td><code>tau_A_s</code></td><td>2.5e−6; &gt;0</td><td>Vorfaktor A.</td></tr><tr><td><code>tau_pressure_exponent</code></td><td>1.2; ≥0</td><td>Druckexponent des generischen Modells.</td></tr><tr><td><code>tau_activation_temperature_K</code></td><td>15000; &gt;0</td><td>Aktivierungstemperatur.</td></tr><tr><td><code>tau_activation_energy_J_per_kg</code></td><td>null oder &gt;0</td><td>Optionale Aktivierungsenergie für Beck.</td></tr><tr><td><code>tau_reference_pressure_Pa</code></td><td>1e6; &gt;0</td><td>Referenzdruck generisches Modell.</td></tr><tr><td><code>tau_reference_lambda</code></td><td>1.4; &gt;0</td><td>Referenz-Lambda.</td></tr><tr><td><code>lambda_slowdown_exponent</code></td><td>0.7; ≥0</td><td>Lambda-Verlangsamung.</td></tr><tr><td><code>residual_slowdown_factor</code></td><td>1.5; ≥1</td><td>Faktor bei 100 % Restgasanteil.</td></tr><tr><td><code>start_temperature_min_K</code></td><td>780; &gt;0</td><td>Unteres Temperatur-Gate.</td></tr><tr><td><code>start_pressure_min_Pa</code></td><td>2e6; &gt;0</td><td>Unteres Druck-Gate.</td></tr><tr><td><code>max_ignition_delay_s</code></td><td>0.02; &gt;0</td><td>Obergrenze des Verzugs.</td></tr><tr><td><code>accumulation_start_mode</code></td><td><code>compression</code></td><td><code>compression</code> oder <code>piston_distance_from_tdc</code>.</td></tr><tr><td><code>accumulation_start_distance_from_tdc_m/mm</code></td><td>bedingt genau eines, ≥0</td><td>Startabstand für distanzbasiertes Akkumulationsfenster.</td></tr><tr><td><code>accumulation_end_mode</code></td><td><code>none</code></td><td><code>none</code> oder <code>combustion_end</code>.</td></tr><tr><td><code>ignition_delay_table_npz</code></td><td>Pflicht bei Tabelle</td><td>Pfad zur NPZ-Zündverzugstabelle.</td></tr><tr><td><code>beck_c1_s</code></td><td>1e−5; &gt;0</td><td>Beck-Vorfaktor.</td></tr><tr><td><code>beck_c2</code></td><td>−1.2</td><td>Beck-Druckexponent; keine zusätzliche Bereichseinschränkung.</td></tr><tr><td><code>beck_reference_pressure_bar</code></td><td>1.0; &gt;0</td><td>Beck-Referenzdruck.</td></tr><tr><td><code>beck_reference_o2_percent</code></td><td>20.94; &gt;0</td><td>O₂-Gehalt der Referenzluft.</td></tr>
+</tbody></table>
+<h3>7.4 Zweistufige Cool-Flame-Parameter</h3><table><thead><tr><th>Parameter</th><th>Default / Bereich</th><th>Beschreibung</th></tr></thead><tbody>
+<tr><td><code>beck_cf_fuel_name</code></td><td><code>Diesel 2</code></td><td>Einer der neun oben genannten Beck-Kraftstoffdatensätze.</td></tr><tr><td><code>cool_flame_enabled</code></td><td>false</td><td>Separate Vorstufe aktivieren.</td></tr><tr><td><code>cool_flame_burn_model</code></td><td><code>gamma</code></td><td><code>gamma</code>, <code>vibe-beck_CF</code>, <code>vibe-beck</code>.</td></tr><tr><td><code>cool_flame_energy_fraction</code></td><td>0.08; (0,1)</td><td>Maximaler Anteil der Zyklusenergie.</td></tr><tr><td><code>cool_flame_duration_ms</code></td><td>0.3409; &gt;0</td><td>Nominelle Cool-Flame-Dauer.</td></tr><tr><td><code>cool_flame_a</code></td><td>6.9; &gt;0</td><td>Vibe-CF-Parameter a.</td></tr><tr><td><code>cool_flame_m</code></td><td>2.0; ≥0</td><td>Formparameter; bei exakt <code>vibe-beck_CF</code> setzt der Builder intern 1.7.</td></tr><tr><td><code>cool_flame_dqmax_c1</code>, <code>cool_flame_dqmax_c2</code>, <code>cool_flame_dqmax_c3</code>, <code>cool_flame_dqmax_c4</code>, <code>cool_flame_dqmax_c5</code>, <code>cool_flame_dqmax_c0</code></td><td>0.363, −0.333, 1.424, 0.155, 0.0, 7.5e−3</td><td>Regressionskoeffizienten für maximale Cool-Flame-Wärmefreisetzung (Default Diesel 2).</td></tr><tr><td><code>cool_flame_duration_c1</code>, <code>cool_flame_duration_c2</code>, <code>cool_flame_duration_c3</code>, <code>cool_flame_duration_c4</code>, <code>cool_flame_duration_c5</code>, <code>cool_flame_duration_c0</code></td><td>−0.071, −8.5e−3, 0.016, −0.241, −0.645, 340.9</td><td>Regressionskoeffizienten für dynamische Dauer (Default Diesel 2).</td></tr>
+</tbody></table>
+<div class="note"><strong>Wichtig bei separatem Zündmodell:</strong> Die Klassen <code>LivengoodWuIgnitionConfig</code>, <code>TabulatedLivengoodWuIgnitionConfig</code>, <code>BeckOneArrheniusIgnitionConfig</code> und <code>BeckTwoStageIgnitionConfig</code> enthalten jeweils nur die zu ihrem Modell gehörenden Felder. Die zwölf freien <code>cool_flame_dqmax_*</code>/<code>duration_*</code>-Koeffizienten existieren nur direkt in <code>HcciDieselCombustionConfig</code>; das separate Beck-Zweistufenmodell wählt diese über <code>beck_cf_fuel_name</code> aus der eingebauten Tabelle.</div></section>
+
+<section id="beispiele"><h2>8. Konfigurationsbeispiele</h2>
+<h3>Vibe, zeit- und positionsbasiert</h3><pre><code>preprocessing:
+  features:
+    combustion: true
+  volumes:
+    - name: cylinder_1
+      type: cylinder
+      combustion:
+        model: vibe
+        start_mode: expansion_distance_from_tdc
+        hign_mm: 10.0
+        duration_mode: time
+        duration_ms: 3.0
+        a: 6.9
+        m: 2.0
+        fueling_mode: fixed_energy
+        fuel_mass_per_cycle_kg: 0.00002
+        lhv_J_per_kg: 42500000.0
+        combustion_efficiency_0to1: 0.96</code></pre>
+<h3>HCCI mit separatem tabelliertem Zündmodell</h3><pre><code>preprocessing:
+  submodels:
+    ignition:
+      hcci_table:
+        model: tabulated_livengood_wu
+        ignition_delay_table_npz: data/hcci_delay.npz
+        start_temperature_min_K: 780.0
+        start_pressure_min_Pa: 2000000.0
+        max_ignition_delay_s: 0.02
+        accumulation_start_mode: piston_distance_from_tdc
+        accumulation_start_distance_from_tdc_mm: 25.0
+    combustion:
+      hcci_main:
+        model: hcci_diesel
+        ignition: {ref: hcci_table}
+        burn_model: wiebe_autoignition
+        duration_mode: time
+        duration_ms: 2.5
+        a: 6.9
+        m: 2.0
+        lambda_target: 1.7
+        lhv_J_per_kg: 42500000.0
+        afr_stoich_kg_air_per_kg_fuel: 14.5
+        combustion_efficiency_0to1: 0.96</code></pre>
+<h3>HCCI Beck, zweistufig</h3><pre><code>combustion:
+  model: hcci_diesel
+  ignition_model: beck_2003_two_stage
+  burn_model: vibe-beck
+  duration_ms: 2.5
+  lambda_target: 1.6
+  lhv_J_per_kg: 42500000.0
+  beck_c1_s: 1.0e-5
+  beck_c2: -1.2
+  beck_reference_pressure_bar: 1.0
+  beck_reference_o2_percent: 20.94
+  beck_cf_fuel_name: Diesel 2
+  cool_flame_enabled: true
+  cool_flame_burn_model: vibe-beck_CF
+  cool_flame_energy_fraction: 0.08
+  cool_flame_duration_ms: 0.3409
+  cool_flame_a: 6.9
+  cool_flame_m: 2.0</code></pre>
+<h3>Gültigkeits-Checkliste</h3><ul><li>Bei <code>fixed_energy</code> entweder direkte Energie oder das vollständige Paar Kraftstoffmasse + LHV angeben – niemals beides.</li><li>Bei alternativen Einheitenfeldern (<code>m/mm</code>, <code>s/ms</code>) immer genau eines setzen.</li><li>Positionsbasierte Vibe-Starts erfordern <code>duration_mode: time</code>.</li><li>HCCI erfordert genau eine positive Zeitdauer, Ziel-Lambda und LHV.</li><li>Das separate <code>ignition</code>-Submodell ist die sauberste Wiederverwendungsform; die Legacy-Felder direkt in <code>hcci_diesel</code> bleiben unterstützt.</li></ul></section>
+<p class="small">Diese Seite beschreibt den ausführbaren Stand des Codes und benennt bewusst Stellen, an denen Modellnamen derzeit auf dieselbe Kernformel abgebildet werden. Browser mit nativer MathML-Unterstützung stellen alle Gleichungen ohne externe Bibliothek dar.</p>
+</main></body></html>

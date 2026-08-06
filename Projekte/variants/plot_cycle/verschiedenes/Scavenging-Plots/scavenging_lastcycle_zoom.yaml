@@ -1,0 +1,62 @@
+name: Slot overlap in the last window
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Last-cycle zoom — overlap and model response
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Slot overlap in the last window
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: manual
+    x_min: 0.88
+    x_max: 1.0
+    y_axes:
+    - id: ax_flow
+      title: Mass flow [g/s]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_area
+      title: A_eff [mm2]
+      side: right
+      color: '#111111'
+      limit_mode: auto
+    series:
+    - signal_key: transfer_slot_1_mdot_kg_per_s
+      label: transfer mdot
+      axis_id: ax_flow
+      color: '#175CD3'
+      line_style: -.
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.45
+    - signal_key: exhaust_slot_1_mdot_kg_per_s
+      label: exhaust mdot
+      axis_id: ax_flow
+      color: '#D92D20'
+      line_style: -.
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.45
+    - signal_key: transfer_slot_1_A_eff_forward_m2
+      label: transfer A_eff
+      axis_id: ax_area
+      color: '#175CD3'
+      line_style: --
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.05
+    - signal_key: exhaust_slot_1_A_eff_forward_m2
+      label: exhaust A_eff
+      axis_id: ax_area
+      color: '#D92D20'
+      line_style: --
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.05
+    show_title: true

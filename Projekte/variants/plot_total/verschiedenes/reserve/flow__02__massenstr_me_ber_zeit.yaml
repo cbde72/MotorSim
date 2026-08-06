@@ -1,0 +1,83 @@
+name: Mass flows over time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- id: f42ffd1452a2
+  title: Free-Piston Mass flows aktiver Connections
+  rows: 1
+  cols: 1
+  subplots:
+  - id: 25f109345fb4
+    title: Mass flows over time
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_scale_factor: 1.0
+    x_offset: 0.0
+    x_limit_mode: auto
+    x_min: 0.0
+    x_max: 720.0
+    y_axes:
+    - id: ax_mdot
+      title: Mass flow [g/s]
+      side: left
+      spine_offset: 0.0
+      color: '#111111'
+      visible: true
+      limit_mode: data
+      y_min: 0.0
+      y_max: 1.0
+      tick_step: 0.0
+      minor_tick_step: 0.0
+      major_grid: true
+      minor_grid: false
+    series:
+    - id: 2fff71a5c5zz
+      signal_key: compressor_1_in_cv_mdot_kg_per_s
+      label: compressor_1_in_cv
+      axis_id: ax_mdot
+      visible: true
+      color: '#175CD3'
+      line_style: -.
+      marker: ''
+      line_width: 1.45
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000.0
+      offset: 0.0
+      series_type: line
+    - id: 616ba3fed924
+      signal_key: transfer_slot_1_mdot_kg_per_s
+      label: transfer_slot
+      axis_id: ax_mdot
+      visible: true
+      color: '#175CD3'
+      line_style: -.
+      marker: ''
+      line_width: 1.45
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000.0
+      offset: 0.0
+      series_type: line
+    - id: 296bf6afc3fe
+      signal_key: exhaust_slot_1_mdot_kg_per_s
+      label: exhaust_slot
+      axis_id: ax_mdot
+      visible: true
+      color: '#D92D20'
+      line_style: -.
+      marker: ''
+      line_width: 1.45
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1000.0
+      offset: 0.0
+      series_type: line
+    events: []
+    legend_visible: true
+    legend_position: best
+    show_grid: true
+    show_title: true

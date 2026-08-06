@@ -24,6 +24,7 @@ from thermo0d.input.builder_common import (
     split_dynamic_volumes_and_boundaries,
 )
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_volume_from_position, free_piston_generalized_initial_state
+from thermo0d.model.free_piston.generator_map import load_generator_torque_map
 from thermo0d.physics.quellen_props import reduced_mixture_properties_from_temperature_quellen
 from thermo0d.physics.beck import beck_cool_flame_fuel_parameters
 from thermo0d.model.free_piston.state_layout import build_free_piston_state_layout
@@ -188,6 +189,19 @@ def _validate_ignition_ref(builder, ref_name: str):
 
 
 def _initial_cylinder_burned_fraction_0to1(fp, cylinder_vol: CylinderVolumeConfig | None = None) -> float:
+    # Named cylinder volumes own their thermodynamic composition.  The global
+    # free-piston combustion_state is retained only for the legacy synthetic
+    # cylinder path; applying it to every named cylinder destroys asymmetric
+    # restart states (for example cylinder_1 != cylinder_2).
+    if cylinder_vol is not None:
+        if hasattr(cylinder_vol, "resolved_initial_burned_fraction_0to1"):
+            value = float(cylinder_vol.resolved_initial_burned_fraction_0to1)
+        elif getattr(cylinder_vol, "initial_burned_mass_percent", None) is not None:
+            value = float(cylinder_vol.initial_burned_mass_percent) / 100.0
+        else:
+            value = float(getattr(cylinder_vol, "initial_burned_fraction_0to1", 0.0) or 0.0)
+        return min(max(value, 0.0), 1.0)
+
     combustion_state = getattr(getattr(fp, "initial_conditions", None), "combustion_state", None)
     if combustion_state is not None:
         if hasattr(combustion_state, "resolved_burned_fraction_0to1"):
@@ -196,15 +210,7 @@ def _initial_cylinder_burned_fraction_0to1(fp, cylinder_vol: CylinderVolumeConfi
             value = float(getattr(combustion_state, "burned_fraction_0to1", 0.0) or 0.0)
         if getattr(combustion_state, "burned_mass_percent", None) is not None or abs(value) > 1.0e-15 or cylinder_vol is None:
             return min(max(value, 0.0), 1.0)
-    if cylinder_vol is None:
-        return 0.0
-    if hasattr(cylinder_vol, "resolved_initial_burned_fraction_0to1"):
-        value = float(cylinder_vol.resolved_initial_burned_fraction_0to1)
-    elif getattr(cylinder_vol, "initial_burned_mass_percent", None) is not None:
-        value = float(cylinder_vol.initial_burned_mass_percent) / 100.0
-    else:
-        value = float(getattr(cylinder_vol, "initial_burned_fraction_0to1", 0.0) or 0.0)
-    return min(max(value, 0.0), 1.0)
+    return 0.0
 
 
 def _wall_temperature_zones(cfg: CycleAverageWallTemperatureConfig):
@@ -543,6 +549,46 @@ def _build_free_piston_wall_matrices(builder, cylinder_cfg_for_submodels: Cylind
     return wall_matrix, wall_ref_matrix, wall_ref_matrix_safe, 0
 
 
+def _build_free_piston_bounce_wall_matrices(
+    builder,
+    bounce_cfg: BounceChamberVolumeConfig,
+    bounce_geom: _ResolvedBounceGeometry,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+    """Build a Woschni row for a stateful bounce/compressor chamber."""
+    wall_cfg = bounce_cfg.wall_heat
+    if isinstance(wall_cfg, DisabledSubmodelConfig):
+        return (
+            np.zeros((0, len(WallCol)), dtype=np.float64),
+            np.zeros((0, len(WallRefCol)), dtype=np.float64),
+            np.zeros((1, len(WallRefCol)), dtype=np.float64),
+            -1,
+        )
+    if not isinstance(wall_cfg, WoschniHeatTransferConfig):
+        raise TypeError("Unsupported wall_heat model for free_piston bounce chamber")
+
+    wall_row = np.zeros((len(WallCol),), dtype=np.float64)
+    wall_row[WallCol.MODEL] = float(HeatTransferModel.WOSCHNI)
+    wall_row[WallCol.C1] = 0.0 if wall_cfg.c1 is None else float(wall_cfg.c1)
+    wall_row[WallCol.C2] = 0.0 if wall_cfg.c2 is None else float(wall_cfg.c2)
+    wall_row[WallCol.C3] = 0.0 if wall_cfg.c3 is None else float(wall_cfg.c3)
+    wall_row[WallCol.WALL_TEMP] = float(wall_cfg.wall_temperature_K)
+    wall_row[WallCol.WALL_AREA] = float(wall_cfg.wall_area_m2)
+    wall_row[WallCol.VARIANT] = float(builder._woschni_variant_enum(wall_cfg.variant))
+    wall_row[WallCol.DP_MODE] = float(builder._woschni_dp_mode_enum(wall_cfg.dp_mode))
+    wall_row[WallCol.REF_MODE] = float(builder._woschni_reference_mode_enum(wall_cfg.reference_state_mode))
+    wall_row[WallCol.PHASE_MODE] = float(builder._woschni_phase_mode_enum(wall_cfg.phase_mode))
+    wall_row[WallCol.MULTIPLIER] = float(wall_cfg.multiplier)
+    wall_row[WallCol.CUCM] = float(wall_cfg.cucm)
+    wall_row[WallCol.SWIRL_NUMBER] = float(wall_cfg.swirl_number)
+    wall_row[WallCol.IMEP_BAR] = float(wall_cfg.imep_bar)
+    wall_row[WallCol.CLEARANCE_VOL] = float(bounce_geom.chamber_min_volume_m3)
+    wall_row[WallCol.MAX_VOL] = float(bounce_geom.chamber_volume0_m3)
+
+    wall_matrix = wall_row.reshape(1, -1)
+    wall_ref_matrix = np.asarray([[0.0, 0.0, 0.0, 0.0, 0.0, -1.0]], dtype=np.float64)
+    return wall_matrix, wall_ref_matrix, wall_ref_matrix.copy(), 0
+
+
 def _resolve_combustion_total_energy_J(combustion_cfg, nominal_stroke_m: float) -> float:
     if getattr(combustion_cfg, 'added_energy_per_cycle_J', None) is not None:
         q_total = float(combustion_cfg.added_energy_per_cycle_J)
@@ -589,6 +635,15 @@ def _resolve_combustion_timing_for_free_piston(combustion_cfg, nominal_stroke_m:
             raise ValueError('hign_m/hign_mm must be <= free-piston nominal stroke')
         ref_type = AngleReference.COMPRESSION_TDC
         start_mode_enum = CombStartMode.HIGN_POSITION
+    elif start_mode == 'expansion_distance_from_tdc':
+        has_m = getattr(combustion_cfg, 'hign_m', None) is not None
+        start_value = float(combustion_cfg.hign_m) if has_m else float(combustion_cfg.hign_mm) * 1.0e-3
+        if start_value <= 0.0:
+            raise ValueError('hign_m/hign_mm must resolve to > 0')
+        if nominal_stroke_m > 1.0e-18 and start_value > nominal_stroke_m + 1.0e-12:
+            raise ValueError('hign_m/hign_mm must be <= free-piston nominal stroke')
+        ref_type = AngleReference.COMPRESSION_TDC
+        start_mode_enum = CombStartMode.EXPANSION_DISTANCE_FROM_TDC
     else:
         start_value = float(combustion_cfg.start_deg)
         start_mode_enum = CombStartMode.ANGLE
@@ -714,6 +769,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
 
     cylinder_cfg_for_submodels: CylinderVolumeConfig | None = None
     cylinder_cfg_by_index: dict[int, CylinderVolumeConfig] = {}
+    bounce_cfg_by_index: dict[int, BounceChamberVolumeConfig] = {}
     cyl_idx: int | None = None
     cylinder_count = 0
     bounce_count = 0
@@ -814,6 +870,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             initial_burned_mass_kg = initial_mass_kg * builder._initial_burned_fraction_0to1(vol)
             y_init[state_layout.burned_mass_index(i)] = initial_burned_mass_kg
         elif isinstance(vol, BounceChamberVolumeConfig):
+            bounce_cfg_by_index[i] = vol
             bounce_count += 1
             motion_sign = 1.0 if bounce_count == 1 else -1.0
             volume_mechanical_dof[i] = 0
@@ -923,6 +980,17 @@ def build_free_piston_bundle(builder) -> ModelBundle:
                     wall_row[WallCol.WALL_TEMP] = weighted_temp / total_area
             vol_matrix[int(cyl_i), VolumeCol.WALL_ROW] = float(len(wall_rows))
             wall_rows.append(wall_row)
+            wall_ref_rows.append(np.asarray(wall_ref_matrix_i[0], dtype=np.float64))
+            wall_ref_safe_rows.append(np.asarray(wall_ref_matrix_safe_i[0], dtype=np.float64))
+    for bounce_i, bounce_cfg_i in bounce_cfg_by_index.items():
+        wall_matrix_i, wall_ref_matrix_i, wall_ref_matrix_safe_i, wall_idx_i = _build_free_piston_bounce_wall_matrices(
+            builder,
+            bounce_cfg_i,
+            bounce_geom,
+        )
+        if wall_idx_i >= 0 and wall_matrix_i.shape[0] > 0:
+            vol_matrix[int(bounce_i), VolumeCol.WALL_ROW] = float(len(wall_rows))
+            wall_rows.append(np.asarray(wall_matrix_i[wall_idx_i], dtype=np.float64))
             wall_ref_rows.append(np.asarray(wall_ref_matrix_i[0], dtype=np.float64))
             wall_ref_safe_rows.append(np.asarray(wall_ref_matrix_safe_i[0], dtype=np.float64))
     wall_matrix = np.asarray(wall_rows, dtype=np.float64) if wall_rows else np.zeros((0, len(WallCol)), dtype=np.float64)
@@ -1128,6 +1196,8 @@ def build_free_piston_bundle(builder) -> ModelBundle:
             wall_bore_by_vol[int(cyl_i)] = float(cyl_cfg_i.kinematics.bore_m) if cyl_cfg_i is not None else float(_fp_piston_diameter_m(fp))
             stroke_m = float(cyl_cfg_i.kinematics.stroke_m) if cyl_cfg_i is not None else max(float(fp.mechanics.x_max_m) - float(fp.mechanics.x_min_m), 0.0)
             wall_ups_by_vol[int(cyl_i)] = 2.0 * stroke_m * float(config.engine.speed_rpm) / 60.0
+    for bounce_i in bounce_cfg_by_index:
+        wall_bore_by_vol[int(bounce_i)] = float(bounce_geom.chamber_diameter_m)
 
     for i in range(n_vol):
         if int(environment_is_fixed[i]) == 1 or int(vol_matrix[i, VolumeCol.TYPE]) == VolumeType.ENVIRONMENT:
@@ -1170,6 +1240,10 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         if int(conn_matrix[i, ConnCol.TYPE]) == int(ConnectionType.SLOT)
         and (int(conn_matrix[i, ConnCol.FROM_VOL]) in cylinder_index_set or int(conn_matrix[i, ConnCol.TO_VOL]) in cylinder_index_set)
     ], dtype=np.int64)
+    generator_torque_map = None
+    if str(fp.load.model) == 'generator_torque_map':
+        generator_torque_map = load_generator_torque_map(fp.load.torque_map, builder.config_path)
+
     meta = FreePistonModelData(
         x0_m=float(fp.initial_conditions.x0_m),
         v0_m_per_s=float(fp.initial_conditions.v0_m_per_s),
@@ -1209,6 +1283,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         load_hard_margin_m=float(fp.load.hard_margin_m if getattr(fp.load, 'hard_margin_m', None) is not None else 0.0),
         load_stop_kp=float(fp.load.stop_kp if getattr(fp.load, 'stop_kp', None) is not None else 1.0),
         load_max_force_N=float(fp.load.max_force_N if getattr(fp.load, 'max_force_N', None) is not None else float('inf')),
+        generator_torque_map=generator_torque_map,
         scavenging_enabled=bool(getattr(fp.scavenging, 'enabled', False)),
         scavenging_model=str(getattr(fp.scavenging, 'model', 'overlap_short_circuit_0d')),
         scavenging_factor=float(getattr(fp.scavenging, 'scavenging_factor', 1.25)),

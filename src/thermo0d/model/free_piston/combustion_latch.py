@@ -304,7 +304,10 @@ def evaluate_free_piston_hcci_ignition_sample(
     if q_total <= 0.0:
         result['reason_code'] = float(HCCI_DIAG_NO_COMBUSTION_ENERGY)
         return result
-    if bool(soc_active):
+    # A real HCCI combustion model must stop accumulating once its SOC is
+    # active.  A Vibe model with hcci_diagnostics_ref is diagnostic-only:
+    # its prescribed SOC must not suppress the independent LW evaluation.
+    if bool(soc_active) and hcci_active:
         result['reason_code'] = float(HCCI_DIAG_SOC_ACTIVE)
         return result
 
@@ -912,7 +915,12 @@ def _comb_start_mode(bundle, cylinder_idx: int | None = None) -> int:
     if comb_row.shape[0] <= int(CombCol.START_MODE):
         return int(CombStartMode.ANGLE)
     mode = int(comb_row[int(CombCol.START_MODE)])
-    if mode in (int(CombStartMode.COMPRESSION_HUB), int(CombStartMode.HIGN_POSITION), int(CombStartMode.AUTOIGNITION)):
+    if mode in (
+        int(CombStartMode.COMPRESSION_HUB),
+        int(CombStartMode.HIGN_POSITION),
+        int(CombStartMode.AUTOIGNITION),
+        int(CombStartMode.EXPANSION_DISTANCE_FROM_TDC),
+    ):
         return mode
     return int(CombStartMode.ANGLE)
 
@@ -960,6 +968,15 @@ def _time_mode_duration_s(bundle, cylinder_idx: int | None = None) -> float:
     return float(comb_row[int(CombCol.DURATION_DEG)])
 
 
+def expansion_distance_start_state(
+    *, armed: bool, distance_from_tdc_m: float, threshold_m: float, compression_stroke: bool
+) -> tuple[bool, bool]:
+    """Arm near TDC and trigger once on the outward threshold crossing."""
+    armed_now = bool(armed) or (bool(compression_stroke) and float(distance_from_tdc_m) <= float(threshold_m))
+    trigger = armed_now and (not bool(compression_stroke)) and float(distance_from_tdc_m) >= float(threshold_m)
+    return bool(armed_now), bool(trigger)
+
+
 def _current_combustion_energy_J(bundle, cylinder_idx: int | None = None) -> float:
     fp = bundle.free_piston
     if fp is None:
@@ -1002,9 +1019,13 @@ def _bootstrap_time_combustion_state(bundle) -> None:
             continue
         start_value = float(comb_row[int(CombCol.START_DEG)])
         fp.runtime_time_combustion_initialized_by_vol[cyl] = 1
-        if start_mode == int(CombStartMode.HIGN_POSITION):
+        if start_mode in (int(CombStartMode.HIGN_POSITION), int(CombStartMode.EXPANSION_DISTANCE_FROM_TDC)):
             distance_from_tdc_m = cylinder_distance_from_tdc(x_m, fp.x_min_m, fp.x_max_m)
-            armed = bool(distance_from_tdc_m > start_value)
+            armed = bool(
+                distance_from_tdc_m > start_value
+                if start_mode == int(CombStartMode.HIGN_POSITION)
+                else distance_from_tdc_m <= start_value
+            )
         else:
             theta_window_deg = _free_piston_theta_window_deg(bundle, 0.0, x_m, v_m_per_s, cyl)
             armed = bool(theta_window_deg < start_value)
@@ -1033,9 +1054,13 @@ def _update_time_combustion_state(bundle, t_s: float, y_state: np.ndarray) -> No
         duration_s = _time_mode_duration_s(bundle, cyl)
         if not bool(fp.runtime_time_combustion_initialized_by_vol[cyl]):
             fp.runtime_time_combustion_initialized_by_vol[cyl] = 1
-            if start_mode == int(CombStartMode.HIGN_POSITION):
+            if start_mode in (int(CombStartMode.HIGN_POSITION), int(CombStartMode.EXPANSION_DISTANCE_FROM_TDC)):
                 distance_from_tdc_m = cylinder_distance_from_tdc(x_m, fp.x_min_m, fp.x_max_m)
-                armed = bool(distance_from_tdc_m > start_value)
+                armed = bool(
+                    distance_from_tdc_m > start_value
+                    if start_mode == int(CombStartMode.HIGN_POSITION)
+                    else distance_from_tdc_m <= start_value
+                )
             else:
                 theta_window_deg = _free_piston_theta_window_deg(bundle, t_s, x_m, v_m_per_s, cyl)
                 armed = bool(theta_window_deg < start_value)
@@ -1051,6 +1076,16 @@ def _update_time_combustion_state(bundle, t_s: float, y_state: np.ndarray) -> No
             if (not bool(fp.runtime_time_combustion_armed_by_vol[cyl])) and distance_from_tdc_m > start_value:
                 fp.runtime_time_combustion_armed_by_vol[cyl] = 1
             trigger_reached = bool(fp.runtime_time_combustion_armed_by_vol[cyl]) and free_piston_is_compression_stroke(v_m_per_s, x_m, fp.x_min_m, fp.x_max_m) and distance_from_tdc_m <= start_value
+        elif start_mode == int(CombStartMode.EXPANSION_DISTANCE_FROM_TDC):
+            distance_from_tdc_m = cylinder_distance_from_tdc(x_m, fp.x_min_m, fp.x_max_m)
+            compression_stroke = free_piston_is_compression_stroke(v_m_per_s, x_m, fp.x_min_m, fp.x_max_m)
+            armed, trigger_reached = expansion_distance_start_state(
+                armed=bool(fp.runtime_time_combustion_armed_by_vol[cyl]),
+                distance_from_tdc_m=distance_from_tdc_m,
+                threshold_m=start_value,
+                compression_stroke=compression_stroke,
+            )
+            fp.runtime_time_combustion_armed_by_vol[cyl] = 1 if armed else 0
         else:
             theta_window_deg = _free_piston_theta_window_deg(bundle, t_s, x_m, v_m_per_s, cyl)
             if (not bool(fp.runtime_time_combustion_armed_by_vol[cyl])) and theta_window_deg < start_value:
@@ -1289,9 +1324,13 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
     for k in range(n):
         x_m, v_m_per_s = _local_piston_kinematics_for_volume(bundle, y[:, k], cyl_idx)
         if not initialized:
-            if start_mode == int(CombStartMode.HIGN_POSITION):
+            if start_mode in (int(CombStartMode.HIGN_POSITION), int(CombStartMode.EXPANSION_DISTANCE_FROM_TDC)):
                 distance_from_tdc_m = cylinder_distance_from_tdc(x_m, fp.x_min_m, fp.x_max_m)
-                armed = bool(distance_from_tdc_m > start_value)
+                armed = bool(
+                    distance_from_tdc_m > start_value
+                    if start_mode == int(CombStartMode.HIGN_POSITION)
+                    else distance_from_tdc_m <= start_value
+                )
             else:
                 theta_window_deg = _free_piston_theta_window_deg(bundle, float(t[k]), x_m, v_m_per_s, cyl_idx)
                 armed = bool(theta_window_deg < start_value)
@@ -1303,6 +1342,15 @@ def replay_free_piston_time_combustion_series(bundle, t: np.ndarray, y: np.ndarr
             if (not armed) and distance_from_tdc_m > start_value:
                 armed = True
             trigger_reached = armed and free_piston_is_compression_stroke(v_m_per_s, x_m, fp.x_min_m, fp.x_max_m) and distance_from_tdc_m <= start_value
+        elif start_mode == int(CombStartMode.EXPANSION_DISTANCE_FROM_TDC):
+            distance_from_tdc_m = cylinder_distance_from_tdc(x_m, fp.x_min_m, fp.x_max_m)
+            compression_stroke = free_piston_is_compression_stroke(v_m_per_s, x_m, fp.x_min_m, fp.x_max_m)
+            armed, trigger_reached = expansion_distance_start_state(
+                armed=armed,
+                distance_from_tdc_m=distance_from_tdc_m,
+                threshold_m=start_value,
+                compression_stroke=compression_stroke,
+            )
         else:
             theta_window_deg = _free_piston_theta_window_deg(bundle, float(t[k]), x_m, v_m_per_s, cyl_idx)
             if (not armed) and theta_window_deg < start_value:

@@ -1,0 +1,361 @@
+# Separate thermo0d postprocessing pipeline configuration for the V25 free-piston
+# setup. The simulation YAML only selects postprocessing.mode: pipeline and points
+# here via postprocessing.config.
+version: 1
+
+# Raw solver archive written during the simulation and reused by offline
+# reprocessing. Keep this enabled when you want to regenerate CSVs/plots without
+# rerunning the solver.
+raw:
+  enabled: true
+  path: raw/run_raw.npz
+  compression: compressed
+  dtype: float32
+
+# Signal selection for the pipeline CSV. include_kinds controls whether raw
+# states, reconstructed engineering signals, RHS derivatives, and integral
+# signals are available for the selected names below.
+signals:
+  selected:
+  - t_s
+  - theta_deg
+  - cylinder_1_m_kg
+  - cylinder_1_m_burned_kg
+  - cylinder_1_m_unburned_kg
+  - cylinder_1_T_K
+  - cylinder_1_p_Pa
+  - cylinder_1_V_m3
+  - cylinder_1_wall_heat_W
+  - cylinder_1_wall_temperature_K
+  - cylinder_1_wall_heat_cycle_J
+  - cylinder_1_wall_cylinder_heat_W
+  - cylinder_1_wall_head_heat_W
+  - cylinder_1_wall_piston_heat_W
+  - cylinder_1_wall_cylinder_heat_cycle_J
+  - cylinder_1_wall_head_heat_cycle_J
+  - cylinder_1_wall_piston_heat_cycle_J
+  - cylinder_1_wall_heat_zones_sum_cycle_J
+  - cylinder_1_heat_transfer_power_W
+  - cylinder_1_htc_W_per_m2K
+  - cylinder_1_added_energy_W
+  - cylinder_1_added_energy_cycle_J
+  - cylinder_1_piston_work_W
+  - cylinder_1_piston_work_cycle_J
+  - cylinder_2_m_kg
+  - cylinder_2_m_burned_kg
+  - cylinder_2_m_unburned_kg
+  - cylinder_2_T_K
+  - cylinder_2_p_Pa
+  - cylinder_2_V_m3
+  - cylinder_2_wall_heat_W
+  - cylinder_2_wall_temperature_K
+  - cylinder_2_wall_heat_cycle_J
+  - cylinder_2_wall_cylinder_heat_W
+  - cylinder_2_wall_head_heat_W
+  - cylinder_2_wall_piston_heat_W
+  - cylinder_2_wall_cylinder_heat_cycle_J
+  - cylinder_2_wall_head_heat_cycle_J
+  - cylinder_2_wall_piston_heat_cycle_J
+  - cylinder_2_wall_heat_zones_sum_cycle_J
+  - cylinder_2_heat_transfer_power_W
+  - cylinder_2_htc_W_per_m2K
+  - cylinder_2_added_energy_W
+  - cylinder_2_added_energy_cycle_J
+  - cylinder_2_piston_work_W
+  - cylinder_2_piston_work_cycle_J
+  - compressor_1_m_kg
+  - compressor_1_U_J
+  - compressor_1_T_K
+  - compressor_1_p_Pa
+  - compressor_1_V_m3
+  - compressor_1_wall_temperature_K
+  - compressor_1_wall_heat_W
+  - compressor_1_heat_transfer_power_W
+  - compressor_1_htc_W_per_m2K
+  - compressor_1_wall_heat_cycle_J
+  - compressor_2_m_kg
+  - compressor_2_U_J
+  - compressor_2_T_K
+  - compressor_2_p_Pa
+  - compressor_2_V_m3
+  - compressor_2_wall_temperature_K
+  - compressor_2_wall_heat_W
+  - compressor_2_heat_transfer_power_W
+  - compressor_2_htc_W_per_m2K
+  - compressor_2_wall_heat_cycle_J
+  - receiver_1_m_kg
+  - receiver_1_U_J
+  - receiver_1_m_burned_kg
+  - receiver_1_m_unburned_kg
+  - receiver_1_T_K
+  - receiver_1_p_Pa
+  - receiver_1_V_m3
+  - receiver_2_m_kg
+  - receiver_2_U_J
+  - receiver_2_m_burned_kg
+  - receiver_2_m_unburned_kg
+  - receiver_2_T_K
+  - receiver_2_p_Pa
+  - receiver_2_V_m3
+  - exhaust_plenum_1_m_kg
+  - exhaust_plenum_1_T_K
+  - exhaust_plenum_1_p_Pa
+  - exhaust_plenum_1_V_m3
+  - exhaust_plenum_2_m_kg
+  - exhaust_plenum_2_T_K
+  - exhaust_plenum_2_p_Pa
+  - exhaust_plenum_2_V_m3
+  - ambient_in_T_K
+  - ambient_in_p_Pa
+  - ambient_out_T_K
+  - ambient_out_p_Pa
+  - transfer_slot_1_slot_height_m
+  - transfer_slot_1_A_geom_m2
+  - transfer_slot_1_A_eff_forward_m2
+  - transfer_slot_1_A_eff_reverse_m2
+  - transfer_slot_1_mdot_kg_per_s
+  - transfer_slot_1_mdot_residual_kg_per_s
+  - transfer_slot_2_slot_height_m
+  - transfer_slot_2_A_geom_m2
+  - transfer_slot_2_A_eff_forward_m2
+  - transfer_slot_2_A_eff_reverse_m2
+  - transfer_slot_2_mdot_kg_per_s
+  - transfer_slot_2_mdot_residual_kg_per_s
+  - exhaust_slot_1_slot_height_m
+  - exhaust_slot_1_A_geom_m2
+  - exhaust_slot_1_A_eff_forward_m2
+  - exhaust_slot_1_A_eff_reverse_m2
+  - exhaust_slot_1_mdot_kg_per_s
+  - exhaust_slot_1_mdot_residual_kg_per_s
+  - exhaust_slot_2_slot_height_m
+  - exhaust_slot_2_A_geom_m2
+  - exhaust_slot_2_A_eff_forward_m2
+  - exhaust_slot_2_A_eff_reverse_m2
+  - exhaust_slot_2_mdot_kg_per_s
+  - exhaust_slot_2_mdot_residual_kg_per_s
+  - exhaust_bleed_1_mdot_kg_per_s
+  - exhaust_bleed_2_mdot_kg_per_s
+  - free_piston_x_m
+  - free_piston_distance_from_tdc_m
+  - free_piston_v_m_per_s
+  - free_piston_a_m_per_s2
+  - free_piston_F_gas_N
+  - free_piston_F_bounce_N
+  - free_piston_F_friction_N
+  - free_piston_F_load_N
+  - free_piston_F_net_N
+  - free_piston_generator_power_W
+  - free_piston_generator_electrical_power_W
+  - free_piston_generator_map_angle_deg
+  - free_piston_generator_map_torque_Nm
+  - free_piston_generator_map_no_load_torque_Nm
+  - free_piston_generator_map_load_torque_Nm
+  - free_piston_generator_map_voltage_V
+  - free_piston_generator_map_out_of_range_0to1
+  - free_piston_generator_assist_force_N
+  - free_piston_generator_assist_torque_Nm
+  - cylinder_1_cp_J_per_kgK
+  - cylinder_1_cv_J_per_kgK
+  - cylinder_1_R_J_per_kgK
+  - cylinder_1_kappa
+  - cylinder_1_m_air_kg
+  - cylinder_1_m_fresh_gas_kg
+  - cylinder_1_m_fuel_liquid_kg
+  - cylinder_1_m_fuel_vapor_kg
+  - cylinder_1_m_fuel_total_kg
+  - cylinder_1_share_air_0to1
+  - cylinder_1_share_burned_0to1
+  - cylinder_1_share_fresh_gas_0to1
+  - cylinder_1_share_fuel_liquid_0to1
+  - cylinder_1_share_fuel_vapor_0to1
+  - cylinder_1_share_residual_0to1
+  - cylinder_1_thermo_lambda
+  - cylinder_1_lambda
+  - cylinder_1_hcci_ignition_delay_s
+  - cylinder_1_hcci_cool_ignition_delay_s
+  - cylinder_1_hcci_ignition_integral
+  - cylinder_1_hcci_cool_ignition_integral
+  - cylinder_1_hcci_ignition_integral_0to1
+  - cylinder_1_hcci_cool_ignition_integral_0to1
+  - cylinder_1_hcci_validity_reason_code
+  - cylinder_1_hcci_accumulation_window_active_0to1
+  - cylinder_1_hcci_start_temperature_min_K
+  - cylinder_1_hcci_start_pressure_min_Pa
+  - cylinder_1_hcci_lambda
+  - cylinder_1_hcci_residual_fraction_0to1
+  - cylinder_1_hcci_tabulated_out_of_bounds_0to1
+  - cylinder_1_combustion_active_0to1
+  - cylinder_1_combustion_fuel_mass_latched_kg
+  - cylinder_1_combustion_fuel_burn_rate_kg_per_s
+  - cylinder_1_combustion_qdot_effective_W
+  - cylinder_1_combustion_fraction_0to1
+  - cylinder_1_scavenging_transfer_in_kg_per_s
+  - cylinder_1_scavenging_exhaust_out_kg_per_s
+  - cylinder_1_scavenging_burned_correction_kg_per_s
+  - cylinder_1_scavenging_short_circuit_fraction
+  - cylinder_1_scavenging_efficiency_0to1
+  - cylinder_1_piston_x_m
+  - cylinder_1_piston_distance_from_tdc_m
+  - cylinder_1_piston_v_m_per_s
+  - cylinder_2_cp_J_per_kgK
+  - cylinder_2_cv_J_per_kgK
+  - cylinder_2_R_J_per_kgK
+  - cylinder_2_kappa
+  - cylinder_2_m_air_kg
+  - cylinder_2_m_fresh_gas_kg
+  - cylinder_2_m_fuel_liquid_kg
+  - cylinder_2_m_fuel_vapor_kg
+  - cylinder_2_m_fuel_total_kg
+  - cylinder_2_share_air_0to1
+  - cylinder_2_share_burned_0to1
+  - cylinder_2_share_fresh_gas_0to1
+  - cylinder_2_share_fuel_liquid_0to1
+  - cylinder_2_share_fuel_vapor_0to1
+  - cylinder_2_share_residual_0to1
+  - cylinder_2_thermo_lambda
+  - cylinder_2_lambda
+  - cylinder_2_hcci_ignition_delay_s
+  - cylinder_2_hcci_cool_ignition_delay_s
+  - cylinder_2_hcci_ignition_integral
+  - cylinder_2_hcci_cool_ignition_integral
+  - cylinder_2_hcci_ignition_integral_0to1
+  - cylinder_2_hcci_cool_ignition_integral_0to1
+  - cylinder_2_hcci_validity_reason_code
+  - cylinder_2_hcci_accumulation_window_active_0to1
+  - cylinder_2_hcci_start_temperature_min_K
+  - cylinder_2_hcci_start_pressure_min_Pa
+  - cylinder_2_hcci_lambda
+  - cylinder_2_hcci_residual_fraction_0to1
+  - cylinder_2_hcci_tabulated_out_of_bounds_0to1
+  - cylinder_2_combustion_active_0to1
+  - cylinder_2_combustion_fuel_mass_latched_kg
+  - cylinder_2_combustion_fuel_burn_rate_kg_per_s
+  - cylinder_2_combustion_qdot_effective_W
+  - cylinder_2_combustion_fraction_0to1
+  - cylinder_2_piston_x_m
+  - cylinder_2_piston_distance_from_tdc_m
+  - cylinder_2_piston_v_m_per_s
+  - compressor_1_cp_J_per_kgK
+  - compressor_1_cv_J_per_kgK
+  - compressor_1_R_J_per_kgK
+  - compressor_1_kappa
+  - compressor_1_m_air_kg
+  - compressor_1_m_fuel_liquid_kg
+  - compressor_1_m_fuel_vapor_kg
+  - compressor_1_m_fuel_total_kg
+  - compressor_1_m_unburned_kg
+  - compressor_1_m_burned_kg
+  - compressor_1_share_air_0to1
+  - compressor_1_share_burned_0to1
+  - compressor_1_share_fuel_liquid_0to1
+  - compressor_1_share_fuel_vapor_0to1
+  - compressor_1_piston_x_m
+  - compressor_1_piston_distance_from_tdc_m
+  - compressor_1_piston_v_m_per_s
+  - compressor_2_piston_x_m
+  - compressor_2_piston_distance_from_tdc_m
+  - compressor_2_piston_v_m_per_s
+  - receiver_1_m_air_kg
+  - receiver_1_m_fuel_liquid_kg
+  - receiver_1_m_fuel_vapor_kg
+  - receiver_1_m_fuel_total_kg
+  - receiver_1_share_air_0to1
+  - receiver_1_share_burned_0to1
+  - receiver_1_share_fresh_gas_0to1
+  - receiver_1_share_fuel_liquid_0to1
+  - receiver_1_share_fuel_vapor_0to1
+  - receiver_1_share_residual_0to1
+  - exhaust_plenum_1_m_air_kg
+  - exhaust_plenum_1_m_fuel_liquid_kg
+  - exhaust_plenum_1_m_fuel_vapor_kg
+  - exhaust_plenum_1_m_fuel_total_kg
+  - exhaust_plenum_1_m_unburned_kg
+  - exhaust_plenum_1_m_burned_kg
+  - exhaust_plenum_1_share_air_0to1
+  - exhaust_plenum_1_share_burned_0to1
+  - exhaust_plenum_1_share_fuel_liquid_0to1
+  - exhaust_plenum_1_share_fuel_vapor_0to1
+  - exhaust_plenum_1_share_residual_0to1
+  - transfer_slot_1_mdot_air_kg_per_s
+  - transfer_slot_1_mdot_burned_kg_per_s
+  - transfer_slot_1_mdot_unburned_kg_per_s
+  - exhaust_slot_1_mdot_air_kg_per_s
+  - exhaust_slot_1_mdot_burned_kg_per_s
+  - exhaust_slot_1_mdot_unburned_kg_per_s
+  - exhaust_slot_1_mdot_residual_kg_per_s
+  - free_piston_combustion_mass_latched_kg
+
+  include_kinds: [raw, reconstructed, derivative, integral]  # raw | reconstructed | derivative | integral
+  remove_zero_columns: false                                # Keep selected diagnostics even if they are zero in one run.
+  zero_tolerance: 0.0                                       # Absolute threshold for zero-column filtering.
+  keep_zero_selected: false                                 # If true, selected signals survive zero filtering.
+
+# Main selected-signal CSV. This is the primary pipeline export used by the plot
+# renderer and offline checks.
+csv:
+  enabled: true
+  path: csv/signals.csv
+  separator: ;
+  include_units_row: true
+  include_kind_row: true
+
+# Generated result CSV with the full set of available generated signals.
+results:
+  enabled: true
+  path: csv/results.csv
+  include_units_row: true
+  include_kind_row: true
+
+# Free-piston last complete UT-OT-UT window, resampled onto a normalized axis.
+# This is the preferred data source for compact final-cycle plots.
+last_ut_ot_ut:
+  enabled: true
+  path: csv/signals_last_ut_ot_ut.csv
+  step_deg: 0.1
+  axis_min_deg: -9.0
+  axis_max_deg: 9.0
+  axis_signal: theta_deg
+
+# Reconstruct engineering signals from raw states when they are requested.
+reconstruction:
+  enabled: true
+  only_selected: true
+
+# Cycle integrals for last-cycle energy and wall-heat plots.
+integrals:
+  enabled: true
+  only_selected: true
+  cycle_mode: full_run
+  absolute_heat_loss: true
+
+# Run summary and README output. README.md also contains the geometry and signal
+# notes generated from the current bundle.
+summary:
+  enabled: true
+  path: summary/run_summary.yaml
+  text_path: summary/run_summary.txt
+  markdown_path: README.md
+
+# Plot rendering controlled by the pipeline. The top-level plot set uses the
+# full selected CSV; last_ut_ot_ut uses the final UT-OT-UT CSV above.
+plots:
+  enabled: true
+  # Kompakter V40-Pruefplot fuer Energie, Leistung, HTC und Temperaturen.
+  layout_path: plot_total
+  output_dir: plots_total
+  prefix: null
+  clean: true
+  last_ut_ot_ut:
+    enabled: true
+    # Kompakter V40-Pruefplot fuer Energie, Leistung, HTC und Temperaturen
+    layout_path: plot_cycle
+    output_dir: plots_cycle
+    prefix: null
+    clean: true
+
+# Offline reprocessing from raw/run_raw.npz. Derivatives and reconstruction are
+# allowed so the offline path can reproduce the online signal set.
+offline:
+  enabled: true
+  allow_reconstruction: true
+  allow_derivatives: true

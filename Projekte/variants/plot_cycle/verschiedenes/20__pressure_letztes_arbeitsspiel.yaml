@@ -1,0 +1,66 @@
+versioning:
+  package_version: 7.1.124
+  config_schema_version: 8
+  loaded_config_schema_version: 0
+  migration_applied: true
+name: Pressure - last working cycle
+style_sheet: ../../plot_style_sheet.yaml
+figures:
+- title: last_ut_ot_ut_pressure
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Pressure - last working cycle
+    plot_type: line
+    x_signal: theta_deg
+    x_title: UT-OT-UT progress [deg]
+    x_limit_mode: auto
+    events:
+    - x: -10.0
+      label: UT
+      color: '#666666'
+      line_style: ':'
+      line_width: 0.9
+      label_ha: left
+    - x: 0.0
+      label: OT
+      color: '#666666'
+      line_style: ':'
+      line_width: 0.9
+      label_ha: center
+    - x: 10.0
+      label: UT
+      color: '#666666'
+      line_style: ':'
+      line_width: 0.9
+      label_ha: right
+    y_axes:
+    - id: p
+      title: Pressure [bar]
+      side: left
+      color: '#111111'
+    series:
+    - signal_key: cylinder_1_p_Pa
+      label: Cylinder
+      axis_id: p
+      color: '#66B3FF'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      line_width: 1.8
+    - signal_key: compressor_1_p_Pa
+      label: Bounce
+      axis_id: p
+      color: '#667085'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      line_width: 1.8
+    - signal_key: receiver_1_p_Pa
+      label: Transfer
+      axis_id: p
+      color: '#175CD3'
+      line_style: '-'
+      scale_factor: 1.0e-05
+      line_width: 1.8
+    show_title: true
+style:
+  default_line_width: 1.6

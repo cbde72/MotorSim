@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thermo0D – Rekonstruktion der Ergebnissignale</title>
+  <style>
+    :root { --ink:#17212b; --muted:#5d6b78; --paper:#fff; --soft:#f3f6f8; --line:#d8e0e6; --accent:#086f83; --raw:#3559a6; --calc:#087f5b; --replay:#9a5b13; --post:#7b3fa1; }
+    * { box-sizing:border-box } body { margin:0; color:var(--ink); background:#edf2f4; font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif }
+    main { max-width:1180px; margin:auto; padding:42px 30px 80px; background:var(--paper); min-height:100vh }
+    h1 { font-size:2.25rem; line-height:1.12; margin:.2em 0 } h2 { margin-top:2.2em; border-bottom:2px solid var(--accent); padding-bottom:.25em } h3 { margin-top:1.6em }
+    .lead { color:var(--muted); font-size:1.12rem; max-width:860px }.note { background:#eaf6f7; border-left:4px solid var(--accent); padding:12px 16px; margin:20px 0 }
+    nav { background:var(--soft); border:1px solid var(--line); border-radius:8px; padding:14px 20px; columns:2 } nav a { display:block; color:var(--accent); text-decoration:none; padding:2px }
+    table { width:100%; border-collapse:collapse; margin:14px 0 26px; font-size:.91rem } th,td { border:1px solid var(--line); padding:8px 10px; vertical-align:top } th { background:var(--soft); text-align:left; position:sticky; top:0 } code { color:#703b00; background:#f7f3ee; padding:.08em .28em; border-radius:3px }
+    .tag { display:inline-block; color:white; border-radius:999px; padding:1px 8px; font-size:.76rem; white-space:nowrap }.raw{background:var(--raw)}.calc{background:var(--calc)}.replay{background:var(--replay)}.post{background:var(--post)}
+    .formula { overflow:auto; padding:10px 14px; margin:9px 0; background:#fbfcfd; border:1px solid var(--line); border-radius:6px } math { font-size:1.08rem }
+    details { margin:10px 0; border:1px solid var(--line); border-radius:6px; padding:8px 12px } summary { cursor:pointer; font-weight:650 }
+    .small { color:var(--muted); font-size:.88rem } @media(max-width:760px){main{padding:24px 12px}nav{columns:1}table{display:block;overflow:auto}}
+    @media print { body{background:white}main{padding:0;max-width:none}nav{display:none}th{position:static}details{break-inside:avoid} }
+  </style>
+</head>
+<body><main>
+  <header>
+    <p class="small">Thermo0D · technische Referenz · Stand 3. August 2026</p>
+    <h1>Wie Ergebnissignale rekonstruiert werden</h1>
+    <p class="lead">Diese Dokumentation beschreibt, welche Daten <code>SignalReconstructionService</code> aus dem Solver-Zeitvektor <code>t</code>, der Zustandsmatrix <code>y</code> und der kompilierten Modellkonfiguration <code>bundle</code> erzeugt. Die Namen verwenden <code>{vol}</code>, <code>{cyl}</code>, <code>{conn}</code> und <code>{zone}</code> als Platzhalter.</p>
+  </header>
+
+  <nav aria-label="Inhalt">
+    <a href="#prinzip">1. Herkunft und Datenfluss</a><a href="#raw">2. Inhalt von run_raw.npz</a><a href="#basis">3. Basis- und Stoffdaten</a><a href="#thermo">4. Thermodynamik</a><a href="#geometrie">5. Geometrie und Winkel</a><a href="#stroemung">6. Verbindungen und Strömung</a><a href="#energie">7. Energie, Wand und Verbrennung</a><a href="#freikolben">8. Freikolben-Mechanik</a><a href="#integrale">9. Fenster und Integrale</a><a href="#grenzen">10. Bedingungen und Grenzen</a><a href="#quellen">11. Implementierungsquellen</a>
+  </nav>
+
+  <section id="prinzip"><h2>1. Herkunft und Datenfluss</h2>
+    <p><span class="tag raw">Zustand</span> bedeutet: Wert wird aus <code>y[:,k]</code> gelesen. <span class="tag calc">algebraisch</span> bedeutet: momentane Berechnung aus Zustand und Konfiguration. <span class="tag replay">Replay</span> bedeutet: zustandsbehaftete Modelllogik wird über die komplette Zeitreihe nochmals abgespielt. <span class="tag post">Postprozess</span> bedeutet: Berechnung aus bereits erzeugten Signalreihen.</p>
+    <div class="formula"><math display="block"><mrow><mo>{</mo><mi>t</mi><mo>,</mo><mi>y</mi><mo>,</mo><msub><mi>i</mi><mi>Zyklus</mi></msub><mo>}</mo><mo>+</mo><mi>bundle</mi><mo>→</mo><mtext>Rekonstruktionsspalten</mtext><mo>→</mo><mtext>Auswahl/Nullfilter</mtext><mo>→</mo><mtext>signals.csv</mtext></mrow></math></div>
+    <p><code>results.csv</code> erhält alle erzeugten Spalten; <code>signals.csv</code> nur die konfigurierte Auswahl. Eine Spalte kann daher korrekt rekonstruierbar sein, aber in <code>signals.csv</code> fehlen.</p>
+  </section>
+
+  <section id="raw"><h2>2. Inhalt von <code>run_raw.npz</code></h2>
+    <p>Das NPZ ist das kompakte Rohdatenarchiv der Simulation. Es enthält die Solver-Ausgabe, ihre Zustandszuordnung und Informationen zur verwendeten Konfiguration – noch nicht den vollständigen rekonstruierten Spaltensatz aus <code>results.csv</code>.</p>
+    <table><thead><tr><th>NPZ-Schlüssel</th><th>Datentyp / Form</th><th>Inhalt und Quelle</th></tr></thead><tbody>
+      <tr><td><code>schema_version</code></td><td>Integer-Array, Länge 1</td><td>Version des Archivschemas; aktuell <code>1</code>.</td></tr>
+      <tr><td><code>t_s</code></td><td>Float-Array, Form <code>(n_samples,)</code></td><td>Vom Solver gespeicherte Ausgabezeiten in Sekunden.</td></tr>
+      <tr><td><code>y</code></td><td>Float-Matrix, Form <code>(n_states, n_samples)</code></td><td>Vollständige Zustandsmatrix. Je Zeile ein Zustand, je Spalte ein Ausgabezeitpunkt.</td></tr>
+      <tr><td><code>cycle_index</code></td><td>Integer-Array, Form <code>(n_samples,)</code></td><td>Zyklusnummer für jeden Ausgabezeitpunkt.</td></tr>
+      <tr><td><code>state_names</code></td><td>String-Array, Form <code>(n_states,)</code></td><td>Durch <code>StateLayout.state_labels(...)</code> erzeugter Name jeder Zeile von <code>y</code>.</td></tr>
+      <tr><td><code>state_units</code></td><td>String-Array, Form <code>(n_states,)</code></td><td>Aus dem jeweiligen Zustandsnamen abgeleitete Einheit.</td></tr>
+      <tr><td><code>architecture</code></td><td>String-Array, Länge 1</td><td>Modellarchitektur, beispielsweise <code>free_piston</code> oder <code>classic</code>.</td></tr>
+      <tr><td><code>config_path</code></td><td>String-Array, Länge 1</td><td>Pfad der für den Lauf verwendeten Simulationskonfiguration.</td></tr>
+      <tr><td><code>config_hash</code></td><td>String-Array, Länge 1</td><td>SHA-256-Prüfsumme des Inhalts dieser Konfigurationsdatei; dient der Zuordnung und Konsistenzprüfung.</td></tr>
+    </tbody></table>
+    <div class="formula"><math display="block"><mrow><mi>y</mi><mo>[</mo><mi>i</mi><mo>,</mo><mi>k</mi><mo>]</mo><mo>=</mo><mtext>Zustand state_names[i] zum Zeitpunkt t_s[k]</mtext></mrow></math></div>
+    <p>Die Genauigkeit der Float-Felder hängt von <code>raw.dtype</code> ab: <code>float32</code> oder standardmäßig <code>float64</code>. <code>raw.compression: compressed</code> ändert nur die Speicherung mit <code>numpy.savez_compressed</code>, nicht die Werte oder Struktur.</p>
+
+    <h3>Konkrete Quelle von <code>free_piston_x_m</code></h3>
+    <p>Beim linearen Freikolben ist die generalisierte Position ein direkt integrierter mechanischer Solverzustand. Für den primären Freiheitsgrad liegt sie bei <code>fp.x_state_index</code>:</p>
+    <div class="formula"><math display="block"><mrow><mi>q</mi><mo>(</mo><msub><mi>t</mi><mi>k</mi></msub><mo>)</mo><mo>=</mo><mi>y</mi><mo>[</mo><mi>fp.x_state_index</mi><mo>,</mo><mi>k</mi><mo>]</mo></mrow></math></div>
+    <p>Bei mehreren mechanischen Freiheitsgraden wählt die Volumenzuordnung <code>volume_mechanical_dof[vol]</code> den Freiheitsgrad <i>d</i>. Seine Quelle ist dann <code>y[fp.mechanical_x_state_indices[d], k]</code>. Das zugehörige Vorzeichen kommt aus <code>volume_mechanical_sign[vol]</code>.</p>
+    <table><thead><tr><th>Fall</th><th>Rohzustand im NPZ</th><th>Rekonstruiertes <code>free_piston_x_m</code></th></tr></thead><tbody>
+      <tr><td>Linear, positiver Richtungssinn</td><td><code>free_piston_x_m</code>, Wert <i>q</i></td><td><math><mrow><mi>x</mi><mo>=</mo><mi>q</mi></mrow></math></td></tr>
+      <tr><td>Linear, negativer Richtungssinn</td><td><code>free_piston_x_m</code> bzw. DOF-Zustand</td><td><math><mrow><mi>x</mi><mo>=</mo><msub><mi>x</mi><mi>min</mi></msub><mo>+</mo><msub><mi>x</mi><mi>max</mi></msub><mo>−</mo><mi>q</mi></mrow></math>; Geschwindigkeit erhält das umgekehrte Vorzeichen.</td></tr>
+      <tr><td>Oszillierend-rotatorisch, positiver Richtungssinn</td><td><code>free_piston_q_rad</code> mit Winkel <i>φ</i></td><td><math><mrow><mi>x</mi><mo>=</mo><msub><mi>x</mi><mi>min</mi></msub><mo>+</mo><msub><mi>r</mi><mi>eff</mi></msub><mo>(</mo><mi>φ</mi><mo>−</mo><msub><mi>φ</mi><mi>min</mi></msub><mo>)</mo></mrow></math></td></tr>
+      <tr><td>Oszillierend-rotatorisch, negativer Richtungssinn</td><td><code>free_piston_q_rad</code></td><td>Zuerst <math><mrow><mi>φ</mi><mo>←</mo><msub><mi>φ</mi><mi>min</mi></msub><mo>+</mo><msub><mi>φ</mi><mi>max</mi></msub><mo>−</mo><mi>φ</mi></mrow></math>, anschließend Umrechnung über den effektiven Radius.</td></tr>
+    </tbody></table>
+    <div class="formula"><math display="block"><mrow><mi>v</mi><mo>=</mo><msub><mi>r</mi><mi>eff</mi></msub><mi>ω</mi><mo>,</mo><mspace width="2em"/><mi>ω</mi><mo>=</mo><mi>y</mi><mo>[</mo><mi>fp.v_state_index</mi><mo>,</mo><mi>k</mi><mo>]</mo></mrow></math></div>
+    <div class="note"><strong>Wichtige Unterscheidung:</strong> Bei linearer Kinematik ist das globale <code>free_piston_x_m</code> im Wesentlichen der Solverzustand, gegebenenfalls lagekorrigiert. Bei rotatorischer Kinematik ist der Solverzustand ein Winkel in Radiant; <code>free_piston_x_m</code> ist dann der daraus rekonstruierte äquivalente Linearweg.</div>
+  </section>
+
+  <section id="basis"><h2>3. Basis- und Stoffdaten</h2>
+    <table><thead><tr><th>Signal(e)</th><th>Herkunft</th><th>Berechnung / Bedeutung</th></tr></thead><tbody>
+      <tr><td><code>t_s</code>, <code>cycle_index</code></td><td><span class="tag raw">Eingabe</span></td><td>Zeitvektor bzw. vom Lauf mitgelieferter Zyklusindex; keine physikalische Rekonstruktion.</td></tr>
+      <tr><td><code>{vol}_m_kg</code>, <code>{vol}_U_J</code></td><td><span class="tag raw">Zustand</span></td><td>Gasmassen- und Energieindex aus <code>StateLayout</code>.</td></tr>
+      <tr><td><code>{vol}_m_burned_kg</code>, <code>m_air_kg</code>, <code>m_fuel_liquid_kg</code>, <code>m_fuel_vapor_kg</code></td><td><span class="tag raw">Zustand</span></td><td>Komponentenmassen über die zugehörigen Layout-Indizes; nicht aus Anteilen zurückgerechnet.</td></tr>
+      <tr><td><code>m_fresh_gas_kg</code></td><td><span class="tag calc">algebraisch</span></td><td><math><mrow><msub><mi>m</mi><mi>frisch</mi></msub><mo>=</mo><msub><mi>m</mi><mi>Luft</mi></msub><mo>+</mo><msub><mi>m</mi><mi>Brennstoff,dampf</mi></msub></mrow></math></td></tr>
+      <tr><td><code>m_fuel_total_kg</code></td><td><span class="tag calc">algebraisch</span></td><td><math><mrow><msub><mi>m</mi><mi>B,total</mi></msub><mo>=</mo><msub><mi>m</mi><mi>B,dampf</mi></msub><mo>+</mo><msub><mi>m</mi><mi>B,flüssig</mi></msub></mrow></math></td></tr>
+      <tr><td><code>m_inventory_total_kg</code></td><td><span class="tag calc">algebraisch</span></td><td>Inventarmasse aus Gasmasse plus flüssigem Brennstoff; die Gasmasse enthält die gasförmigen Komponenten.</td></tr>
+      <tr><td><code>m_unburned_kg</code></td><td><span class="tag calc">algebraisch</span></td><td>Hilfsfunktion <code>unburned_mass_kg</code>; im Wesentlichen nicht verbrannter Anteil der Gasmasse, numerisch begrenzt.</td></tr>
+      <tr><td><code>burned_fraction_0to1</code></td><td><span class="tag calc">algebraisch</span></td><td><math><mrow><msub><mi>x</mi><mi>verbrannt</mi></msub><mo>=</mo><mi>clip</mi><mo>(</mo><mfrac><msub><mi>m</mi><mi>verbrannt</mi></msub><msub><mi>m</mi><mi>Gas</mi></msub></mfrac><mo>,</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>)</mo></mrow></math></td></tr>
+      <tr><td><code>share_*_0to1</code></td><td><span class="tag calc">algebraisch</span></td><td>Jeweilige nichtnegative Komponentenmasse geteilt durch <code>max(m_inventory_total, 10⁻³⁰)</code>. Verfügbar für Luft, Dampf, Flüssig-, Gesamtbrennstoff, verbrannt, Frischgas und unverbrannt.</td></tr>
+    </tbody></table>
+  </section>
+
+  <section id="thermo"><h2>4. Thermodynamische Rekonstruktion</h2>
+    <div class="note">Es existieren zwei Pfade. Mit aktiviertem PROMO/Quellen-Stoffmodell werden <i>c<sub>p</sub></i>, <i>c<sub>v</sub></i>, <i>R</i> und <i>κ</i> aus Masse, Energie und Zusammensetzung bestimmt. Sonst gelten die konstanten Werte aus <code>bundle.gas_props</code>.</div>
+    <div class="formula"><math display="block"><mrow><mi>T</mi><mo>=</mo><mfrac><mi>U</mi><mrow><mi>m</mi><msub><mi>c</mi><mi>v</mi></msub></mrow></mfrac><mo>,</mo><mspace width="2em"/><mi>p</mi><mo>=</mo><mfrac><mrow><mi>m</mi><mi>R</mi><mi>T</mi></mrow><mi>V</mi></mfrac><mo>=</mo><mfrac><mrow><mi>U</mi><mi>R</mi></mrow><mrow><mi>V</mi><msub><mi>c</mi><mi>v</mi></msub></mrow></mfrac><mo>,</mo><mspace width="2em"/><mi>κ</mi><mo>=</mo><mfrac><msub><mi>c</mi><mi>p</mi></msub><msub><mi>c</mi><mi>v</mi></msub></mfrac></mrow></math></div>
+    <table><thead><tr><th>Signal</th><th>Quellen</th><th>Hinweise</th></tr></thead><tbody>
+      <tr><td><code>{vol}_T_K</code></td><td><code>m</code>, <code>U</code>, <code>cv</code>, ggf. Zusammensetzung</td><td>Festes Umgebungsvolumen: direkt aus der Randbedingung, Default 300 K.</td></tr>
+      <tr><td><code>{vol}_p_Pa</code></td><td><code>m</code>, <code>U/T</code>, <code>V</code>, <code>R</code>, <code>cv</code></td><td>Festes Umgebungsvolumen: direkt aus der Randbedingung, Default 101325 Pa.</td></tr>
+      <tr><td><code>cp_J_per_kgK</code>, <code>cv_J_per_kgK</code>, <code>R_J_per_kgK</code>, <code>kappa</code></td><td>Gas-Default oder <code>properties_from_mass_energy_components_quellen</code></td><td>Im variablen Pfad abhängig von Luft-, Brennstoffdampf- und verbrannter Masse.</td></tr>
+      <tr><td><code>{vol}_thermo_lambda</code></td><td>Luftmasse, Brennstoffmasse, stöchiometrisches AFR</td><td><math><mrow><mi>λ</mi><mo>=</mo><mfrac><msub><mi>m</mi><mi>Luft</mi></msub><mrow><msub><mi>m</mi><mi>Brennstoff</mi></msub><msub><mi>AFR</mi><mi>stöch</mi></msub></mrow></mfrac></mrow></math>; im einfachen Stoffmodell wird ein luftähnlicher Default ausgegeben.</td></tr>
+    </tbody></table>
+  </section>
+
+  <section id="geometrie"><h2>5. Volumen, Kolbenweg und Winkel</h2>
+    <h3>Freikolben</h3>
+    <div class="formula"><math display="block"><mrow><msub><mi>V</mi><mi>Zyl</mi></msub><mo>=</mo><msub><mi>V</mi><mi>Rest</mi></msub><mo>+</mo><msub><mi>A</mi><mi>Kolben</mi></msub><mo>·</mo><mi>clip</mi><mo>(</mo><mi>x</mi><mo>−</mo><msub><mi>x</mi><mi>min</mi></msub><mo>,</mo><mn>0</mn><mo>,</mo><msub><mi>x</mi><mi>max</mi></msub><mo>−</mo><msub><mi>x</mi><mi>min</mi></msub><mo>)</mo></mrow></math></div>
+    <div class="formula"><math display="block"><mrow><mfrac><mrow><mi>d</mi><mi>V</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><msub><mi>A</mi><mi>Kolben</mi></msub><mi>v</mi><mo>,</mo><mspace width="2em"/><msub><mi>V</mi><mi>Bounce</mi></msub><mo>=</mo><msub><mi>V</mi><mn>0</mn></msub><mo>+</mo><msub><mi>A</mi><mi>Bounce</mi></msub><mo>(</mo><msub><mi>x</mi><mi>max</mi></msub><mo>−</mo><mi>x</mi><mo>)</mo></mrow></math></div>
+    <p><code>{vol}_piston_x_m</code> und <code>piston_v_m_per_s</code> stammen aus dem mechanischen Freiheitsgrad. Bei mehreren Freiheitsgraden werden Zuordnung und Vorzeichen aus <code>volume_mechanical_dof/sign</code> verwendet; bei oszillierend-rotatorischer Kinematik werden Winkel und Winkelgeschwindigkeit über den effektiven Radius in äquivalente lineare Größen umgerechnet.</p>
+    <p>Der lokale Freikolbenwinkel bildet normierten Hub und Bewegungsrichtung auf einen Zyklus ab: Kompression und Expansion belegen je eine Zyklushälfte. Die genaue Bedeutung der ähnlich benannten Exportfelder ist im folgenden Vergleich festgehalten.</p>
+
+    <h3 id="winkelvergleich">Unterschied der Winkelbezeichnungen</h3>
+    <div class="note"><strong>Kurzfassung für die aktuelle Pipeline:</strong> <code>theta_deg</code> und <code>theta_local_deg</code> werden beide mit dem lokalen Zykluswinkel des primären Zylinders befüllt und sind damit normalerweise identisch. <code>{vol}_theta_deg</code> ist dagegen volumenbezogen. <code>crank_angle_deg</code> und <code>free_piston_crank_angle_deg</code> werden von der aktuellen Rekonstruktionspipeline nicht erzeugt.</div>
+    <table><thead><tr><th>Name</th><th>Aktueller Status</th><th>Quelle und Bedeutung</th><th>Wann verschieden?</th></tr></thead><tbody>
+      <tr><td><code>theta_deg</code></td><td>Globale Pipeline-Spalte</td><td>In <code>SignalReconstructionService.build()</code> aus dem lokalen Winkel des <em>primären Zylinders</em> übernommen. Trotz des allgemeinen Namens ist dies im aktuellen Export nicht der intern berechnete zeitbasierte Globalwinkel.</td><td>Von <code>{anderer_zylinder}_theta_deg</code>, wenn Zylinder unterschiedliche Phasenlagen haben. Im UT–OT–UT-Sonderexport wird die Spalte durch dessen normierte Achse ersetzt.</td></tr>
+      <tr><td><code>theta_local_deg</code></td><td>Globale Pipeline-Spalte</td><td>Ebenfalls lokaler Zykluswinkel des primären Zylinders. Wird explizit als lokale Referenz geführt, derzeit aber mit demselben Array wie <code>theta_deg</code> ausgegeben.</td><td>Im normalen <code>signals.csv</code>/<code>results.csv</code> derzeit nicht von <code>theta_deg</code>. Die getrennten Namen halten die Semantik für Verbraucher und mögliche spätere Trennung stabil.</td></tr>
+      <tr><td><code>crank_angle_deg</code></td><td>Kein aktuelles Rekonstruktionssignal</td><td>Generischer bzw. historischer Name für einen Kurbelwinkel. Er wird weder in <code>reconstruction.py</code> erzeugt noch automatisch auf <code>theta_deg</code> abgebildet.</td><td>Nur vorhanden, wenn eine externe/ältere CSV oder benutzerspezifische Verarbeitung ihn bereitstellt. Nicht ohne Prüfung als Alias voraussetzen.</td></tr>
+      <tr><td><code>free_piston_crank_angle_deg</code></td><td>Legacy-Kompatibilitätsname</td><td>Wird von aktueller Rekonstruktion nicht geschrieben. Der Legacy-Plotcode akzeptiert ihn lediglich als dritte Fallback-Quelle nach <code>{cyl}_theta_deg</code> und <code>cylinder_theta_deg</code>.</td><td>Kann in älteren oder extern erzeugten Datensätzen vorkommen. Beim Freikolben ist „crank angle“ nur ein äquivalenter, aus Hub und Richtung gebildeter Zykluswinkel – kein Winkel einer realen Kurbelwelle.</td></tr>
+      <tr><td><code>{vol}_theta_deg</code> beziehungsweise <code>*_theta_deg</code></td><td>Volumenbezogene Rekonstruktionsspalte</td><td>Für jeden Eintrag aus <code>bundle.volume_names</code> erzeugt. Zylinder erhalten ihren eigenen lokalen Kinematikwinkel; starre Volumina, Umgebungen und Bounce Chambers erhalten aktuell 0°.</td><td>Mehrzylindermotor: Zylinderwerte unterscheiden sich um ihre konfigurierte Phase. Beim Freikolben können mechanisch getrennte Zylinder ihren jeweils aus Position und Richtung bestimmten Winkel besitzen.</td></tr>
+    </tbody></table>
+
+    <h3>Mathematische Zuordnung</h3>
+    <p>Beim klassischen Kurbeltrieb wird zuerst ein gemeinsamer zeitbasierter Globalwinkel bestimmt und je Zylinder um dessen Phase verschoben:</p>
+    <div class="formula"><math display="block"><mrow><msub><mi>θ</mi><mi>global</mi></msub><mo>=</mo><mi>wrap</mi><mo>(</mo><mover><mi>θ</mi><mo>˙</mo></mover><mi>t</mi><mo>,</mo><msub><mi>θ</mi><mi>Zyklus</mi></msub><mo>)</mo><mo>,</mo><mspace width="2em"/><msub><mi>θ</mi><mrow><mi>lokal</mi><mo>,</mo><mi>i</mi></mrow></msub><mo>=</mo><mi>wrap</mi><mo>(</mo><msub><mi>θ</mi><mi>global</mi></msub><mo>+</mo><msub><mi>φ</mi><mi>i</mi></msub><mo>,</mo><msub><mi>θ</mi><mi>Zyklus</mi></msub><mo>)</mo></mrow></math></div>
+    <p>Exportiert wird <code>{vol}_theta_deg = θ_lokal,i</code>. Für den primären Zylinder gilt in der aktuellen Implementierung:</p>
+    <div class="formula"><math display="block"><mrow><mi>theta_deg</mi><mo>=</mo><mi>theta_local_deg</mi><mo>=</mo><msub><mi>θ</mi><mrow><mi>lokal</mi><mo>,</mo><mi>primär</mi></mrow></msub></mrow></math></div>
+    <p>Beim Freikolben wird der äquivalente Winkel nicht aus einer Drehzahl, sondern aus Hubanteil <i>s</i> und Bewegungsrichtung gebildet:</p>
+    <div class="formula"><math display="block"><mrow><mi>s</mi><mo>=</mo><mfrac><mrow><mi>clip</mi><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>x</mi><mi>min</mi></msub><mo>,</mo><msub><mi>x</mi><mi>max</mi></msub><mo>)</mo><mo>−</mo><msub><mi>x</mi><mi>min</mi></msub></mrow><mrow><msub><mi>x</mi><mi>max</mi></msub><mo>−</mo><msub><mi>x</mi><mi>min</mi></msub></mrow></mfrac><mo>,</mo><mspace width="2em"/><msub><mi>θ</mi><mi>lokal</mi></msub><mo>=</mo><mrow><mo>{</mo><mtable><mtr><mtd><mfrac><msub><mi>θ</mi><mi>Zyklus</mi></msub><mn>2</mn></mfrac><mi>s</mi></mtd><mtd><mtext>Bewegung vom OT weg</mtext></mtd></mtr><mtr><mtd><msub><mi>θ</mi><mi>Zyklus</mi></msub><mo>−</mo><mfrac><msub><mi>θ</mi><mi>Zyklus</mi></msub><mn>2</mn></mfrac><mi>s</mi></mtd><mtd><mtext>Bewegung zum OT</mtext></mtd></mtr></mtable></mrow></mrow></math></div>
+    <p>Bei einem Zweitaktzyklus folgt daraus: OT auf der Expansionsseite 0°, UT 180° und OT am Ende der Kompression 360°; die Zyklusendpunkt-Normalisierung kann exakt 360° anschließend als 0° darstellen.</p>
+
+    <details><summary>Sonderfall <code>signals_last_ut_ot_ut.csv</code></summary><p>Beim resampelten letzten UT–OT–UT-Fenster ersetzt die Pipeline sowohl <code>theta_deg</code> als auch <code>theta_local_deg</code> durch die konfigurierte Darstellungsachse. Standardmäßig wird sie aus <code>axis_min_deg</code> bis <code>axis_max_deg</code> aufgebaut; bei oszillierend-rotatorischer Kinematik folgt sie dem interpolierten realen mechanischen Winkel in Grad. In dieser Datei sind die beiden Namen deshalb Plot-/Fensterkoordinaten und nicht unverändert die Winkel aus dem normalen Gesamtlauf-CSV.</p></details>
+
+    <h3 id="totpunkte">Definition von oberem und unterem Totpunkt</h3>
+    <p>Beim Freikolben unterscheidet die Implementierung zwischen den <strong>konfigurierten geometrischen Hubgrenzen</strong> und den <strong>tatsächlich erreichten dynamischen Umkehrpunkten</strong>. Diese müssen bei einem transienten oder lastabhängigen Lauf nicht zusammenfallen.</p>
+
+    <h4>Geometrische Definition</h4>
+    <table><thead><tr><th>Punkt</th><th>Position</th><th>Zylindervolumen</th><th>Abstand vom OT</th><th>Lokaler Winkel bei 2-Takt</th></tr></thead><tbody>
+      <tr><td>Oberer Totpunkt, OT/TDC</td><td><math><mrow><mi>x</mi><mo>=</mo><msub><mi>x</mi><mi>min</mi></msub></mrow></math></td><td>Minimal: <math><mrow><mi>V</mi><mo>=</mo><msub><mi>V</mi><mi>Rest</mi></msub></mrow></math></td><td>0</td><td>0° auf der Expansionsseite bzw. 360° am Ende der Kompression; exakt 360° kann auf 0° normalisiert werden.</td></tr>
+      <tr><td>Unterer Totpunkt, UT/BDC</td><td><math><mrow><mi>x</mi><mo>=</mo><msub><mi>x</mi><mi>max</mi></msub></mrow></math></td><td>Maximal: <math><mrow><mi>V</mi><mo>=</mo><msub><mi>V</mi><mi>Rest</mi></msub><mo>+</mo><msub><mi>A</mi><mi>Kolben</mi></msub><mo>(</mo><msub><mi>x</mi><mi>max</mi></msub><mo>−</mo><msub><mi>x</mi><mi>min</mi></msub><mo>)</mo></mrow></math></td><td><math><mrow><msub><mi>x</mi><mi>max</mi></msub><mo>−</mo><msub><mi>x</mi><mi>min</mi></msub></mrow></math></td><td>180°</td></tr>
+    </tbody></table>
+    <p>Die ausgegebene Größe <code>{vol}_piston_distance_from_tdc_m</code> beziehungsweise <code>free_piston_distance_from_tdc_m</code> ist der auf das konfigurierte Hubfenster begrenzte Abstand:</p>
+    <div class="formula"><math display="block"><mrow><msub><mi>x</mi><mtext>ab OT</mtext></msub><mo>=</mo><mi>clip</mi><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>x</mi><mi>min</mi></msub><mo>,</mo><msub><mi>x</mi><mi>max</mi></msub><mo>)</mo><mo>−</mo><msub><mi>x</mi><mi>min</mi></msub></mrow></math></div>
+
+    <h4>Dynamische Totpunkte im simulierten Verlauf</h4>
+    <p>Für Zykluszählung und den Export <code>signals_last_ut_ot_ut.csv</code> werden Totpunkte aus den Zeitreihen von Position und Geschwindigkeit erkannt. Ein Punkt gilt nur dann als Umkehrpunkt, wenn die Geschwindigkeit vor und nach dem betreffenden Sample ein eindeutiges, entgegengesetztes Vorzeichen besitzt. Liegt die Geschwindigkeit numerisch nahe null, wird zusätzlich die Positionssteigung zur Vorzeichenermittlung verwendet.</p>
+    <table><thead><tr><th>Dynamischer Punkt</th><th>Richtungswechsel</th><th>Positionsmerkmal</th></tr></thead><tbody>
+      <tr><td>UT</td><td><math><mrow><mi>v</mi><mo>:</mo><mspace width=".5em"/><mo>+</mo><mo>→</mo><mo>−</mo></mrow></math></td><td>Lokales Maximum der tatsächlich simulierten Position <i>x(t)</i>.</td></tr>
+      <tr><td>OT</td><td><math><mrow><mi>v</mi><mo>:</mo><mspace width=".5em"/><mo>−</mo><mo>→</mo><mo>+</mo></mrow></math></td><td>Lokales Minimum der tatsächlich simulierten Position <i>x(t)</i>.</td></tr>
+    </tbody></table>
+    <p>Ein vollständiges UT–OT–UT-Fenster besteht aus drei zeitlich aufeinanderfolgenden, strikten Geschwindigkeitsumkehrungen und erfüllt:</p>
+    <div class="formula"><math display="block"><mrow><msub><mi>t</mi><mrow><mi>UT</mi><mo>,</mo><mn>1</mn></mrow></msub><mo>&lt;</mo><msub><mi>t</mi><mi>OT</mi></msub><mo>&lt;</mo><msub><mi>t</mi><mrow><mi>UT</mi><mo>,</mo><mn>2</mn></mrow></msub><mo>,</mo><mspace width="2em"/><msub><mi>x</mi><mrow><mi>UT</mi><mo>,</mo><mn>1</mn></mrow></msub><mo>&gt;</mo><msub><mi>x</mi><mi>OT</mi></msub><mo>&lt;</mo><msub><mi>x</mi><mrow><mi>UT</mi><mo>,</mo><mn>2</mn></mrow></msub></mrow></math></div>
+    <p>Zusätzlich müssen beide Halbhübe größer als die numerische Mindestschwelle sein. Direkt benachbarte doppelte Kandidaten werden zusammengefasst.</p>
+    <div class="note"><strong>Folge:</strong> <math><mrow><msub><mi>x</mi><mtext>OT,tatsächlich</mtext></msub></mrow></math> kann größer als <math><mrow><msub><mi>x</mi><mi>min</mi></msub></mrow></math> und <math><mrow><msub><mi>x</mi><mtext>UT,tatsächlich</mtext></msub></mrow></math> kleiner als <math><mrow><msub><mi>x</mi><mi>max</mi></msub></mrow></math> sein. <code>x_min_m</code> und <code>x_max_m</code> definieren das zulässige/geometrische Hubfenster; die dynamischen Totpunkte beschreiben die im Lauf wirklich erreichten Bewegungsumkehrungen.</div>
+    <h3>Klassischer Kurbeltrieb</h3>
+    <p><code>cylinder_kinematic_state_from_time</code> berechnet aus Zeit und <code>kin_matrix</code> gemeinsam <code>V</code>, <code>dV/dt</code>, Kurbelwinkel, Kolbenposition, Winkelrate und Zykluslänge. Die Parameter umfassen unter anderem Drehzahl, Bohrung, Hub/Radius, Pleuellänge, Verdichtung und Phasenlage.</p>
+    <table><thead><tr><th>Signal</th><th>Quelle</th></tr></thead><tbody><tr><td><code>{vol}_V_m3</code>, <code>{vol}_dVdt_m3_per_s</code></td><td>Kinematik; bei starren Volumina <code>FIXED_VOLUME</code> und 0.</td></tr><tr><td><code>{vol}_theta_deg</code></td><td>Lokaler Volumenwinkel; starre Volumina 0.</td></tr><tr><td><code>theta_deg</code>, <code>theta_local_deg</code></td><td>Beide aktuell lokaler Winkel des Primärzylinders; Zyklusendpunkt wird auf 0° normalisiert.</td></tr><tr><td><code>piston_distance_from_tdc_m</code></td><td>Begrenzter Abstand von der OT-Position.</td></tr></tbody></table>
+  </section>
+
+  <section id="stroemung"><h2>6. Verbindungen, Flächen und Massenströme</h2>
+    <table><thead><tr><th>Verbindung</th><th>Rekonstruierte Geometrie</th><th>Quellen</th></tr></thead><tbody>
+      <tr><td>Ventil</td><td><code>valve_lift_m</code>, <code>A_geom_m2</code>, <code>A_eff_forward/reverse_m2</code></td><td>Lokaler/globaler Winkel, Ventilzeile, Lift- und Alpha-Tabelle.</td></tr>
+      <tr><td>Slot</td><td><code>slot_height_m</code>, Flächen</td><td>Kolbenabstand, Slotgeometrie und Cd-Tabelle.</td></tr>
+      <tr><td>Orifice</td><td>Geometrische und effektive Flächen</td><td>Konstante Geometrie; <math><mrow><msub><mi>A</mi><mi>eff</mi></msub><mo>=</mo><msub><mi>C</mi><mi>d</mi></msub><msub><mi>A</mi><mi>geom</mi></msub></mrow></math>.</td></tr>
+      <tr><td>Check valve</td><td>Flächen, <code>open_0to1</code></td><td>Öffnungszustand aus Druckrichtung und Ventilparametern.</td></tr>
+    </tbody></table>
+    <p><code>{conn}_mdot_kg_per_s</code> wird mit der vorzeichenbehafteten De-Saint-Venant–Wantzel-Funktion aus beiden Drücken und Temperaturen, geometrischer Fläche, richtungsabhängigen Durchflusskoeffizienten sowie <i>κ</i> und <i>R</i> der stromaufwärtigen Seite erneut ausgewertet. Positives Vorzeichen bedeutet <code>FROM → TO</code>.</p>
+    <div class="formula"><math display="block"><mrow><msub><mover><mi>m</mi><mo>˙</mo></mover><mi>i</mi></msub><mo>=</mo><mover><mi>m</mi><mo>˙</mo></mover><msub><mi>Y</mi><mi>i,upstream</mi></msub><mo>,</mo><mspace width="2em"/><mi>h</mi><mo>=</mo><msub><mi>c</mi><mi>p,upstream</mi></msub><msub><mi>T</mi><mi>upstream</mi></msub><mo>,</mo><mspace width="2em"/><mover><mi>H</mi><mo>˙</mo></mover><mo>=</mo><mover><mi>m</mi><mo>˙</mo></mover><mi>h</mi></mrow></math></div>
+    <p>Daraus entstehen <code>mdot_burned</code> und <code>mdot_air</code>; <code>mdot_unburned = mdot − mdot_burned</code> und <code>mdot_fuel_vapor = mdot − mdot_burned − mdot_air</code>. Pro Zylinder werden richtungsbereinigt <code>mdot_in/out</code>, <code>enthalpy_in/out</code> und <code>A_eff_in/out</code> über alle angrenzenden Verbindungen summiert.</p>
+  </section>
+
+  <section id="energie"><h2>7. Energiequellen, Wand und Verbrennung</h2>
+    <h3>Zylinderenergiebilanz</h3>
+    <div class="formula"><math display="block"><mrow><mfrac><mrow><mi>d</mi><mi>U</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><msub><mover><mi>H</mi><mo>˙</mo></mover><mi>in</mi></msub><mo>−</mo><msub><mover><mi>H</mi><mo>˙</mo></mover><mi>out</mi></msub><mo>+</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>comb</mi></msub><mo>−</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>wall</mi></msub><mo>−</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>evap</mi></msub><mo>−</mo><mi>p</mi><mfrac><mrow><mi>d</mi><mi>V</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac></mrow></math></div>
+    <p><code>cylinder_energy_source_terms_from_context</code> wird mit genau den rekonstruierten momentanen Größen erneut aufgerufen. Es liefert <code>piston_work_W</code>, <code>wall_heat_W</code>/<code>heat_transfer_power_W</code>, <code>htc_W_per_m2K</code>, <code>added_energy_W</code> und <code>evaporation_sink_W</code>. Das Vorzeichen entspricht der Implementierung der RHS-Quellterme; insbesondere ist Kolbenarbeit der dort verwendete <i>p·dV/dt</i>-Term.</p>
+    <h3>Wandzonen</h3>
+    <div class="formula"><math display="block"><mrow><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>z</mi></msub><mo>=</mo><mi>α</mi><msub><mi>A</mi><mi>z</mi></msub><mo>(</mo><msub><mi>T</mi><mi>Wand,z</mi></msub><mo>−</mo><msub><mi>T</mi><mi>Gas</mi></msub><mo>)</mo><mo>,</mo><mspace width="2em"/><msub><mi>T</mi><mi>Wand</mi></msub><mo>=</mo><mfrac><mrow><mo>∑</mo><msub><mi>A</mi><mi>z</mi></msub><msub><mi>T</mi><mi>Wand,z</mi></msub></mrow><mrow><mo>∑</mo><msub><mi>A</mi><mi>z</mi></msub></mrow></mfrac></mrow></math></div>
+    <p>Die drei optionalen Zonen sind <code>cylinder</code>, <code>head</code> und <code>piston</code>. Ihre Temperaturen sind Solverzustände; Wärmeleistung, Flächenmittel, Zonensumme und <code>heat_share</code> werden algebraisch erzeugt.</p>
+    <h3>Verbrennung und HCCI</h3>
+    <p>Winkel- oder zeitbasierte Vibe-Funktionen erzeugen <code>combustion_fraction_0to1</code>, deren zeitliche Rate und <code>added_energy_W</code>. In kompakter Form:</p>
+    <div class="formula"><math display="block"><mrow><mi>x</mi><mo>=</mo><mn>1</mn><mo>−</mo><mi>exp</mi><mo>[</mo><mo>−</mo><mi>a</mi><msup><mi>ξ</mi><mrow><mi>m</mi><mo>+</mo><mn>1</mn></mrow></msup><mo>]</mo><mo>,</mo><mspace width="2em"/><mover><mi>Q</mi><mo>˙</mo></mover><mo>=</mo><msub><mi>Q</mi><mi>gesamt</mi></msub><mfrac><mrow><mi>d</mi><mi>x</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac></mrow></math></div>
+    <p>Beim Freikolben werden Latch-, Start-of-Combustion- und Cool-Flame-Zeitreihen per <span class="tag replay">Replay</span> rekonstruiert. Daraus kommen <code>combustion_*_latched</code>, <code>combustion_soc_*</code>, <code>cool_flame_*</code> sowie die Freikolben-Aliase. HCCI-Verzugszeiten und Gültigkeitsdiagnosen stammen aus <code>evaluate_free_piston_hcci_ignition_sample</code>.</p>
+    <div class="formula"><math display="block"><mrow><msub><mi>I</mi><mi>ign</mi></msub><mo>(</mo><msub><mi>t</mi><mi>k</mi></msub><mo>)</mo><mo>=</mo><msub><mi>I</mi><mi>ign</mi></msub><mo>(</mo><msub><mi>t</mi><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>)</mo><mo>+</mo><mfrac><mrow><mi>Δ</mi><mi>t</mi></mrow><msub><mi>τ</mi><mi>ign</mi></msub></mfrac></mrow></math></div>
+    <p>Das Integral wächst nur im gültigen Akkumulationsfenster; beim zweistufigen Modell zuerst mit der Cool-Flame-Verzugszeit. Außerhalb des Fensters wird es zurückgesetzt. Diagnosefelder umfassen Verzugszeiten, Integrale, Reason-Code, Fensterstatus, Mindesttemperatur/-druck, Lambda, Restgasanteil und Tabellenbereichsverletzung.</p>
+  </section>
+
+  <section id="freikolben"><h2>8. Freikolben-Kräfte und Generator</h2>
+    <div class="formula"><math display="block"><mrow><msub><mi>F</mi><mi>Gas</mi></msub><mo>=</mo><mo>∑</mo><msub><mi>s</mi><mi>i</mi></msub><msub><mi>p</mi><mi>i</mi></msub><msub><mi>A</mi><mi>Kolben</mi></msub><mo>,</mo><mspace width="1em"/><msub><mi>F</mi><mi>Bounce</mi></msub><mo>=</mo><mo>∑</mo><mo>−</mo><msub><mi>s</mi><mi>i</mi></msub><msub><mi>p</mi><mi>i</mi></msub><msub><mi>A</mi><mi>Bounce</mi></msub></mrow></math></div>
+    <div class="formula"><math display="block"><mrow><msub><mi>F</mi><mi>Reib</mi></msub><mo>=</mo><mo>−</mo><mo>(</mo><msub><mi>F</mi><mi>c</mi></msub><mi>sgn</mi><mo>(</mo><mi>v</mi><mo>)</mo><mo>+</mo><msub><mi>c</mi><mi>v</mi></msub><mi>v</mi><mo>)</mo><mo>,</mo><mspace width="1em"/><msub><mi>F</mi><mi>netto</mi></msub><mo>=</mo><msub><mi>F</mi><mi>Gas</mi></msub><mo>+</mo><msub><mi>F</mi><mi>Bounce</mi></msub><mo>+</mo><msub><mi>F</mi><mi>Reib</mi></msub><mo>+</mo><msub><mi>F</mi><mi>Last</mi></msub></mrow></math></div>
+    <p>Linear gilt <math><mrow><mi>a</mi><mo>=</mo><msub><mi>F</mi><mi>netto</mi></msub><mo>/</mo><msub><mi>m</mi><mi>beweglich</mi></msub></mrow></math>. Rotatorisch wird die äquivalente lineare Beschleunigung als <math><mrow><mi>a</mi><mo>=</mo><msub><mi>F</mi><mi>netto</mi></msub><msup><mi>r</mi><mn>2</mn></msup><mo>/</mo><mi>J</mi></mrow></math> ausgegeben. <code>compute_load_info</code> rekonstruiert Lastkraft, mechanische/elektrische Leistung, effektive Dämpfung, Basis-, Leistungs-, Assistenz- und Anschlagkraft sowie Anschlagabstand und Mittengewicht. Diese Werte hängen vom konfigurierten Lastmodell ab und sind keine allgemeingültige Einzelgleichung.</p>
+    <p>Falls keine zustandsbehaftete Bounce Chamber existiert, gilt der polytrope Ersatz:</p>
+    <div class="formula"><math display="block"><mrow><msub><mi>p</mi><mi>Bounce</mi></msub><mo>=</mo><msub><mi>p</mi><mn>0</mn></msub><msup><mrow><mo>(</mo><mfrac><msub><mi>V</mi><mn>0</mn></msub><msub><mi>V</mi><mi>Bounce</mi></msub></mfrac><mo>)</mo></mrow><mi>n</mi></msup></mrow></math></div>
+  </section>
+
+  <section id="integrale"><h2>9. Burn-Fenster, Spülung und Integrale</h2>
+    <h3>Burn-Fenster</h3><p>Aus jedem <code>{vol}_added_energy_W</code> wird mit einem amplitudenabhängigen Schwellwert ein aktives Fenster erkannt. Kurze Null-Lücken von höchstens zwei Samples werden unter Zeit- und Nachbarwertbedingungen geschlossen. Innerhalb jedes Fensters integriert die Trapezregel:</p>
+    <div class="formula"><math display="block"><mrow><msub><mi>E</mi><mi>k</mi></msub><mo>=</mo><msub><mi>E</mi><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mo>[</mo><mi>max</mi><mo>(</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>,</mo><mn>0</mn><mo>)</mo><mo>+</mo><mi>max</mi><mo>(</mo><msub><mover><mi>Q</mi><mo>˙</mo></mover><mi>k</mi></msub><mo>,</mo><mn>0</mn><mo>)</mo><mo>]</mo><mi>Δ</mi><mi>t</mi></mrow></math></div>
+    <p>Ergebnis: <code>combustion_active_0to1</code>, <code>burn_window_index</code>, <code>released_energy_window_progress_J</code> und der auf alle Fensterzeilen kopierte Endwert <code>released_energy_window_J</code>.</p>
+    <h3>Spülung</h3><p>Slot-Massenströme werden je Zylinder zu Transfer-Einlass und Auslass summiert. Die Effizienz ist die positive Transfer-Luftmasse relativ zum positiven Transfer-Gesamtstrom; Kurzschlussanteil und Korrektur werden aus Transfer- und Auslassstrom gebildet und numerisch begrenzt.</p>
+    <h3>Pipeline-Integrale</h3><p>Signale der Art <code>integral</code> entstehen erst nach der Rekonstruktion aus ausgewählten Leistungs- oder Massenstromspalten. Pro Zyklus/Fenster gilt allgemein:</p>
+    <div class="formula"><math display="block"><mrow><mi>I</mi><mo>(</mo><msub><mi>t</mi><mi>k</mi></msub><mo>)</mo><mo>=</mo><mo>∑</mo><mfrac><mrow><msub><mi>f</mi><mrow><mi>j</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>f</mi><mi>j</mi></msub></mrow><mn>2</mn></mfrac><mo>(</mo><msub><mi>t</mi><mi>j</mi></msub><mo>−</mo><msub><mi>t</mi><mrow><mi>j</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>)</mo></mrow></math></div>
+    <p>Dazu gehören unter anderem <code>*_wall_heat_cycle_J</code>, <code>*_added_energy_cycle_J</code>, Enthalpie-, Kolbenarbeits-, Verdampfungs- und Massenstromintegrale. Bei Wandwärme kann per Konfiguration der Betrag integriert werden. Delta-, Bilanz- und Leistungsfelder des Legacy-Exports sind nachgelagerte Auswertungen und keine Spalten aus <code>SignalReconstructionService</code> selbst.</p>
+  </section>
+
+  <section id="grenzen"><h2>10. Bedingungen, Fallbacks und Interpretationsgrenzen</h2>
+    <ul><li>Rekonstruktion ist eine erneute Auswertung an gespeicherten Ausgabestützstellen. Bei zustandsbehafteten Ereignissen können Replay und Solver-internes Ereignis-Timing durch die Abtastung begrenzt sein.</li><li>Wird <code>only_selected</code> verwendet, werden aufwendige Verbrennungs-/HCCI-Replays nur bei passenden angeforderten Schlüsseln ausgeführt.</li><li>Fehlende optionale Replay-Funktionen oder Replay-Fehler liefern aus Kompatibilitätsgründen Nullreihen.</li><li>Divisionen sind mit kleinen Mindestwerten geschützt; Null kann daher „nicht aktiv/nicht bestimmbar“ statt eines physikalisch gemessenen Nullwerts bedeuten.</li><li>Einzelinstanzen erhalten Kompatibilitäts-Aliase, etwa <code>cylinder_1_p_Pa → cylinder_p_Pa</code>. Alias und Quelle zeigen auf dieselbe Reihe.</li><li>Einheiten und Signalart werden später durch die Pipeline als zweite und dritte CSV-Zeile ergänzt.</li></ul>
+  </section>
+
+  <section id="quellen"><h2>11. Implementierungsquellen</h2>
+    <table><thead><tr><th>Datei</th><th>Verantwortung</th></tr></thead><tbody>
+      <tr><td><code>src/thermo0d/output/reconstruction.py</code></td><td>Orchestrierung, Signalnamen, Replay, Summen und Burn-Fenster.</td></tr>
+      <tr><td><code>src/thermo0d/core/state_layout.py</code></td><td>Zuordnung der Solverzustände zu Massen, Energie und Komponenten.</td></tr>
+      <tr><td><code>src/thermo0d/model/free_piston/geometry.py</code></td><td>Freikolbenvolumen, Hub, Winkel und äquivalente Kinematik.</td></tr>
+      <tr><td><code>src/thermo0d/model/free_piston/thermo.py</code>, <code>physics/quellen_props.py</code></td><td>Temperatur, Druck und zusammensetzungsabhängige Stoffwerte.</td></tr>
+      <tr><td><code>src/thermo0d/physics/flow.py</code>, <code>physics/rhs.py</code></td><td>Kompressibler Massenstrom und Verbindungsflächen.</td></tr>
+      <tr><td><code>src/thermo0d/physics/source_terms.py</code>, <code>physics/combustion.py</code></td><td>Energiequellen, Wärmeübertragung und Vibe-Modelle.</td></tr>
+      <tr><td><code>src/thermo0d/model/free_piston/combustion_latch.py</code>, <code>forces.py</code></td><td>Verbrennungs-Replay/HCCI und Lastmodell.</td></tr>
+      <tr><td><code>src/thermo0d/output/pipeline.py</code></td><td>Auswahl, Nullfilter, Integrale sowie CSV-Ausgabe.</td></tr>
+    </tbody></table>
+    <p class="small">Diese Referenz beschreibt die aktuelle Implementierung, nicht ein unabhängiges theoretisches Modell. Bei Änderungen am Quellcode sollte sie zusammen mit <code>reconstruction.py</code> aktualisiert werden.</p>
+  </section>
+</main></body></html>

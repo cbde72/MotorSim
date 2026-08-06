@@ -1,20 +1,10 @@
-name: Enthalpie ein/aus kumuliert / Ventilhub
+name: Enthalpie ein/aus cumulative / Valve lift
 style_sheet: ../plot_style_sheet.yaml
 style:
-  background_color: '#ffffff'
-  axes_facecolor: '#ffffff'
-  text_color: '#202020'
-  grid_color: '#d8d8d8'
-  legend_facecolor: '#ffffff'
-  legend_edgecolor: '#9aa0a6'
-  default_line_width: 1.8
-  default_marker_size: 4.5
-  font_size: 10
-  title_size: 12
-  grid_alpha: 0.65
+  default_line_width: 1.6
 figures:
 - id: 0642650190f1
-  title: Enthalpie ein/aus kumuliert / Ventilhub
+  title: Enthalpie ein/aus cumulative / Valve lift
   rows: 1
   cols: 1
   subplots:
@@ -22,7 +12,7 @@ figures:
     title: ''
     plot_type: line
     x_signal: cylinder_theta_deg
-    x_title: Kurbelwinkel [deg]
+    x_title: Crank angle [deg]
     x_unit_preset: raw
     x_scale_factor: 1.0
     x_offset: 0.0
@@ -44,10 +34,10 @@ figures:
       major_grid: true
       minor_grid: false
     - id: ax_lift
-      title: Ventilhub [mm]
+      title: Valve lift [mm]
       side: right
       spine_offset: 0.0
-      color: '#1f77b4'
+      color: '#111111'
       visible: true
       limit_mode: data
       y_min: 0.0
@@ -59,13 +49,13 @@ figures:
     series:
     - id: ac7b4563ac6c
       signal_key: cylinder_enthalpy_in_cycle_J
-      label: Enthalpie ein (kumuliert)
+      label: Enthalpie ein (cumulative)
       axis_id: ax_main
       visible: true
-      color: '#87cefa'
+      color: '#7DD3C7'
       line_style: '-'
       marker: ''
-      line_width: 1.8
+      line_width: 1.6
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1.0
@@ -73,13 +63,13 @@ figures:
       series_type: line
     - id: fc6b5d5feb12
       signal_key: cylinder_enthalpy_out_cycle_J
-      label: Enthalpie aus (kumuliert)
+      label: Enthalpie aus (cumulative)
       axis_id: ax_main
       visible: true
-      color: '#8b0000'
+      color: '#7DD3C7'
       line_style: '-'
       marker: ''
-      line_width: 1.8
+      line_width: 1.6
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1.0
@@ -87,13 +77,13 @@ figures:
       series_type: line
     - id: 682f06e5c08c
       signal_key: intake_valve_valve_lift_m
-      label: Einlasshub
+      label: Intake valve lift
       axis_id: ax_lift
       visible: true
-      color: '#0000ff'
+      color: '#175CD3'
       line_style: --
       marker: ''
-      line_width: 1.8
+      line_width: 1.05
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1000.0
@@ -101,13 +91,13 @@ figures:
       series_type: line
     - id: 3aac6bd303a9
       signal_key: exhaust_valve_valve_lift_m
-      label: Auslasshub
+      label: Exhaust valve lift
       axis_id: ax_lift
       visible: true
-      color: '#ff0000'
+      color: '#D92D20'
       line_style: --
       marker: ''
-      line_width: 1.8
+      line_width: 1.05
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1000.0
@@ -327,3 +317,4 @@ figures:
     legend_visible: true
     legend_position: best
     show_grid: true
+    show_title: true

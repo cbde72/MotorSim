@@ -1,20 +1,10 @@
 name: Subplot
 style_sheet: ../plot_style_sheet.yaml
 style:
-  background_color: '#ffffff'
-  axes_facecolor: '#ffffff'
-  text_color: '#202020'
-  grid_color: '#d8d8d8'
-  legend_facecolor: '#ffffff'
-  legend_edgecolor: '#9aa0a6'
-  default_line_width: 1.8
-  default_marker_size: 4.5
-  font_size: 10
-  title_size: 12
-  grid_alpha: 0.65
+  default_line_width: 1.6
 figures:
 - id: b6a0e07d1501
-  title: Massenströme / Hubvolumen
+  title: Mass flows / Displacement volume
   rows: 1
   cols: 1
   subplots:
@@ -22,7 +12,7 @@ figures:
     title: Subplot
     plot_type: line
     x_signal: cylinder_theta_deg
-    x_title: Kurbelwinkel [deg]
+    x_title: Crank angle [deg]
     x_unit_preset: raw
     x_scale_factor: 1.0
     x_offset: 0.0
@@ -31,7 +21,7 @@ figures:
     x_max: 10440.0
     y_axes:
     - id: ax_mdot
-      title: Massenstrom [kg/s]
+      title: Mass flow [kg/s]
       side: left
       spine_offset: 0.0
       color: '#111111'
@@ -44,10 +34,10 @@ figures:
       major_grid: true
       minor_grid: false
     - id: ax_vol
-      title: Hubvolumen [cm³]
+      title: Displacement volume [cm³]
       side: right
       spine_offset: 0.0
-      color: '#666666'
+      color: '#111111'
       visible: true
       limit_mode: data
       y_min: 0.0
@@ -57,10 +47,10 @@ figures:
       major_grid: true
       minor_grid: false
     - id: e1b74efc9761
-      title: Ventilhub [mm]
+      title: Valve lift [mm]
       side: right
       spine_offset: 0.12
-      color: '#d62728'
+      color: '#111111'
       visible: true
       limit_mode: manual
       y_min: 0.0
@@ -73,7 +63,7 @@ figures:
       title: Y4
       side: right
       spine_offset: 0.24
-      color: '#d62728'
+      color: '#111111'
       visible: true
       limit_mode: data
       y_min: 0.0
@@ -85,13 +75,13 @@ figures:
     series:
     - id: 759c378553b8
       signal_key: cylinder_V_m3
-      label: Hubvolumen
+      label: Displacement volume
       axis_id: ax_vol
       visible: false
-      color: '#808080'
+      color: '#7DD3C7'
       line_style: --
       marker: ''
-      line_width: 0.0
+      line_width: 1.05
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1000000.0
@@ -99,13 +89,13 @@ figures:
       series_type: line
     - id: 2791115c3b2f
       signal_key: intake_valve_mdot_kg_per_s
-      label: Massenstrom (IV)
+      label: Mass flow (IV)
       axis_id: ax_mdot
       visible: true
-      color: '#5500ff'
-      line_style: '-'
+      color: '#175CD3'
+      line_style: -.
       marker: ''
-      line_width: 1.8
+      line_width: 1.45
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1.0
@@ -113,13 +103,13 @@ figures:
       series_type: line
     - id: c933a9c355b4
       signal_key: exhaust_valve_mdot_kg_per_s
-      label: Massenstrom (EV)
+      label: Mass flow (EV)
       axis_id: ax_mdot
       visible: true
-      color: '#ff0000'
-      line_style: '-'
+      color: '#D92D20'
+      line_style: -.
       marker: ''
-      line_width: 0.0
+      line_width: 1.45
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1.0
@@ -127,13 +117,13 @@ figures:
       series_type: line
     - id: 297c47c29fa7
       signal_key: intake_valve_valve_lift_m
-      label: Ventilhub (IV)
+      label: Valve lift (IV)
       axis_id: e1b74efc9761
       visible: true
-      color: '#5500ff'
+      color: '#175CD3'
       line_style: --
       marker: ''
-      line_width: 1.0
+      line_width: 1.05
       marker_size: 4.5
       unit_preset: mm
       scale_factor: 1.0
@@ -141,13 +131,13 @@ figures:
       series_type: line
     - id: 1ba5879975e6
       signal_key: exhaust_valve_valve_lift_m
-      label: Ventilhub (EV)
+      label: Valve lift (EV)
       axis_id: e1b74efc9761
       visible: true
-      color: '#aa0000'
+      color: '#D92D20'
       line_style: --
       marker: ''
-      line_width: 1.0
+      line_width: 1.05
       marker_size: 4.5
       unit_preset: mm
       scale_factor: 1.0
@@ -158,10 +148,10 @@ figures:
       label: cylinder_m_kg
       axis_id: 18175935f7f6
       visible: true
-      color: '#000000'
+      color: '#7DD3C7'
       line_style: '-'
       marker: ''
-      line_width: 2.8
+      line_width: 1.6
       marker_size: 4.5
       unit_preset: raw
       scale_factor: 1.0
@@ -381,3 +371,4 @@ figures:
     legend_visible: true
     legend_position: best
     show_grid: true
+    show_title: true

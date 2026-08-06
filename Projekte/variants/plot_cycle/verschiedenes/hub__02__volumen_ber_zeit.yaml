@@ -1,0 +1,57 @@
+name: Volume vs time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Volume
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Volume vs time
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time in Last Working Cycle [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    y_axes:
+    - id: ax_v
+      title: Volume [cm³]
+      side: left
+      color: '#111111'
+      limit_mode: data
+    series:
+    - signal_key: cylinder_1_V_m3
+      label: Combustion Chamber 1
+      axis_id: ax_v
+      color: '#7DD3C7'
+      line_style: --
+      line_width: 1.05
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: cylinder_2_V_m3
+      label: Combustion Chamber 2
+      axis_id: ax_v
+      color: '#7DD3C7'
+      line_style: --
+      line_width: 1.05
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: compressor_1_V_m3
+      label: Compression Chamber 1
+      axis_id: ax_v
+      color: '#667085'
+      line_style: --
+      line_width: 1.05
+      scale_factor: 1000000.0
+      unit_preset: raw
+    - signal_key: compressor_2_V_m3
+      label: Compression Chamber 2
+      axis_id: ax_v
+      color: '#667085'
+      line_style: --
+      line_width: 1.05
+      scale_factor: 1000000.0
+      unit_preset: raw
+    show_title: true

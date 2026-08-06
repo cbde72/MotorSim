@@ -1,27 +1,33 @@
-name: Massenströme (Einlass / Auslass)
+name: Mass flows (Intake / Exhaust)
 style_sheet: ../plot_style_sheet.yaml
 figures:
-- title: Massenströme & Ventilposition
+- title: Mass flows & Ventilposition
   rows: 1
   cols: 1
   subplots:
-  - title: Massenströme (Einlass / Auslass)
+  - title: Mass flows (Intake / Exhaust)
     x_signal: cylinder_0_theta_deg
-    x_title: Kurbelwinkel [°]
+    x_title: Crank angle [deg]
     y_axes:
     - id: flow_ax
-      title: Massenstrom [kg/s]
+      title: Mass flow [kg/s]
       side: left
+      color: '#111111'
     series:
     - signal_key: connection_intake_valve_mdot_kg_per_s
-      label: Einlassstrom
+      label: Intake mass flow
       axis_id: flow_ax
-      color: '#175cd3'
-      line_style: '-'
+      color: '#175CD3'
+      line_style: -.
       scale_factor: 1.0
+      line_width: 1.45
     - signal_key: connection_exhaust_valve_mdot_kg_per_s
-      label: Auslasstrom
+      label: Exhaust mass flow
       axis_id: flow_ax
-      color: '#b42318'
-      line_style: '-'
+      color: '#D92D20'
+      line_style: -.
       scale_factor: 1.0
+      line_width: 1.45
+    show_title: true
+style:
+  default_line_width: 1.6

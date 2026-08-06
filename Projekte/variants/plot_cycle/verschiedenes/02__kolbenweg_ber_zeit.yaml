@@ -1,0 +1,83 @@
+name: stroke vs time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: s_t
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Piston Position - Last Working Cycle
+    show_title: true
+    plot_type: line
+    x_signal: last_cycle_time_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    y_axes:
+    - id: ax_x
+      limit_mode: manual
+      y_min: -60.0
+      y_max: 60.0
+      title: stroke [mm] (+54.035 = OT, -54.035 = UT)
+      side: left
+      color: '#111111'
+      min: -60.0
+      max: 60.0
+    y_lines:
+    - y: -54.035
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      axis_id: ax_x
+      show_label: true
+      label: UT
+      color: '#000000'
+      line_style: --
+      line_width: 0.5
+      alpha: 0.95
+    - y: 54.035
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      axis_id: ax_x
+      show_label: true
+      label: OT
+      color: '#000000'
+      line_style: --
+      line_width: 0.5
+      alpha: 0.95
+    - y: -38.0
+      label_position: above
+      label_offset_pt: 1
+      axis_id: ax_x
+      show_label: true
+      label: Intake
+      color: '#0000FF'
+      line_style: dotted
+      label_font_size: 4
+      line_width: 0.5
+      alpha: 0.9
+    - y: -36.0
+      label_position: below
+      label_offset_pt: 2
+      axis_id: ax_x
+      show_label: true
+      label: Exhaust
+      label_font_size: 4
+      color: '#FF0000'
+      line_style: dotted
+      line_width: 0.5
+      alpha: 0.9
+    series:
+    - signal_key: free_piston_x_m
+      label: stroke
+      axis_id: ax_x
+      color: '#111111'
+      line_style: --
+      scale_factor: -1000.0
+      unit_preset: raw
+      offset: 54.035
+      line_width: 1.35

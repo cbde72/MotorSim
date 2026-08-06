@@ -1,0 +1,62 @@
+name: Residual gas and air in cylinder
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Scavenging — composition in cylinder
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Residual gas and air in cylinder
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_mass
+      title: Mass [mg]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: ax_frac
+      title: Fraction [-]
+      side: right
+      color: '#111111'
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 1.05
+    series:
+    - signal_key: cylinder_1_m_air_kg
+      label: m_air
+      axis_id: ax_mass
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_m_burned_kg
+      label: m_burned
+      axis_id: ax_mass
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_share_air_0to1
+      label: share_air
+      axis_id: ax_frac
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_share_burned_0to1
+      label: share_burned
+      axis_id: ax_frac
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.6
+    show_title: true
