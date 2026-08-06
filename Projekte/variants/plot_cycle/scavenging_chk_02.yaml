@@ -1,0 +1,90 @@
+name: Residual gas and air in cylinder
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Scavenging — composition in cylinder
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Residual gas and air in cylinder
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_mass
+      title: Mass [mg]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: port_area
+      title: Port Opening Area [mm²]
+      side: right
+      color: '#111111'  
+      #spine_offset: 0.08
+      label_pad: 2
+      tick_label_pad: 2      
+      
+    - id: ax_frac
+      title: Fraction [-]
+      side: right
+      color: '#111111'
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 1.05
+      spine_offset: 0.08
+      label_pad: 2
+      tick_label_pad: 2      
+      
+    series:
+    - signal_key: cylinder_1_m_air_kg
+      label: m_air
+      axis_id: ax_mass
+      color: '#7DD3C7'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_m_burned_kg
+      label: m_burned
+      axis_id: ax_mass
+      color: '#DC143C'
+      line_style: '-'
+      scale_factor: 1000000.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_share_air_0to1
+      label: share_air
+      axis_id: ax_frac
+      color: '#FF69B4'
+      line_style: '-'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: cylinder_1_share_burned_0to1
+      label: share_burned
+      axis_id: ax_frac
+      color: '#9932CC'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.6
+    - signal_key: transfer_slot_1_A_geom_m2
+      label: Inlet Port Opening Area
+      axis_id: port_area
+      color: '#B22222'
+      line_style: '--'
+      line_width: 1.0
+      scale_factor: 1.0e6
+      unit_preset: raw
+    - signal_key: exhaust_slot_1_A_geom_m2
+      label: Exhaust Port Opening Area
+      axis_id: port_area
+      color: '#667085'
+      line_style: '--'
+      line_width: 1.0
+      scale_factor: 1.0e6
+      unit_preset: raw  
+    show_title: true

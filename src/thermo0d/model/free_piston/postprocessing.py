@@ -6,6 +6,7 @@ import numpy as np
 
 from thermo0d.config.constants import CombCol, CombDurationMode, FeatureCol, VolumeCol, VolumeType
 from thermo0d.model.free_piston.forces import compute_load_info
+from thermo0d.model.free_piston.generator_map import lookup_generator_torque_map
 from thermo0d.model.free_piston.geometry import (
     bounce_volume_from_position,
     cylinder_distance_from_tdc,
@@ -224,28 +225,51 @@ def build_free_piston_rows(bundle, t: np.ndarray, y: np.ndarray) -> list[dict[st
             friction_force = 0.0
         else:
             friction_force = -(fp.friction_fc_N * np.copysign(1.0, v_m_per_s) + fp.friction_cv_Ns_per_m * v_m_per_s)
-        load_info = compute_load_info(
-            fp.load_model,
-            fp.load_damping_Ns_per_m,
-            v_m_per_s,
-            x_m=x_m,
-            x_min_m=fp.x_min_m,
-            x_max_m=fp.x_max_m,
-            max_damping_Ns_per_m=fp.load_max_damping_Ns_per_m,
-            control_zone_m=fp.load_control_zone_m,
-            power_target_W=fp.load_power_target_W,
-            efficiency_0to1=fp.load_efficiency_0to1,
-            min_velocity_m_per_s=fp.load_min_velocity_m_per_s,
-            assist_velocity_threshold_m_per_s=fp.load_assist_velocity_threshold_m_per_s,
-            assist_force_N=fp.load_assist_force_N,
-            target_margin_m=fp.load_target_margin_m,
-            hard_margin_m=fp.load_hard_margin_m,
-            stop_kp=fp.load_stop_kp,
-            moving_mass_kg=fp.moving_mass_kg,
-            max_force_N=fp.load_max_force_N,
-        )
-        load_force_signed = float(load_info.force_signed_N)
-        load_force = -load_force_signed
+        map_value = None
+        if str(fp.load_model) == 'generator_torque_map':
+            map_value = lookup_generator_torque_map(fp.generator_torque_map, q, q_dot, fp.rotary_angle_min_rad, fp.rotary_angle_max_rad)
+            radius = max(float(fp.rotary_effective_radius_m), 1.0e-18)
+            safety_info = compute_load_info('generator_controlled', fp.load_damping_Ns_per_m, v_m_per_s, x_m=x_m, x_min_m=fp.x_min_m, x_max_m=fp.x_max_m, max_damping_Ns_per_m=fp.load_max_damping_Ns_per_m, control_zone_m=fp.load_control_zone_m)
+            safety_force = -float(safety_info.force_signed_N)
+            load_force = float(map_value.torque_Nm) / radius + safety_force
+            generator_mechanical_power_W = float(max(-map_value.torque_Nm * q_dot, 0.0) + safety_info.mechanical_power_W)
+            generator_electrical_power_W = float(map_value.electrical_power_W)
+            generator_damping_eff = generator_mechanical_power_W / max(v_m_per_s * v_m_per_s, 1.0e-18)
+            generator_force_base = 0.0
+            generator_force_power = abs(load_force)
+            generator_force_stop = abs(safety_force)
+            generator_distance_to_stop = float('nan')
+            generator_midstroke_weight = 0.0
+        else:
+            load_info = compute_load_info(
+                fp.load_model,
+                fp.load_damping_Ns_per_m,
+                v_m_per_s,
+                x_m=x_m,
+                x_min_m=fp.x_min_m,
+                x_max_m=fp.x_max_m,
+                max_damping_Ns_per_m=fp.load_max_damping_Ns_per_m,
+                control_zone_m=fp.load_control_zone_m,
+                power_target_W=fp.load_power_target_W,
+                efficiency_0to1=fp.load_efficiency_0to1,
+                min_velocity_m_per_s=fp.load_min_velocity_m_per_s,
+                assist_velocity_threshold_m_per_s=fp.load_assist_velocity_threshold_m_per_s,
+                assist_force_N=fp.load_assist_force_N,
+                target_margin_m=fp.load_target_margin_m,
+                hard_margin_m=fp.load_hard_margin_m,
+                stop_kp=fp.load_stop_kp,
+                moving_mass_kg=fp.moving_mass_kg,
+                max_force_N=fp.load_max_force_N,
+            )
+            load_force = -float(load_info.force_signed_N)
+            generator_mechanical_power_W = float(load_info.mechanical_power_W)
+            generator_electrical_power_W = float(load_info.electrical_power_W)
+            generator_damping_eff = float(load_info.effective_damping_Ns_per_m)
+            generator_force_base = float(load_info.base_force_N)
+            generator_force_power = float(load_info.power_force_N)
+            generator_force_stop = float(load_info.stop_force_N)
+            generator_distance_to_stop = float(load_info.distance_to_stop_m)
+            generator_midstroke_weight = float(load_info.midstroke_weight_0to1)
         force_net_N = force_gas_N + force_bounce_N + friction_force + load_force
         if str(getattr(fp, 'kinematics_type', 'linear') or 'linear') == 'oscillating_rotary':
             radius = max(float(getattr(fp, 'rotary_effective_radius_m', 1.0) or 1.0), 1.0e-18)
@@ -328,14 +352,20 @@ def build_free_piston_rows(bundle, t: np.ndarray, y: np.ndarray) -> list[dict[st
             'free_piston_F_load_N': load_force,
             'free_piston_F_net_N': force_net_N,
             'free_piston_a_m_per_s2': equivalent_accel_m_per_s2,
-            'free_piston_generator_power_W': float(load_info.mechanical_power_W),
-            'free_piston_generator_electrical_power_W': float(load_info.electrical_power_W),
-            'free_piston_generator_damping_eff_Ns_per_m': float(load_info.effective_damping_Ns_per_m),
-            'free_piston_generator_force_base_N': float(load_info.base_force_N),
-            'free_piston_generator_force_power_N': float(load_info.power_force_N),
-            'free_piston_generator_force_stop_N': float(load_info.stop_force_N),
-            'free_piston_generator_distance_to_stop_m': float(load_info.distance_to_stop_m),
-            'free_piston_generator_midstroke_weight': float(load_info.midstroke_weight_0to1),
+            'free_piston_generator_power_W': generator_mechanical_power_W,
+            'free_piston_generator_electrical_power_W': generator_electrical_power_W,
+            'free_piston_generator_damping_eff_Ns_per_m': generator_damping_eff,
+            'free_piston_generator_force_base_N': generator_force_base,
+            'free_piston_generator_force_power_N': generator_force_power,
+            'free_piston_generator_force_stop_N': generator_force_stop,
+            'free_piston_generator_distance_to_stop_m': generator_distance_to_stop,
+            'free_piston_generator_midstroke_weight': generator_midstroke_weight,
+            'free_piston_generator_map_angle_deg': float(map_value.angle_deg) if map_value is not None else float('nan'),
+            'free_piston_generator_map_torque_Nm': float(map_value.torque_Nm) if map_value is not None else 0.0,
+            'free_piston_generator_map_no_load_torque_Nm': float(map_value.no_load_torque_Nm) if map_value is not None else 0.0,
+            'free_piston_generator_map_load_torque_Nm': float(map_value.load_torque_Nm) if map_value is not None else 0.0,
+            'free_piston_generator_map_voltage_V': float(map_value.voltage_V) if map_value is not None else 0.0,
+            'free_piston_generator_map_out_of_range_0to1': float(map_value.out_of_range) if map_value is not None else 0.0,
             'cylinder_added_energy_W': float(added_energy_W),
             'cylinder_combustion_air_mass_latched_kg': latched_air_mass_kg,
             'cylinder_combustion_fuel_mass_latched_kg': latched_fuel_mass_kg,

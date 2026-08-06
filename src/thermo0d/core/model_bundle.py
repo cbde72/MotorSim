@@ -85,6 +85,7 @@ class FreePistonModelData:
     mechanical_v_state_indices: np.ndarray = field(default_factory=lambda: np.zeros(1, dtype=np.int64))
     volume_mechanical_dof: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
     volume_mechanical_sign: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    generator_torque_map: object | None = None
     combustion_fueling_mode: str = 'fixed_energy'
     combustion_fueling_mode_by_vol: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
     combustion_lambda_target: float = 0.0

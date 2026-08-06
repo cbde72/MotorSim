@@ -1,0 +1,87 @@
+name: stroke vs time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: s_t
+  rows: 1
+  cols: 1
+  subplots:
+  - title: stroke vs time
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_x
+      limit_mode: manual
+      y_min: -50.0
+      y_max: 50.0
+      tick_step: 10.0
+      minor_tick_step: 2.0
+      title: stroke [mm] (+45.6 = OT, -45.6 = UT)
+      side: left
+      color: '#111111'
+      limit_mode: manual
+      
+    y_lines:
+    - y: -45.553093
+      label_font_size: 6.0
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      axis_id: ax_x
+      show_label: true
+      label: UT 45.6 mm
+      color: '#000000'
+      line_style: --
+      line_width: 0.2
+      alpha: 0.95
+    - y: 45.553093
+      label_font_size: 6.0
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      axis_id: ax_x
+      show_label: true
+      label: OT 45.6 mm
+      color: '#000000'
+      line_style: --
+      line_width: 0.2
+      alpha: 0.95
+    - y: -35.43
+      label_position: above
+      label_offset_pt: 1
+      axis_id: ax_x
+      show_label: true
+      label: Intake -35.4 mm
+      color: '#0000FF'
+      line_style: dotted
+      label_font_size: 4
+      line_width: 0.5
+      alpha: 0.9
+    - y: -27.84
+      label_position: below
+      label_offset_pt: 2
+      axis_id: ax_x
+      show_label: true
+      label: Exhaust -27.8 mm
+      label_font_size: 4
+      color: '#FF0000'
+      line_style: dotted
+      line_width: 0.5
+      alpha: 0.9
+    
+      
+    series:
+    - signal_key: free_piston_x_m
+      label: position
+      axis_id: ax_x
+      color: '#111111'
+      line_style: --
+      scale_factor: -1000.0
+      unit_preset: raw
+      offset: 45.553093
+      line_width: 1.0
+    show_title: true

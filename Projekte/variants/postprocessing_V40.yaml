@@ -145,6 +145,13 @@ signals:
   - free_piston_F_load_N
   - free_piston_F_net_N
   - free_piston_generator_power_W
+  - free_piston_generator_electrical_power_W
+  - free_piston_generator_map_angle_deg
+  - free_piston_generator_map_torque_Nm
+  - free_piston_generator_map_no_load_torque_Nm
+  - free_piston_generator_map_load_torque_Nm
+  - free_piston_generator_map_voltage_V
+  - free_piston_generator_map_out_of_range_0to1
   - free_piston_generator_assist_force_N
   - free_piston_generator_assist_torque_Nm
   - cylinder_1_cp_J_per_kgK

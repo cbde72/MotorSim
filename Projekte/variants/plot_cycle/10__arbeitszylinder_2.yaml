@@ -2,6 +2,8 @@ name: Power cylinder 2
 style_sheet: ../../plot_style_sheet.yaml
 style:
   default_line_width: 1.6
+  axis_label_size: 11.0
+  tick_label_size: 9.0
 figures:
 - title: energy
   rows: 1
@@ -16,6 +18,43 @@ figures:
     x_limit_mode: auto
     x_start_at_zero: true
     x_axis_position: bottom
+    text_box:
+      enabled: true
+      source: data
+      title: Signed mass-flow check
+      x: 0.02
+      y: 0.98
+      ha: left
+      va: top
+      font_size: 8.0
+      facecolor: '#ffffff'
+      edgecolor: '#111111'
+      alpha: 0.90
+      metrics:
+      - label: Transfer minimum
+        signal_key: transfer_slot_2_mdot_kg_per_s
+        mode: min
+        unit: kg/s
+        digits: 5
+        fixed: true
+      - label: Transfer maximum
+        signal_key: transfer_slot_2_mdot_kg_per_s
+        mode: max
+        unit: kg/s
+        digits: 5
+        fixed: true
+      - label: Exhaust minimum
+        signal_key: exhaust_slot_2_mdot_kg_per_s
+        mode: min
+        unit: kg/s
+        digits: 5
+        fixed: true
+      - label: Exhaust maximum
+        signal_key: exhaust_slot_2_mdot_kg_per_s
+        mode: max
+        unit: kg/s
+        digits: 5
+        fixed: true
     y_axes:
     - id: ax_x_2
       title: Piston position [mm] (+54 = OT, -54 = UT)
@@ -35,11 +74,16 @@ figures:
       axis_label_size: 8
       tick_label_size: 6
     - id: ax_mdot_2
-      title: Mass flow [kg/s]
+      title: Signed mass flow [kg/s] (+ from -> to, - to -> from)
       side: right
       color: '#111111'
-      axis_label_size: 8
-      tick_label_size: 6
+      limit_mode: manual
+      y_min: -0.03
+      y_max: 0.30
+      tick_step: 0.05
+      minor_tick_step: 0.01
+      axis_label_size: 11
+      tick_label_size: 9
     - id: ax_qzu_2
       title: Qzu [W]
       side: right
@@ -51,6 +95,17 @@ figures:
       y_max: 1000000.0
       min: 0.0
       max: 1000000.0
+    y_lines:
+    - y: 0.0
+      label: Zero mass flow
+      axis_id: ax_mdot_2
+      color: '#111111'
+      line_style: ':'
+      line_width: 0.9
+      alpha: 0.9
+      show_label: true
+      label_x: 0.99
+      label_font_size: 8.0
     series:
     - signal_key: cylinder_2_piston_distance_from_tdc_m
       label: Piston position

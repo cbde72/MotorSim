@@ -1,7 +1,7 @@
 name: Pressures over time
 style_sheet: ../../plot_style_sheet.yaml
 style:
-  default_line_width: 1.6
+  default_line_width: 1.0
 figures:
 - title: Free-piston pressure traces of all volumes
   rows: 1
@@ -29,7 +29,7 @@ figures:
       line_style: '-'
       scale_factor: 1.0e-05
       unit_preset: raw
-      line_width: 1.8
+      line_width: 1.0
     - signal_key: compressor_1_p_Pa
       label: bounce
       axis_id: ax_p
@@ -37,7 +37,7 @@ figures:
       line_style: '-'
       scale_factor: 1.0e-05
       unit_preset: raw
-      line_width: 1.8
+      line_width: 1.0
     - signal_key: receiver_1_p_Pa
       label: receiver
       axis_id: ax_p
@@ -45,7 +45,7 @@ figures:
       line_style: '-'
       scale_factor: 1.0e-05
       unit_preset: raw
-      line_width: 1.8
+      line_width: 1.0
     - signal_key: exhaust_plenum_1_p_Pa
       label: exhaust_plenum
       axis_id: ax_p
@@ -53,7 +53,7 @@ figures:
       line_style: '-'
       scale_factor: 1.0e-05
       unit_preset: raw
-      line_width: 1.8
+      line_width: 1.0
     - signal_key: ambient_in_p_Pa
       label: ambient_in
       axis_id: ax_p
@@ -61,7 +61,7 @@ figures:
       line_style: '-'
       scale_factor: 1.0e-05
       unit_preset: raw
-      line_width: 1.8
+      line_width: 1.0
     - signal_key: ambient_out_p_Pa
       label: ambient_out
       axis_id: ax_p
@@ -69,5 +69,5 @@ figures:
       line_style: '-'
       scale_factor: 1.0e-05
       unit_preset: raw
-      line_width: 1.8
+      line_width: 1.0
     show_title: true

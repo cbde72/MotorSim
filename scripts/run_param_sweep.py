@@ -580,8 +580,7 @@ if __name__ == '__main__':
     project_root = this_file.parents[1] if this_file.parent.name == 'scripts' else this_file.parent
 # %%
 # %%
-    default_cfg = project_root / 'Projekte' / 'sweeps' / 'vibe_hign_mm.yaml'
-
+    default_cfg = project_root / 'Projekte' / 'sweeps' / 'generator_zone.yaml'
 
     print (default_cfg)
     simulated_argv = ['--sweep-config', str(default_cfg)]

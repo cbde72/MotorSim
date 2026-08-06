@@ -1,0 +1,98 @@
+name: Actual strokes and mechanical angle over full simulation time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.0
+figures:
+- title: actual_strokes_and_mechanical_angle_over_time
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Actual strokes and mechanical angle over full simulation time
+    show_title: true
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    x_axis_position: bottom
+    y_axes:
+    - id: ax_hub
+      title: Actual stroke from TDC [mm]
+      side: left
+      color: '#111111'
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 91.1
+      min: 0.0
+      max: 91.1
+      axis_label_size: 8
+      tick_label_size: 7
+    - id: ax_angle
+      title: Actual mechanical angle [deg]
+      side: right
+      color: '#175CD3'
+      limit_mode: manual
+      y_min: -9.0
+      y_max: 9.0
+      min: -9.0
+      max: 9.0
+      axis_label_size: 8
+      tick_label_size: 7
+    y_lines:
+    - y: 0.0
+      label: TDC / x_min
+      axis_id: ax_hub
+      color: '#667085'
+      line_style: ':'
+      line_width: 0.8
+      alpha: 0.9
+    - y: 91.1
+      label: BDC / x_max
+      axis_id: ax_hub
+      color: '#667085'
+      line_style: ':'
+      line_width: 0.8
+      alpha: 0.9
+    - y: 0.0
+      label: Theoretical TDC angle
+      axis_id: ax_angle
+      color: '#D92D20'
+      line_style: '--'
+      line_width: 1.0
+      alpha: 0.9
+    series:
+    - signal_key: free_piston_x_m
+      label: Stroke from equation of motion x(q)
+      axis_id: ax_hub
+      color: '#D92D20'
+      line_style: '-'
+      line_width: 2.4
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: cylinder_1_piston_distance_from_tdc_m
+      label: Actual stroke cylinder 1
+      axis_id: ax_hub
+      color: '#12B76A'
+      line_style: --
+      line_width: 3.9
+      alpha: 0.65
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: cylinder_2_piston_distance_from_tdc_m
+      label: Actual stroke cylinder 2
+      axis_id: ax_hub
+      color: '#F79009'
+      line_style: -.
+      line_width: 0.9
+      alpha: 0.65
+      scale_factor: 1000.0
+      unit_preset: raw
+    - signal_key: free_piston_q
+      label: Actual mechanical angle
+      axis_id: ax_angle
+      color: '#175CD3'
+      line_style: '-'
+      line_width: 1.4
+      scale_factor: 57.29577951308232
+      unit_preset: raw

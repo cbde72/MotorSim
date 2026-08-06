@@ -1,0 +1,571 @@
+versioning:
+  package_version: 7.1.127
+  config_schema_version: 8
+  loaded_config_schema_version: 8
+  migration_applied: false
+test_description: 'Free-piston V40: feste Zylinderwandtemperatur wie V38
+  plus Woschni-PROMO-Wandwaerme in beiden Bounce-Kompressoren'
+modeling:
+  architecture: free_piston
+free_piston:
+  initial_conditions:
+    x0_m: 0.0456
+    v0_m_per_s: -4.247
+    combustion_state:
+      burned_fraction_0to1: 0.0
+      released_energy_J: 0.0
+      ignition_armed: false
+      injection_armed: false
+      burned_mass_percent: 0.0
+  mechanics:
+    kinematics_type: oscillating_rotary
+    moving_mass_kg: 100.11  # 11.8 x 2 
+    piston_diameter_m: 0.0605
+    compression_ratio: 50
+    x_min_m: 0.0
+    x_max_m: 0.0911
+    angle_min_deg: -9.0
+    angle_max_deg: 9.0
+    effective_radius_m: 0.290   #0.344/2
+    rotary_inertia_kg_m2: 2.792 #1.396 x 2
+  friction:
+    model: coulomb_viscous
+    fc_N: 80.0
+    cv_Ns_per_m: 0
+  load:
+    model: generator_controlled
+    damping_Ns_per_m: 0.0
+    max_damping_Ns_per_m: 10000
+    control_zone_m: 0.01
+  scavenging:
+    enabled: true
+    model: overlap_short_circuit_0d
+    scavenging_factor: 1.25
+    max_trapping_efficiency: 0.92
+    short_circuit_start_ratio: 0.7
+    short_circuit_slope: 0.35
+    max_short_circuit_fraction: 0.35
+    min_residual_fraction: 0.03
+preprocessing:
+  gas_properties:
+    cp_J_per_kgK: 1005.0
+    cv_J_per_kgK: 718.0
+    R_J_per_kgK: 287.0
+    thermo_model: promo
+  features:
+    mass_flow: true
+    wall_heat: true
+    combustion: true
+    evaporation: false
+    pv_work: true
+  engine:
+    cycle_type: 2t
+    speed_rpm: 25.0
+  submodels:
+    volumes:
+      cylinder_free_piston:
+        type: cylinder
+        kinematics:
+          type: crank_slider
+          bore_m: 1.0745
+          stroke_m: 1.08
+          conrod_m: 1.12
+          compression_ratio: 50.0
+          phase_deg: 0.0
+        # V38: Das dynamische Wandtemperaturmodell ist ausgeschaltet.
+        # Dadurch wird ausschliesslich wall_heat.wall_temperature_K verwendet.
+        wall_temperature:
+          ref: fixed_wall_temperature
+        wall_heat:
+          ref: woschni_promo_wall
+        combustion:
+          ref: vibe_lambda_slot
+        evaporation:
+          model: none
+      compressor_bounce:
+        type: bounce_chamber
+        model: gas_exchange
+        initial_burned_fraction_0to1: 0.0
+        chamber_diameter_m: 0.07
+        chamber_length_m: 0.10807
+        compression_ratio: 16
+        polytropic_exponent: 1.3
+        # V40: eigener Wandwaermeansatz fuer die bewegte Kompressorkammer.
+        wall_heat:
+          ref: woschni_promo_compressor_wall
+      receiver_plenum:
+        type: plenum
+        fixed_volume_m3: 0.00048
+        wall_heat:
+          model: none
+        combustion:
+          model: none
+        evaporation:
+          model: none
+      exhaust_plenum:
+        type: plenum
+        fixed_volume_m3: 0.00260279
+        wall_heat:
+          model: none
+        combustion:
+          model: none
+        evaporation:
+          model: none
+      ambient_environment:
+        type: environment
+        pressure_Pa: 101325.0
+        temperature_K: 300.0
+    wall_temperature:
+      # "none" deaktiviert die Berechnung zyklusgemittelter Temperaturen.
+      # Bei model: none sind keine Zonen-, Kuehlmittel- oder Relaxationswerte erlaubt.
+      fixed_wall_temperature:
+        model: none
+    wall_heat:
+      woschni_promo_wall:
+        model: woschni
+        variant: promo
+        # Einzige wirksame Wandtemperatur in V38, konstant fuer den gesamten Zyklus.
+        # Kopf, Kolben und Laufbuchse verwenden gemeinsam diesen Wert.
+        wall_temperature_K: 450.0
+        wall_area_m2: 0.03
+        dp_mode: 'off'
+        multiplier: 5
+        reference_state_mode: none
+        phase_mode: promo
+        c1: 2.28
+        c2: 0.00324
+        c3: 0.0
+        cucm: 0.0
+        swirl_number: 0.0
+        imep_bar: 0.0
+      # Empirischer Woschni-PROMO-Ansatz fuer die Bounce-Kompressoren.
+      # Der Code verwendet den realen Kammerdurchmesser (0.07 m) und den
+      # Betrag der momentanen Kolbengeschwindigkeit als Geschwindigkeitsmass.
+      woschni_promo_compressor_wall:
+        model: woschni
+        variant: promo
+        # Konstante, gemeinsame Innenwandtemperatur beider Kompressoren.
+        wall_temperature_K: 350.0
+        # Naeherung: zwei Stirnflaechen plus Mantelflaeche bei maximaler Laenge.
+        # Dieser Wert und der Multiplikator sind gegen Messdaten zu kalibrieren.
+        wall_area_m2: 0.0315
+        dp_mode: 'off'
+        multiplier: 1.0
+        reference_state_mode: none
+        phase_mode: promo
+        c1: 2.28
+        c2: 0.00324
+        c3: 0.0
+        cucm: 0.0
+        swirl_number: 0.0
+        imep_bar: 0.0
+    combustion:
+      vibe_lambda_slot:
+        model: vibe
+        start_mode: hign_position
+        duration_mode: time
+        hign_mm: 15.0
+        duration_ms: 10.0
+        a: 6.9
+        m: 2.0
+        energy_coupling: none
+        fueling_mode: lambda_from_cylinder_mass_at_slot_close
+        lambda_target: 1.0
+        lhv_J_per_kg: 43000000.0
+        afr_stoich_kg_air_per_kg_fuel: 14.5
+        combustion_efficiency_0to1: 1.0
+        slot_open_threshold_m2: 1.0e-07
+        slot_closed_threshold_m2: 1.0e-12
+        compression_velocity_threshold_m_per_s: 0.02
+        angle_reference: absolute
+        hcci_diagnostics_ref: ignition_diag_beck_2003_1_arrhenius_cylinder_1
+    ignition:
+      ignition_diag_beck_2003_1_arrhenius:
+        model: beck_2003_1_arrhenius                         # Beck-HCCI-Modell mit einer Arrhenius-Stufe; zulässig ist hier nur beck_2003_1_arrhenius.
+        beck_c1_s: 1.47044752e-05                            # Fit Zylinder 1: LW=1 beim ersten Erreichen von T>=1123.15 K und p>=30 bar.
+        beck_c2: -1.2                                       # Druckexponent in (p/p_ref)^c2: negativer = stärkere Verkürzung bei steigendem Druck; typisch ca. -2.5 ... -0.3.
+        beck_reference_pressure_bar: 1.0                    # Bezugsdruck p_ref zur Normierung des Druckterms; sinnvoll ca. 0.8 ... 1.2 bar, üblicherweise 1.0 bar und nicht als Fitparameter verwenden.
+        beck_reference_o2_percent: 20.94                    # O2-Anteil frischer Luft zur Normierung des Verdünnungsterms; sinnvoll ca. 20.0 ... 21.0 %, Standard-Trockenluft 20.94 %.
+        tau_activation_temperature_K: 5000.0                # Arrhenius-Aktivierungstemperatur im Fallback exp(T_A/T); sinnvoll ca. 3000 ... 20000 K. Beim Beck-Pfad wird derzeit vorrangig die intern hinterlegte Aktivierungsenergie des Kraftstoffs verwendet.
+        tau_reference_pressure_Pa: 1000000.0                # Kompatibilitätsparameter des allgemeinen Livengood-Wu-Modells; sinnvoll ca. 1e5 ... 2e6 Pa, im Beck-2003-1-Arrhenius-Verzug derzeit ohne Wirkung.
+        tau_reference_lambda: 1.0                           # Kompatibilitäts-Bezugslambda; sinnvoll ca. 0.8 ... 3.0, im Beck-Modell derzeit ohne Wirkung, da dort der O2-Verdünnungsterm verwendet wird.
+        lambda_slowdown_exponent: 0.7                       # Kompatibilitäts-Exponent für Lambda-Verlangsamung; sinnvoll ca. 0.0 ... 2.0, im Beck-Modell derzeit ohne Wirkung.
+        residual_slowdown_factor: 1.5                       # Multiplikator bei 100 % Restgas, linear mit Restgasanteil interpoliert: 1 = kein Einfluss; sinnvoll ca. 1.0 ... 3.0.
+        start_temperature_min_K: 780.0                      # Beginn der Vorakkumulation vor dem Zielpunkt.
+        start_pressure_min_Pa: 2000000.0                    # Beginn der Vorakkumulation ab 20 bar absolut.
+        max_ignition_delay_s: 0.1                           # Nicht begrenzend innerhalb des verwendeten Fitfensters.
+        accumulation_start_mode: compression                # Akkumulation nur im Verdichtungshub.
+        accumulation_end_mode: none                         # Reiner Diagnosepfad: nicht durch das Ende der vorgegebenen Vibe-Verbrennung begrenzen; Ende weiterhin spätestens mit dem Verdichtungshub.
+    connections:
+      compressor_in_check_valve:
+        type: check_valve
+        diameter_mm: 55
+        discharge_coefficient: 0.82
+        cracking_pressure_Pa: 0.0
+      compressor_out_check_valve:
+        type: check_valve
+        diameter_mm: 55.3
+        discharge_coefficient: 0.82
+        cracking_pressure_Pa: 50000.0
+      transfer_slot:
+        type: slot
+        source_of_data: rectangle
+        opening_mode: by_distance
+        distance_from_tdc_mm: 92.07
+        piston_height_if_crankcase_m: 0.0
+        entrance_angle_deg: 0.0
+        width_mm: 26.0
+        height_mm: 16.0
+        open_fillet_radius_m: 0.0
+        full_fillet_radius_m: 0.0
+        number_of_identical_holes: 6
+        discharge_coefficients:
+          mode: constant
+          forward_cd: 0.95
+          reverse_cd: 0.95
+      exhaust_slot:
+        type: slot
+        source_of_data: rectangle
+        opening_mode: by_distance
+        distance_from_tdc_mm: 90.6
+        piston_height_if_crankcase_m: 0.0
+        entrance_angle_deg: 0.0
+        width_mm: 24
+        height_mm: 18
+        open_fillet_radius_m: 0.0
+        full_fillet_radius_m: 0.0
+        number_of_identical_holes: 6
+        discharge_coefficients:
+          mode: constant
+          forward_cd: 0.95
+          reverse_cd: 0.95
+      exhaust_bleed:
+        type: orifice
+        diameter_mm: 14.0
+        forward_cd: 0.98
+        reverse_cd: 0.98
+  environment:
+  - name: ambient_in
+    ref: ambient_environment
+  - name: ambient_out
+    ref: ambient_environment
+  volumes:
+  - name: cylinder_1
+    ref: cylinder_free_piston
+    combustion:
+      ref: vibe_lambda_slot
+      hcci_diagnostics_ref: ignition_diag_beck_2003_1_arrhenius
+    initial_pressure_Pa: 257686
+    initial_temperature_K: 487
+    initial_burned_fraction_0to1: 0.269
+    type: cylinder
+    kinematics:
+      type: crank_slider
+      bore_m: 1.0745
+      stroke_m: 1.08
+      conrod_m: 1.12
+      compression_ratio: 50.0
+      phase_deg: 0.0
+    # Keine dynamische Wandtemperatur fuer Zylinder 1.
+    # Der feste Wert 450 K kommt aus dem referenzierten Woschni-Modell.
+    wall_temperature:
+      ref: fixed_wall_temperature
+      model: none
+    wall_heat:
+      ref: woschni_promo_wall
+    evaporation:
+      model: none
+
+  - name: cylinder_2
+    ref: cylinder_free_piston
+    combustion:
+      ref: vibe_lambda_slot
+      hcci_diagnostics_ref: ignition_diag_beck_2003_1_arrhenius
+    initial_pressure_Pa: 542041
+    initial_temperature_K: 1011
+    initial_burned_fraction_0to1: 0.871
+    type: cylinder
+    kinematics:
+      type: crank_slider
+      bore_m: 1.0745
+      stroke_m: 1.08
+      conrod_m: 1.12
+      compression_ratio: 50.0
+      phase_deg: 0.0
+    # Keine dynamische Wandtemperatur fuer Zylinder 2.
+    # Der feste Wert 450 K kommt aus dem referenzierten Woschni-Modell.
+    wall_temperature:
+      ref: fixed_wall_temperature
+      model: none
+
+    wall_heat:
+      ref: woschni_promo_wall
+
+    evaporation:
+      model: none
+  - name: compressor_1
+    ref: compressor_bounce
+    initial_pressure_Pa: 101135
+    initial_temperature_K: 299
+    type: bounce_chamber
+    model: gas_exchange
+    initial_burned_fraction_0to1: 0.0
+    chamber_diameter_m: 0.07
+    chamber_length_m: 0.10807
+    compression_ratio: 16
+    polytropic_exponent: 1.3
+    # Feste Wandtemperatur und Woschni-Waermeuebergang aus der Bibliothek.
+    wall_heat:
+      ref: woschni_promo_compressor_wall
+  - name: compressor_2
+    ref: compressor_bounce
+    initial_pressure_Pa: 198465
+    initial_temperature_K: 361
+    type: bounce_chamber
+    model: gas_exchange
+    initial_burned_fraction_0to1: 0.0
+    chamber_diameter_m: 0.07
+    chamber_length_m: 0.10807
+    compression_ratio: 16
+    polytropic_exponent: 1.3
+    # Identischer Ansatz fuer eine symmetrische thermische Parametrierung.
+    wall_heat:
+      ref: woschni_promo_compressor_wall
+  - name: receiver_1
+    ref: receiver_plenum
+    initial_pressure_Pa: 134003
+    initial_temperature_K: 346
+    initial_burned_fraction_0to1: 0.0134
+    type: plenum
+    fixed_volume_m3: 0.00048
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+    wall_temperature:
+      model: none
+  - name: receiver_2
+    ref: receiver_plenum
+    initial_pressure_Pa: 149847
+    initial_temperature_K: 367
+    initial_burned_fraction_0to1: 0.02356
+    type: plenum
+    fixed_volume_m3: 0.00048
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+    wall_temperature:
+      model: none
+  - name: exhaust_plenum_1
+    ref: exhaust_plenum
+    initial_pressure_Pa: 123188
+    initial_temperature_K: 499
+    initial_burned_fraction_0to1: 0.303
+    type: plenum
+    fixed_volume_m3: 0.00260279
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+    wall_temperature:
+      model: none
+  - name: exhaust_plenum_2
+    ref: exhaust_plenum
+    initial_pressure_Pa: 105762
+    initial_temperature_K: 498
+    initial_burned_fraction_0to1: 0.318
+    type: plenum
+    fixed_volume_m3: 0.00260279
+    wall_heat:
+      model: none
+    combustion:
+      model: none
+    evaporation:
+      model: none
+    wall_temperature:
+      model: none
+  connections:
+  - name: compressor_1_in_cv
+    ref: compressor_in_check_valve
+    from_volume: ambient_in
+    to_volume: compressor_1
+    type: check_valve
+    diameter_mm: 55
+    discharge_coefficient: 0.82
+    cracking_pressure_Pa: 0.0
+  - name: compressor_1_out_cv
+    ref: compressor_out_check_valve
+    from_volume: compressor_1
+    to_volume: receiver_1
+    type: check_valve
+    diameter_mm: 55.3
+    discharge_coefficient: 0.82
+    cracking_pressure_Pa: 50000.0
+  - name: compressor_2_in_cv
+    ref: compressor_in_check_valve
+    from_volume: ambient_in
+    to_volume: compressor_2
+    type: check_valve
+    diameter_mm: 55
+    discharge_coefficient: 0.82
+    cracking_pressure_Pa: 0.0
+  - name: compressor_2_out_cv
+    ref: compressor_out_check_valve
+    from_volume: compressor_2
+    to_volume: receiver_2
+    type: check_valve
+    diameter_mm: 55.3
+    discharge_coefficient: 0.82
+    cracking_pressure_Pa: 50000.0
+  - name: transfer_slot_1
+    ref: transfer_slot
+    from_volume: receiver_1
+    to_volume: cylinder_1
+    type: slot
+    source_of_data: rectangle
+    opening_mode: by_distance
+    distance_from_tdc_mm: 92.07
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 0.0
+    width_mm: 26.0
+    height_mm: 16.0
+    open_fillet_radius_m: 0.0
+    full_fillet_radius_m: 0.0
+    number_of_identical_holes: 6
+    discharge_coefficients:
+      mode: constant
+      forward_cd: 0.95
+      reverse_cd: 0.95
+  - name: transfer_slot_2
+    ref: transfer_slot
+    from_volume: receiver_2
+    to_volume: cylinder_2
+    type: slot
+    source_of_data: rectangle
+    opening_mode: by_distance
+    distance_from_tdc_mm: 92.07
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 0.0
+    width_mm: 26.0
+    height_mm: 16.0
+    open_fillet_radius_m: 0.0
+    full_fillet_radius_m: 0.0
+    number_of_identical_holes: 6
+    discharge_coefficients:
+      mode: constant
+      forward_cd: 0.95
+      reverse_cd: 0.95
+  - name: exhaust_slot_1
+    ref: exhaust_slot
+    from_volume: cylinder_1
+    to_volume: exhaust_plenum_1
+    type: slot
+    source_of_data: rectangle
+    opening_mode: by_distance
+    distance_from_tdc_mm: 90.6
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 0.0
+    width_mm: 24
+    height_mm: 18
+    open_fillet_radius_m: 0.0
+    full_fillet_radius_m: 0.0
+    number_of_identical_holes: 6
+    discharge_coefficients:
+      mode: constant
+      forward_cd: 0.95
+      reverse_cd: 0.95
+  - name: exhaust_slot_2
+    ref: exhaust_slot
+    from_volume: cylinder_2
+    to_volume: exhaust_plenum_2
+    type: slot
+    source_of_data: rectangle
+    opening_mode: by_distance
+    distance_from_tdc_mm: 90.6
+    piston_height_if_crankcase_m: 0.0
+    entrance_angle_deg: 0.0
+    width_mm: 24
+    height_mm: 18
+    open_fillet_radius_m: 0.0
+    full_fillet_radius_m: 0.0
+    number_of_identical_holes: 6
+    discharge_coefficients:
+      mode: constant
+      forward_cd: 0.95
+      reverse_cd: 0.95
+  - name: exhaust_bleed_1
+    ref: exhaust_bleed
+    from_volume: exhaust_plenum_1
+    to_volume: ambient_out
+    type: orifice
+    diameter_mm: 14.0
+    forward_cd: 0.98
+    reverse_cd: 0.98
+  - name: exhaust_bleed_2
+    ref: exhaust_bleed
+    from_volume: exhaust_plenum_2
+    to_volume: ambient_out
+    type: orifice
+    diameter_mm: 14.0
+    forward_cd: 0.98
+    reverse_cd: 0.98
+simulation:
+  dt_s: 1.0e-05
+  total_cycles: 3
+  save_last_cycles: 2
+  simulationtime: 0.2
+  solver:
+    kind: rk4
+    rtol: 1.0e-05
+    atol: 1.0e-07
+postprocessing:
+  mode: pipeline
+  # V40 verwendet eine eigene Signalauswahl mit Kompressor-Wandwaermesignalen.
+  config: postprocessing_V40.yaml
+  auto_update_initial_conditions: false
+  sampling:
+    mode: time
+    step_s: 0.0001
+  console:
+    run_summary:
+      enabled: true
+    cycle_summary:
+      enabled: false
+    check_report:
+      enabled: false
+    geometry:
+      enabled: false
+  csv_enabled: true
+  csv_path: results/editor_export.csv
+  csv_separator: ;
+  excel_enabled: false
+  excel_path: results/editor_export.xlsx
+  final_cycle_uniform_angle_export:
+    enabled: false
+    step_deg: 1.0
+  free_piston_last_ut_ot_ut_export:
+    enabled: false
+    step_deg: 1.0
+    axis_min_deg: 0.0
+    axis_max_deg: 360.0
+  check_report:
+    enabled: true
+    html_enabled: false
+  plots:
+    enabled: true
+    source: last_cycle_uniform
+    output_dir: results/plots
+    layouts:
+      auto_create_defaults: true
+      entries: []
+  csv_export_layout: thermo0d_signal_export_layout.csv
+  csv_export_mode: auto
+  csv_export_missing_layout: warn_all
+  csv_export_unknown_signals: warn_empty

@@ -22,14 +22,23 @@ SIMULATED_ARG_PRESETS: dict[str, list[str]] = {
         '--batch-variants',
         '--continue-on-error',
     ],
-    'free_piston_v47': [
-        '--config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V53.yaml'),
+    'free_piston_v56_HCCI': [
+        '--config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V56_HCCI_Diesel.yaml'),
+        '--project', str(Path(DEFAULT_PROJECT)),
+    ],
+    'free_piston_v56': [
+        '--config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V56.yaml'),
+        '--project', str(Path(DEFAULT_PROJECT)),
+    ],
+    'free_piston_v57': [
+        '--config', str(PROJECT_ROOT / 'Projekte' / 'variants' / 'free_piston_GenSet_V57.yaml'),
         '--project', str(Path(DEFAULT_PROJECT)),
     ],
 }
 
+
 # Nur diesen Namen umstellen, wenn du ohne echte CLI-Argumente ein anderes Setup starten willst.
-SELECTED_PRESET = 'free_piston_v47'
+SELECTED_PRESET = 'free_piston_v57'
 
 
 

@@ -1,7 +1,7 @@
 project_root: ../..
-base_config: Projekte/variants/free_piston_GenSet_V05.yaml
+base_config: Projekte/variants/free_piston_GenSet_V34.yaml
 sweep_name: Vibe_dura
-output_dir: Projekte/results/sweeps/Vibe_dura
+output_dir: Projekte/results/sweeps/Vibe_duration
 excel: false
 keep_temp_configs: false
 
@@ -11,7 +11,7 @@ csv_name_template: '{run_tag}.csv'
 excel_name_template: '{run_tag}.xlsx'
 
 parameter:
-  path: preprocessing.volumes.0.combustion.duration_hub_m
+  path: preprocessing.submodels.combustion.vibe_lambda_slot.duration_ms
   label: vibe_dur
   round_digits: 4
   #range:
@@ -19,9 +19,9 @@ parameter:
   #  step: 0.001
   #  end: 0.013
   linspace:
-    start: 0.005
-    end: 0.04
-    num: 20
+    start: 5
+    end: 30
+    num: 10
   #values:
   #  - 0.005
   #  - 0.01

@@ -15,14 +15,14 @@ figures:
     x_limit_mode: auto
     y_axes:
     - id: ax_x
-      title: Piston position [mm] (+54 = OT, -54 = UT)
+      title: Piston position [mm] (+46 = OT, -46 = UT)
       side: left
       color: '#111111'
       limit_mode: manual
-      y_min: -60.0
-      y_max: 60.0
+      y_min: -50.0
+      y_max: 50.0
     y_lines:
-    - y: 54.0
+    - y: 45.553093
       label: OT
       axis_id: ax_x
       color: '#000000'
@@ -33,7 +33,7 @@ figures:
       label_position: center
       label_bg_color: '#FFFFFF'
       label_border_color: '#000000'
-    - y: -54.0
+    - y: -45.553093
       label: UT
       axis_id: ax_x
       color: '#000000'
@@ -46,39 +46,39 @@ figures:
       label_border_color: '#000000'
     series:
     - signal_key: cylinder_1_piston_x_m
-      label: Power cylinder 1
+      label: Position cylinder 1
       axis_id: ax_x
       color: '#111111'
       line_style: --
       line_width: 1.35
       scale_factor: -1000.0
-      offset: 54.04
+      offset: 45.553093
       unit_preset: raw
     - signal_key: cylinder_2_piston_x_m
-      label: Power cylinder 2
+      label: Position cylinder 2
       axis_id: ax_x
-      color: '#111111'
+      color: '#FF0000'
       line_style: --
       line_width: 1.35
       scale_factor: -1000.0
-      offset: 54.04
+      offset: 45.553093
       unit_preset: raw
     - signal_key: compressor_1_piston_x_m
-      label: Compressor 1
+      label: Position Compressor 1
       axis_id: ax_x
-      color: '#111111'
+      color: '#B0C4DE'
       line_style: --
       line_width: 1.35
       scale_factor: -1000.0
-      offset: 54.04
+      offset: 45.553093
       unit_preset: raw
     - signal_key: compressor_2_piston_x_m
       label: Compressor 2
       axis_id: ax_x
-      color: '#111111'
+      color: '#7B68EE'
       line_style: --
       line_width: 1.35
       scale_factor: -1000.0
-      offset: 54.04
+      offset: 45.553093
       unit_preset: raw
     show_title: true

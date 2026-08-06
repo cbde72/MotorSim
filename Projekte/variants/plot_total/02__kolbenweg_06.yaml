@@ -1,0 +1,152 @@
+name: stroke vs time
+style_sheet: ../../plot_style_sheet.yaml
+#style:
+#  default_line_width: 1.6
+#  font_size: 8
+#  legend_position: upper left
+figures:
+- title: s_t
+  rows: 1
+  cols: 1
+  subplots:
+  - title: stroke vs time
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_x
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 100.0
+      title: stroke [mm] (+91.1 = UT, 0 = OT)
+      side: left
+      color: '#111111'
+      min: 0.0
+      max: 100.0
+      label_pad: 2
+      tick_label_pad: 2
+    - id: ax_area
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 50.0
+      tick_step: 10.0
+      minor_tick_step: 50
+      title: Port Area (Geo.) [cm²] 
+      side: right
+      color: '#111111'
+      min: 0.0
+      max: 50.0
+      label_pad: 2
+      tick_label_pad: 2
+    - id: ax_qzu
+      title: Heat Release [W]
+      side: right
+      color: '#111111'
+      axis_label_size: 6
+      tick_label_size: 6
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 500
+      min: -0.1
+      spine_offset: 0.08
+      label_pad: 2
+      tick_label_pad: 2
+
+    y_lines:
+    - y: 0
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      axis_id: ax_x
+      show_label: true
+      label: OT
+      color: '#000000'
+      line_style: --
+      line_width: 0.5
+      alpha: 0.95
+    - y: 91.1
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      axis_id: ax_x
+      show_label: true
+      label: UT
+      color: '#000000'
+      line_style: --
+      line_width: 0.5
+      alpha: 0.95
+    - y: 70.86
+      label_position: above
+      label_offset_pt: 1
+      axis_id: ax_x
+      show_label: true
+      label: Intake
+      color: '#0000FF'
+      line_style: dotted
+      label_font_size: 4
+      line_width: 0.5
+      alpha: 0.9
+    - y: 55.68
+      label_position: below
+      label_offset_pt: 2
+      axis_id: ax_x
+      show_label: true
+      label: Exhaust
+      label_font_size: 4
+      color: '#FF0000'
+      line_style: dotted
+      line_width: 0.5
+      alpha: 0.9
+    series:
+    #- signal_key: free_piston_x_m
+    #  label: position fp
+    #  axis_id: ax_x
+    #  color: '#111111'
+    #  line_style: --
+    #  scale_factor: 1000.0
+    #  unit_preset: raw
+    #  #offset: 0
+    #  line_width: 1.0
+    - signal_key: cylinder_1_piston_x_m
+      label: position cyl1
+      axis_id: ax_x
+      color: '#483D8B'
+      line_style: dotted
+      scale_factor: 1000.0
+      unit_preset: raw
+      #offset: 0
+      line_width: 0.8
+    - signal_key: transfer_slot_1_A_geom_m2
+      label: Intake Slot
+      axis_id: ax_area
+      color: '#0000FF'
+      scale_factor: 10000
+      unit_preset: raw
+      line_style: --
+      #offset: 0
+      line_width: 0.7
+      alpha: 0.2
+    - signal_key: exhaust_slot_1_A_geom_m2
+      label: Exhaust Slot
+      axis_id: ax_area
+      color: '#B22222'
+      scale_factor: 10000
+      unit_preset: raw
+      #offset: 0
+      line_width: 0.70
+      line_style: --
+      alpha: 0.2
+    - signal_key: cylinder_1_added_energy_W
+      label: Heat Release
+      axis_id: ax_qzu
+      color: '#111111'
+      #line_style: -.
+      line_width: 0.8
+      scale_factor: 1e-3
+      unit_preset: raw
+
+
+
+    show_title: true

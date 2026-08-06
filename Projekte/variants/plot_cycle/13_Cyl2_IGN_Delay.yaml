@@ -129,8 +129,8 @@ figures:
       color: '#111111'
       scale: log
       limit_mode: manual
-      y_min: 0.01
-      y_max: 1000.0
+      y_min: 0.0
+      y_max: 100.0
     - id: piston_distance
       title: Piston distance from TDC [mm]
       side: right
@@ -152,6 +152,21 @@ figures:
       line_style: --
       line_width: 1.0
       scale_factor: 1000.0
+    - id: 46c7ec14c878
+      signal_key: cylinder_2_combustion_active_0to1
+      label: cyl2 combustion active
+      axis_id: delay
+      visible: true
+      color: '#FF1493'
+      line_style: '-'
+      marker: ''
+      line_width: 2.0
+      marker_size: 4.5
+      unit_preset: raw
+      scale_factor: 1.0
+      offset: 0.0
+      series_type: line
+
     show_title: true
   - title: Cylinder 2 - Livengood-Wu Integral
     plot_type: line
@@ -172,6 +187,8 @@ figures:
       side: right
       color: '#111111'
       limit_mode: data
+      axis_label_size: 6
+      tick_label_size: 6
     y_lines:
     - y: 1.0
       axis_id: integral
@@ -193,6 +210,7 @@ figures:
       line_style: --
       line_width: 1.0
       scale_factor: 1000.0
+    
     show_title: true
   - title: Cylinder 2 - Thermodynamic State
     plot_type: line
@@ -239,6 +257,7 @@ figures:
         unit: mm
         digits: 2
         fixed: true
+
     y_axes:
     - id: temperature
       title: Temperature [K]

@@ -1,0 +1,98 @@
+name: Diagnose des 0D-Scavengmodells
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+figures:
+- title: Scavenging — model response
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Diagnose des 0D-Scavengmodells
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_rate
+      title: Rate [g/s]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+    - id: port_area
+      title: Port Opening Area [mm²]
+      side: right
+      color: '#111111'  
+      spine_offset: 0.08
+      label_pad: 2
+      tick_label_pad: 2
+
+    - id: ax_frac
+      title: Fraction / Eta [-]
+      side: right
+      color: '#111111'
+      limit_mode: manual
+      y_min: -0.05
+      y_max: 1.05
+      label_pad: 2
+      tick_label_pad: 2
+
+    series:
+    - signal_key: cylinder_1_scavenging_transfer_in_kg_per_s
+      label: transfer_in
+      axis_id: ax_rate
+      color: '#0000FF'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.0
+    - signal_key: cylinder_1_scavenging_exhaust_out_kg_per_s
+      label: exhaust_out
+      axis_id: ax_rate
+      color: '#FF0000'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.0
+    - signal_key: cylinder_1_scavenging_burned_correction_kg_per_s
+      label: burned_correction
+      axis_id: ax_rate
+      color: '#FFD700'
+      line_style: '-'
+      scale_factor: 1000.0
+      unit_preset: raw
+      line_width: 1.0
+    - signal_key: cylinder_1_scavenging_short_circuit_fraction
+      label: short_circuit
+      axis_id: ax_frac
+      color: '#8B0000'
+      line_style: ':'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.0
+    - signal_key: cylinder_1_scavenging_efficiency_0to1
+      label: eta_scav
+      axis_id: ax_frac
+      color: '#FF4500'
+      line_style: '--'
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.0
+    - signal_key: transfer_slot_1_A_geom_m2
+      label: Inlet Port Opening Area
+      axis_id: port_area
+      color: '#B22222'
+      line_style: '--'
+      line_width: 1.0
+      scale_factor: 1.0e6
+      unit_preset: raw
+    - signal_key: exhaust_slot_1_A_geom_m2
+      label: Exhaust Port Opening Area
+      axis_id: port_area
+      color: '#667085'
+      line_style: '--'
+      line_width: 1.0
+      scale_factor: 1.0e6
+      unit_preset: raw  
+      
+    show_title: true

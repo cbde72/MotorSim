@@ -10,6 +10,7 @@ from thermo0d.physics.flow import de_st_venant_wantzel_signed
 from thermo0d.physics.kinematics import cylinder_kinematic_state_from_time
 from thermo0d.model.free_piston.forces import compute_load_info
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_distance_from_tdc, cylinder_dvdt_from_velocity, cylinder_volume_from_position, free_piston_equivalent_linear_kinematics, free_piston_is_compression_stroke, free_piston_local_cycle_angle_deg, free_piston_local_cycle_angle_rate_deg_s, free_piston_reference_is_active
+from thermo0d.model.free_piston.generator_map import lookup_generator_torque_map
 from thermo0d.model.free_piston.thermo import pressure_from_state, temperature_from_state
 try:
     from thermo0d.model.free_piston.combustion_latch import evaluate_free_piston_hcci_ignition_sample, free_piston_combustion_enabled, free_piston_cylinder_uses_latched_fuel, free_piston_uses_slot_closure_lambda, free_piston_uses_vapor_injector, replay_free_piston_combustion_latch_series, replay_free_piston_cool_flame_series, replay_free_piston_time_combustion_series
@@ -724,7 +725,23 @@ class SignalReconstructionService:
                         else:
                             friction_force = -(fp.friction_fc_N * np.copysign(1.0, piston_v) + fp.friction_cv_Ns_per_m * piston_v)
                         assist_threshold, assist_force = _free_piston_assist_params_for_time(fp, float(tk), assist_shutdown_time_s)
-                        load_info = compute_load_info(
+                        map_value = None
+                        if str(fp.load_model) == 'generator_torque_map':
+                            map_value = lookup_generator_torque_map(fp.generator_torque_map, piston_q, piston_q_dot, fp.rotary_angle_min_rad, fp.rotary_angle_max_rad)
+                            radius = max(float(fp.rotary_effective_radius_m), 1.0e-18)
+                            safety_info = compute_load_info('generator_controlled', fp.load_damping_Ns_per_m, piston_v, x_m=piston_x, x_min_m=fp.x_min_m, x_max_m=fp.x_max_m, max_damping_Ns_per_m=fp.load_max_damping_Ns_per_m, control_zone_m=fp.load_control_zone_m)
+                            safety_force = -float(safety_info.force_signed_N)
+                            load_force = float(map_value.torque_Nm) / radius + safety_force
+                            generator_mechanical_power = float(max(-map_value.torque_Nm * piston_q_dot, 0.0) + safety_info.mechanical_power_W)
+                            generator_electrical_power = float(map_value.electrical_power_W)
+                            generator_damping = generator_mechanical_power / max(piston_v * piston_v, 1.0e-18)
+                            generator_force_base = 0.0
+                            generator_force_power = abs(load_force)
+                            generator_force_stop = abs(safety_force)
+                            generator_distance_to_stop = float('nan')
+                            generator_midstroke_weight = 0.0
+                        else:
+                            load_info = compute_load_info(
                             fp.load_model,
                             fp.load_damping_Ns_per_m,
                             piston_v,
@@ -742,10 +759,17 @@ class SignalReconstructionService:
                             hard_margin_m=fp.load_hard_margin_m,
                             stop_kp=fp.load_stop_kp,
                             moving_mass_kg=fp.moving_mass_kg,
-                            max_force_N=fp.load_max_force_N,
-                        )
-                        load_force_signed = float(load_info.force_signed_N)
-                        load_force = -load_force_signed
+                                max_force_N=fp.load_max_force_N,
+                            )
+                            load_force = -float(load_info.force_signed_N)
+                            generator_mechanical_power = float(load_info.mechanical_power_W)
+                            generator_electrical_power = float(load_info.electrical_power_W)
+                            generator_damping = float(load_info.effective_damping_Ns_per_m)
+                            generator_force_base = float(load_info.base_force_N)
+                            generator_force_power = float(load_info.power_force_N)
+                            generator_force_stop = float(load_info.stop_force_N)
+                            generator_distance_to_stop = float(load_info.distance_to_stop_m)
+                            generator_midstroke_weight = float(load_info.midstroke_weight_0to1)
                         force_net = force_gas + force_bounce + friction_force + load_force
                         if str(getattr(fp, 'kinematics_type', 'linear') or 'linear') == 'oscillating_rotary':
                             radius = max(float(getattr(fp, 'rotary_effective_radius_m', 1.0) or 1.0), 1.0e-18)
@@ -766,17 +790,23 @@ class SignalReconstructionService:
                         cls._ensure_float_column(columns, 'free_piston_F_friction_N', n_samples)[k] = friction_force
                         cls._ensure_float_column(columns, 'free_piston_F_load_N', n_samples)[k] = load_force
                         cls._ensure_float_column(columns, 'free_piston_F_net_N', n_samples)[k] = force_net
-                        cls._ensure_float_column(columns, 'free_piston_generator_power_W', n_samples)[k] = float(load_info.mechanical_power_W)
-                        cls._ensure_float_column(columns, 'free_piston_generator_electrical_power_W', n_samples)[k] = float(load_info.electrical_power_W)
-                        cls._ensure_float_column(columns, 'free_piston_generator_damping_eff_Ns_per_m', n_samples)[k] = float(load_info.effective_damping_Ns_per_m)
-                        cls._ensure_float_column(columns, 'free_piston_generator_force_base_N', n_samples)[k] = float(load_info.base_force_N)
-                        cls._ensure_float_column(columns, 'free_piston_generator_force_power_N', n_samples)[k] = float(load_info.power_force_N)
-                        assist_force_output_N = float(load_info.power_force_N) if str(getattr(fp, 'load_model', '') or '').strip().lower() == 'generator_controlled' and assist_force > 0.0 else 0.0
+                        cls._ensure_float_column(columns, 'free_piston_generator_power_W', n_samples)[k] = generator_mechanical_power
+                        cls._ensure_float_column(columns, 'free_piston_generator_electrical_power_W', n_samples)[k] = generator_electrical_power
+                        cls._ensure_float_column(columns, 'free_piston_generator_damping_eff_Ns_per_m', n_samples)[k] = generator_damping
+                        cls._ensure_float_column(columns, 'free_piston_generator_force_base_N', n_samples)[k] = generator_force_base
+                        cls._ensure_float_column(columns, 'free_piston_generator_force_power_N', n_samples)[k] = generator_force_power
+                        assist_force_output_N = generator_force_power if str(getattr(fp, 'load_model', '') or '').strip().lower() == 'generator_controlled' and assist_force > 0.0 else 0.0
                         cls._ensure_float_column(columns, 'free_piston_generator_assist_force_N', n_samples)[k] = assist_force_output_N
                         cls._ensure_float_column(columns, 'free_piston_generator_assist_torque_Nm', n_samples)[k] = assist_force_output_N * float(getattr(fp, 'rotary_effective_radius_m', 0.0) or 0.0)
-                        cls._ensure_float_column(columns, 'free_piston_generator_force_stop_N', n_samples)[k] = float(load_info.stop_force_N)
-                        cls._ensure_float_column(columns, 'free_piston_generator_distance_to_stop_m', n_samples)[k] = float(load_info.distance_to_stop_m)
-                        cls._ensure_float_column(columns, 'free_piston_generator_midstroke_weight', n_samples)[k] = float(load_info.midstroke_weight_0to1)
+                        cls._ensure_float_column(columns, 'free_piston_generator_force_stop_N', n_samples)[k] = generator_force_stop
+                        cls._ensure_float_column(columns, 'free_piston_generator_distance_to_stop_m', n_samples)[k] = generator_distance_to_stop
+                        cls._ensure_float_column(columns, 'free_piston_generator_midstroke_weight', n_samples)[k] = generator_midstroke_weight
+                        cls._ensure_float_column(columns, 'free_piston_generator_map_angle_deg', n_samples)[k] = float(map_value.angle_deg) if map_value is not None else float('nan')
+                        cls._ensure_float_column(columns, 'free_piston_generator_map_torque_Nm', n_samples)[k] = float(map_value.torque_Nm) if map_value is not None else 0.0
+                        cls._ensure_float_column(columns, 'free_piston_generator_map_no_load_torque_Nm', n_samples)[k] = float(map_value.no_load_torque_Nm) if map_value is not None else 0.0
+                        cls._ensure_float_column(columns, 'free_piston_generator_map_load_torque_Nm', n_samples)[k] = float(map_value.load_torque_Nm) if map_value is not None else 0.0
+                        cls._ensure_float_column(columns, 'free_piston_generator_map_voltage_V', n_samples)[k] = float(map_value.voltage_V) if map_value is not None else 0.0
+                        cls._ensure_float_column(columns, 'free_piston_generator_map_out_of_range_0to1', n_samples)[k] = float(map_value.out_of_range) if map_value is not None else 0.0
                     else:
                         volume, dvdt, theta_deg, piston_x, dtheta_dt, cycle_deg = cylinder_kinematic_state_from_time(kin_matrix[kin_idx], float(tk))
                         theta_deg = cls._normalize_cycle_endpoint_theta(theta_deg, float(tk), float(dtheta_dt), float(cycle_deg))
@@ -941,27 +971,51 @@ class SignalReconstructionService:
                 else:
                     friction_force = -(fp.friction_fc_N * np.copysign(1.0, piston_v) + fp.friction_cv_Ns_per_m * piston_v)
                 assist_threshold, assist_force = _free_piston_assist_params_for_time(fp, float(tk), assist_shutdown_time_s)
-                load_info = compute_load_info(
-                    fp.load_model,
-                    fp.load_damping_Ns_per_m,
-                    piston_v,
-                    x_m=piston_x,
-                    x_min_m=fp.x_min_m,
-                    x_max_m=fp.x_max_m,
-                    max_damping_Ns_per_m=fp.load_max_damping_Ns_per_m,
-                    control_zone_m=fp.load_control_zone_m,
-                    power_target_W=fp.load_power_target_W,
-                    efficiency_0to1=fp.load_efficiency_0to1,
-                    min_velocity_m_per_s=fp.load_min_velocity_m_per_s,
-                    assist_velocity_threshold_m_per_s=assist_threshold,
-                    assist_force_N=assist_force,
-                    target_margin_m=fp.load_target_margin_m,
-                    hard_margin_m=fp.load_hard_margin_m,
-                    stop_kp=fp.load_stop_kp,
-                    moving_mass_kg=fp.moving_mass_kg,
-                    max_force_N=fp.load_max_force_N,
-                )
-                load_force = -float(load_info.force_signed_N)
+                map_value = None
+                if str(fp.load_model) == 'generator_torque_map':
+                    map_value = lookup_generator_torque_map(fp.generator_torque_map, piston_q, piston_q_dot, fp.rotary_angle_min_rad, fp.rotary_angle_max_rad)
+                    radius = max(float(fp.rotary_effective_radius_m), 1.0e-18)
+                    safety_info = compute_load_info('generator_controlled', fp.load_damping_Ns_per_m, piston_v, x_m=piston_x, x_min_m=fp.x_min_m, x_max_m=fp.x_max_m, max_damping_Ns_per_m=fp.load_max_damping_Ns_per_m, control_zone_m=fp.load_control_zone_m)
+                    safety_force = -float(safety_info.force_signed_N)
+                    load_force = float(map_value.torque_Nm) / radius + safety_force
+                    generator_mechanical_power = float(max(-map_value.torque_Nm * piston_q_dot, 0.0) + safety_info.mechanical_power_W)
+                    generator_electrical_power = float(map_value.electrical_power_W)
+                    generator_damping = generator_mechanical_power / max(piston_v * piston_v, 1.0e-18)
+                    generator_force_base = 0.0
+                    generator_force_power = abs(load_force)
+                    generator_force_stop = abs(safety_force)
+                    generator_distance_to_stop = float('nan')
+                    generator_midstroke_weight = 0.0
+                else:
+                    load_info = compute_load_info(
+                        fp.load_model,
+                        fp.load_damping_Ns_per_m,
+                        piston_v,
+                        x_m=piston_x,
+                        x_min_m=fp.x_min_m,
+                        x_max_m=fp.x_max_m,
+                        max_damping_Ns_per_m=fp.load_max_damping_Ns_per_m,
+                        control_zone_m=fp.load_control_zone_m,
+                        power_target_W=fp.load_power_target_W,
+                        efficiency_0to1=fp.load_efficiency_0to1,
+                        min_velocity_m_per_s=fp.load_min_velocity_m_per_s,
+                        assist_velocity_threshold_m_per_s=assist_threshold,
+                        assist_force_N=assist_force,
+                        target_margin_m=fp.load_target_margin_m,
+                        hard_margin_m=fp.load_hard_margin_m,
+                        stop_kp=fp.load_stop_kp,
+                        moving_mass_kg=fp.moving_mass_kg,
+                        max_force_N=fp.load_max_force_N,
+                    )
+                    load_force = -float(load_info.force_signed_N)
+                    generator_mechanical_power = float(load_info.mechanical_power_W)
+                    generator_electrical_power = float(load_info.electrical_power_W)
+                    generator_damping = float(load_info.effective_damping_Ns_per_m)
+                    generator_force_base = float(load_info.base_force_N)
+                    generator_force_power = float(load_info.power_force_N)
+                    generator_force_stop = float(load_info.stop_force_N)
+                    generator_distance_to_stop = float(load_info.distance_to_stop_m)
+                    generator_midstroke_weight = float(load_info.midstroke_weight_0to1)
                 force_net = force_gas + force_bounce + friction_force + load_force
                 if str(getattr(fp, 'kinematics_type', 'linear') or 'linear') == 'oscillating_rotary':
                     radius = max(float(getattr(fp, 'rotary_effective_radius_m', 1.0) or 1.0), 1.0e-18)
@@ -983,17 +1037,23 @@ class SignalReconstructionService:
                 cls._ensure_float_column(columns, 'free_piston_F_friction_N', n_samples)[k] = friction_force
                 cls._ensure_float_column(columns, 'free_piston_F_load_N', n_samples)[k] = load_force
                 cls._ensure_float_column(columns, 'free_piston_F_net_N', n_samples)[k] = force_net
-                cls._ensure_float_column(columns, 'free_piston_generator_power_W', n_samples)[k] = float(load_info.mechanical_power_W)
-                cls._ensure_float_column(columns, 'free_piston_generator_electrical_power_W', n_samples)[k] = float(load_info.electrical_power_W)
-                cls._ensure_float_column(columns, 'free_piston_generator_damping_eff_Ns_per_m', n_samples)[k] = float(load_info.effective_damping_Ns_per_m)
-                cls._ensure_float_column(columns, 'free_piston_generator_force_base_N', n_samples)[k] = float(load_info.base_force_N)
-                cls._ensure_float_column(columns, 'free_piston_generator_force_power_N', n_samples)[k] = float(load_info.power_force_N)
-                assist_force_output_N = float(load_info.power_force_N) if str(getattr(fp, 'load_model', '') or '').strip().lower() == 'generator_controlled' and assist_force > 0.0 else 0.0
+                cls._ensure_float_column(columns, 'free_piston_generator_power_W', n_samples)[k] = generator_mechanical_power
+                cls._ensure_float_column(columns, 'free_piston_generator_electrical_power_W', n_samples)[k] = generator_electrical_power
+                cls._ensure_float_column(columns, 'free_piston_generator_damping_eff_Ns_per_m', n_samples)[k] = generator_damping
+                cls._ensure_float_column(columns, 'free_piston_generator_force_base_N', n_samples)[k] = generator_force_base
+                cls._ensure_float_column(columns, 'free_piston_generator_force_power_N', n_samples)[k] = generator_force_power
+                assist_force_output_N = generator_force_power if str(getattr(fp, 'load_model', '') or '').strip().lower() == 'generator_controlled' and assist_force > 0.0 else 0.0
                 cls._ensure_float_column(columns, 'free_piston_generator_assist_force_N', n_samples)[k] = assist_force_output_N
                 cls._ensure_float_column(columns, 'free_piston_generator_assist_torque_Nm', n_samples)[k] = assist_force_output_N * float(getattr(fp, 'rotary_effective_radius_m', 0.0) or 0.0)
-                cls._ensure_float_column(columns, 'free_piston_generator_force_stop_N', n_samples)[k] = float(load_info.stop_force_N)
-                cls._ensure_float_column(columns, 'free_piston_generator_distance_to_stop_m', n_samples)[k] = float(load_info.distance_to_stop_m)
-                cls._ensure_float_column(columns, 'free_piston_generator_midstroke_weight', n_samples)[k] = float(load_info.midstroke_weight_0to1)
+                cls._ensure_float_column(columns, 'free_piston_generator_force_stop_N', n_samples)[k] = generator_force_stop
+                cls._ensure_float_column(columns, 'free_piston_generator_distance_to_stop_m', n_samples)[k] = generator_distance_to_stop
+                cls._ensure_float_column(columns, 'free_piston_generator_midstroke_weight', n_samples)[k] = generator_midstroke_weight
+                cls._ensure_float_column(columns, 'free_piston_generator_map_angle_deg', n_samples)[k] = float(map_value.angle_deg) if map_value is not None else float('nan')
+                cls._ensure_float_column(columns, 'free_piston_generator_map_torque_Nm', n_samples)[k] = float(map_value.torque_Nm) if map_value is not None else 0.0
+                cls._ensure_float_column(columns, 'free_piston_generator_map_no_load_torque_Nm', n_samples)[k] = float(map_value.no_load_torque_Nm) if map_value is not None else 0.0
+                cls._ensure_float_column(columns, 'free_piston_generator_map_load_torque_Nm', n_samples)[k] = float(map_value.load_torque_Nm) if map_value is not None else 0.0
+                cls._ensure_float_column(columns, 'free_piston_generator_map_voltage_V', n_samples)[k] = float(map_value.voltage_V) if map_value is not None else 0.0
+                cls._ensure_float_column(columns, 'free_piston_generator_map_out_of_range_0to1', n_samples)[k] = float(map_value.out_of_range) if map_value is not None else 0.0
 
             for j in range(n_conn):
                 conn = conn_matrix[j]

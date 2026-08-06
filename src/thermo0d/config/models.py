@@ -1407,8 +1407,34 @@ class FreePistonFrictionConfig(StrictBaseModel):
         return self
 
 
+class GeneratorTorqueMapConfig(StrictBaseModel):
+    file: StrictStr
+    load_resistance_ohm: StrictFloat
+    angle_at_x_min_deg: StrictFloat = 9.0
+    angle_at_x_max_deg: StrictFloat = -9.0
+    include_no_load_torque: StrictBool = True
+    angle_out_of_range: Literal["clamp", "error"] = "clamp"
+    resistance_out_of_range: Literal["clamp", "error"] = "error"
+    max_abs_torque_Nm: StrictFloat | None = None
+    max_electrical_power_W: StrictFloat | None = None
+
+    @model_validator(mode="after")
+    def validate_values(self) -> "GeneratorTorqueMapConfig":
+        if not self.file.strip():
+            raise ValueError("generator torque-map file must not be empty")
+        if self.load_resistance_ohm <= 0.0:
+            raise ValueError("load_resistance_ohm must be > 0")
+        if self.angle_at_x_min_deg == self.angle_at_x_max_deg:
+            raise ValueError("angle_at_x_min_deg and angle_at_x_max_deg must differ")
+        if self.max_abs_torque_Nm is not None and self.max_abs_torque_Nm <= 0.0:
+            raise ValueError("max_abs_torque_Nm must be > 0")
+        if self.max_electrical_power_W is not None and self.max_electrical_power_W <= 0.0:
+            raise ValueError("max_electrical_power_W must be > 0")
+        return self
+
+
 class FreePistonLoadConfig(StrictBaseModel):
-    model: Literal["none", "viscous", "electromagnetic_linear", "generator_controlled", "linear_generator_regulated"]
+    model: Literal["none", "viscous", "electromagnetic_linear", "generator_controlled", "linear_generator_regulated", "generator_torque_map"]
     damping_Ns_per_m: StrictFloat
     max_damping_Ns_per_m: StrictFloat | None = None
     control_zone_m: StrictFloat | None = None
@@ -1423,6 +1449,7 @@ class FreePistonLoadConfig(StrictBaseModel):
     hard_margin_m: StrictFloat | None = None
     stop_kp: StrictFloat | None = None
     max_force_N: StrictFloat | None = None
+    torque_map: GeneratorTorqueMapConfig | None = None
 
     @model_validator(mode="after")
     def validate_values(self) -> "FreePistonLoadConfig":
@@ -1485,6 +1512,8 @@ class FreePistonLoadConfig(StrictBaseModel):
                 raise ValueError("control_zone_m must be > target_margin_m")
             if self.stop_kp is None or self.stop_kp <= 0.0:
                 raise ValueError("linear_generator_regulated requires stop_kp > 0")
+        if self.model == "generator_torque_map" and self.torque_map is None:
+            raise ValueError("generator_torque_map requires torque_map")
         return self
 
 

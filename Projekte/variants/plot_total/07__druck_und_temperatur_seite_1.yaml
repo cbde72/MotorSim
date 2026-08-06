@@ -1,0 +1,139 @@
+name: Pressure and temperature side 1
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.1
+figures:
+- title: pressure_and_temperature_side_1
+  rows: 2
+  cols: 1
+  subplots:
+  - title: Pressure side 1
+    show_title: true
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    y_axes:
+    - id: ax_pressure
+      title: Pressure [bar]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+      axis_label_size: 8
+      tick_label_size: 7
+    series:
+    - signal_key: ambient_in_p_Pa
+      label: Ambient
+      axis_id: ax_pressure
+      color: '#667085'
+      line_style: ':'
+      line_width: 0.9
+      scale_factor: 1.0e-05
+      unit_preset: raw
+    - signal_key: intake_plenum_p_Pa
+      label: Intake plenum
+      axis_id: ax_pressure
+      color: '#06AED5'
+      line_style: '-'
+      line_width: 1.1
+      scale_factor: 1.0e-05
+      unit_preset: raw
+    - signal_key: compressor_1_p_Pa
+      label: Compressor 1
+      axis_id: ax_pressure
+      color: '#7F56D9'
+      line_style: '-'
+      line_width: 1.1
+      scale_factor: 1.0e-05
+      unit_preset: raw
+    - signal_key: receiver_1_p_Pa
+      label: Receiver 1
+      axis_id: ax_pressure
+      color: '#175CD3'
+      line_style: '-'
+      line_width: 1.1
+      scale_factor: 1.0e-05
+      unit_preset: raw
+    - signal_key: cylinder_1_p_Pa
+      label: Cylinder 1
+      axis_id: ax_pressure
+      color: '#D92D20'
+      line_style: '-'
+      line_width: 1.2
+      scale_factor: 1.0e-05
+      unit_preset: raw
+    - signal_key: exhaust_plenum_1_p_Pa
+      label: Exhaust plenum 1
+      axis_id: ax_pressure
+      color: '#F79009'
+      line_style: '-'
+      line_width: 1.1
+      scale_factor: 1.0e-05
+      unit_preset: raw
+  - title: Temperature side 1
+    show_title: true
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    x_start_at_zero: true
+    y_axes:
+    - id: ax_temperature
+      title: Temperature [K]
+      side: left
+      color: '#111111'
+      limit_mode: auto
+      axis_label_size: 8
+      tick_label_size: 7
+    series:
+    - signal_key: ambient_in_T_K
+      label: Ambient
+      axis_id: ax_temperature
+      color: '#667085'
+      line_style: ':'
+      line_width: 0.9
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: intake_plenum_T_K
+      label: Intake plenum
+      axis_id: ax_temperature
+      color: '#06AED5'
+      line_style: '-'
+      line_width: 1.1
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: compressor_1_T_K
+      label: Compressor 1
+      axis_id: ax_temperature
+      color: '#7F56D9'
+      line_style: '-'
+      line_width: 1.1
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: receiver_1_T_K
+      label: Receiver 1
+      axis_id: ax_temperature
+      color: '#175CD3'
+      line_style: '-'
+      line_width: 1.1
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: cylinder_1_T_K
+      label: Cylinder 1
+      axis_id: ax_temperature
+      color: '#D92D20'
+      line_style: '-'
+      line_width: 1.2
+      scale_factor: 1.0
+      unit_preset: raw
+    - signal_key: exhaust_plenum_1_T_K
+      label: Exhaust plenum 1
+      axis_id: ax_temperature
+      color: '#F79009'
+      line_style: '-'
+      line_width: 1.1
+      scale_factor: 1.0
+      unit_preset: raw

@@ -24,6 +24,7 @@ from thermo0d.input.builder_common import (
     split_dynamic_volumes_and_boundaries,
 )
 from thermo0d.model.free_piston.geometry import bounce_volume_from_position, cylinder_volume_from_position, free_piston_generalized_initial_state
+from thermo0d.model.free_piston.generator_map import load_generator_torque_map
 from thermo0d.physics.quellen_props import reduced_mixture_properties_from_temperature_quellen
 from thermo0d.physics.beck import beck_cool_flame_fuel_parameters
 from thermo0d.model.free_piston.state_layout import build_free_piston_state_layout
@@ -1239,6 +1240,10 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         if int(conn_matrix[i, ConnCol.TYPE]) == int(ConnectionType.SLOT)
         and (int(conn_matrix[i, ConnCol.FROM_VOL]) in cylinder_index_set or int(conn_matrix[i, ConnCol.TO_VOL]) in cylinder_index_set)
     ], dtype=np.int64)
+    generator_torque_map = None
+    if str(fp.load.model) == 'generator_torque_map':
+        generator_torque_map = load_generator_torque_map(fp.load.torque_map, builder.config_path)
+
     meta = FreePistonModelData(
         x0_m=float(fp.initial_conditions.x0_m),
         v0_m_per_s=float(fp.initial_conditions.v0_m_per_s),
@@ -1278,6 +1283,7 @@ def build_free_piston_bundle(builder) -> ModelBundle:
         load_hard_margin_m=float(fp.load.hard_margin_m if getattr(fp.load, 'hard_margin_m', None) is not None else 0.0),
         load_stop_kp=float(fp.load.stop_kp if getattr(fp.load, 'stop_kp', None) is not None else 1.0),
         load_max_force_N=float(fp.load.max_force_N if getattr(fp.load, 'max_force_N', None) is not None else float('inf')),
+        generator_torque_map=generator_torque_map,
         scavenging_enabled=bool(getattr(fp.scavenging, 'enabled', False)),
         scavenging_model=str(getattr(fp.scavenging, 'model', 'overlap_short_circuit_0d')),
         scavenging_factor=float(getattr(fp.scavenging, 'scavenging_factor', 1.25)),

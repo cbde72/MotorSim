@@ -1,0 +1,114 @@
+name: stroke vs time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.6
+  legend_position: upper left
+figures:
+- title: s_t
+  rows: 1
+  cols: 1
+  subplots:
+  - title: stroke vs time
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_x
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 100.0
+      title: stroke [mm] (+91.1 = UT, 0 = OT)
+      side: left
+      color: '#111111'
+      min: 0.0
+      max: 100.0
+    - id: ax_p
+      limit_mode: manual
+      y_min: 0.0
+      y_max: 300.0
+      title: Pressure [Pa] 
+      side: right
+      color: '#111111'
+      min: 0.0
+      max: 300.0
+    y_lines:
+    - y: 0
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      axis_id: ax_x
+      show_label: true
+      label: OT
+      color: '#000000'
+      line_style: --
+      line_width: 0.5
+      alpha: 0.95
+    - y: 91.1
+      label_position: center
+      label_bg_color: '#FFFFFF'
+      label_border_color: '#000000'
+      axis_id: ax_x
+      show_label: true
+      label: UT
+      color: '#000000'
+      line_style: --
+      line_width: 0.5
+      alpha: 0.95
+    - y: 70.86
+      label_position: above
+      label_offset_pt: 1
+      axis_id: ax_x
+      show_label: true
+      label: Intake
+      color: '#0000FF'
+      line_style: dotted
+      label_font_size: 4
+      line_width: 0.5
+      alpha: 0.9
+    - y: 55.68
+      label_position: below
+      label_offset_pt: 2
+      axis_id: ax_x
+      show_label: true
+      label: Exhaust
+      label_font_size: 4
+      color: '#191970'
+      line_style: dotted
+      line_width: 0.5
+      alpha: 0.9
+    series:
+    #- signal_key: free_piston_x_m
+    #  label: position fp
+    #  axis_id: ax_x
+    #  color: '#111111'
+    #  line_style: --
+    #  scale_factor: 1000.0
+    #  unit_preset: raw
+    #  #offset: 0
+    #  line_width: 1.0
+    - signal_key: cylinder_1_piston_x_m
+      label: position cyl1
+      axis_id: ax_x
+      color: '#483D8B'
+      line_style: dotted
+      scale_factor: 1000.0
+      unit_preset: raw
+      #offset: 0
+      line_width: 0.8
+    - signal_key: cylinder_1_p_Pa
+      label: pressure
+      axis_id: ax_p
+      color: '#191970'
+      scale_factor: 1.0e-05
+      unit_preset: raw
+      #offset: 0
+      line_width: 0.8
+
+
+
+
+
+
+    show_title: true

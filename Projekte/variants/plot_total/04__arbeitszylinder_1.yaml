@@ -1,7 +1,7 @@
 name: Power cylinder 1
 style_sheet: ../../plot_style_sheet.yaml
 style:
-  default_line_width: 1.6
+  default_line_width: 1.0
 figures:
 - title: pV
   rows: 1
@@ -25,7 +25,7 @@ figures:
       axis_id: ax_p_1
       color: '#66B3FF'
       line_style: '-'
-      line_width: 1.8
+      line_width: 1.0
       scale_factor: 1.0e-05
       unit_preset: raw
     show_title: true

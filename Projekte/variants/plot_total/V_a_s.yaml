@@ -1,0 +1,70 @@
+name: Velocity, acceleration and piston position over time
+style_sheet: ../../plot_style_sheet.yaml
+style:
+  default_line_width: 1.0
+figures:
+- title: V-a-s
+  rows: 1
+  cols: 1
+  subplots:
+  - title: Velocity, acceleration and piston position over time
+    plot_type: line
+    x_signal: t_s
+    x_title: Time [s]
+    x_unit_preset: raw
+    x_limit_mode: auto
+    y_axes:
+    - id: ax_vel
+      title: Velocity [m/s]
+      side: left
+      color: '#000000'
+      limit_mode: manual
+      y_min: -10.0
+      y_max: 10.0
+    - id: ax_acc
+      title: Acceleration [m/s²]
+      side: right
+      color: '#000000'
+      limit_mode: manual
+      y_min: -3000.0
+      y_max: 3000.0
+      label_pad: 2
+      tick_label_pad: 2
+    - id: ax_x3
+      title: Piston position [mm] (+45.6 = OT, -45.6 = UT)
+      side: right
+      color: '#000000'
+      limit_mode: manual
+      y_min: -60.0
+      y_max: 60.0
+      spine_offset: 0.1
+      label_pad: 2
+      tick_label_pad: 2
+      
+    series:
+    - signal_key: free_piston_v_m_per_s
+      label: Velocity
+      axis_id: ax_vel
+      color: '#00FF7F'
+      line_style: --
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.0
+    - signal_key: free_piston_a_m_per_s2
+      label: Acceleration
+      axis_id: ax_acc
+      color: '#A52A2A'
+      line_style: --
+      scale_factor: 1.0
+      unit_preset: raw
+      line_width: 1.0
+    - signal_key: free_piston_x_m
+      label: Piston position
+      axis_id: ax_x3
+      color: '#000000'
+      line_style: --
+      scale_factor: -1000.0
+      unit_preset: raw
+      offset: 45.6
+      line_width: 1.0
+    show_title: true

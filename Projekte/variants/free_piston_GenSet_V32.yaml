@@ -385,10 +385,10 @@ preprocessing:
     combustion:
       ref: vibe_lambda_slot
       model: vibe
-      start_mode: hign_position
+      start_mode: compression_hub
       duration_mode: time
-      hign_mm: 15.0
       duration_ms: 6.0
+      hign_mm: 15.0
       a: 6.9
       m: 2.0
       energy_coupling: none
