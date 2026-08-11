@@ -1410,6 +1410,7 @@ class FreePistonFrictionConfig(StrictBaseModel):
 class GeneratorTorqueMapConfig(StrictBaseModel):
     file: StrictStr
     load_resistance_ohm: StrictFloat
+    skalierung_faktor: StrictFloat = 1.0
     angle_at_x_min_deg: StrictFloat = 9.0
     angle_at_x_max_deg: StrictFloat = -9.0
     include_no_load_torque: StrictBool = True
@@ -1424,6 +1425,8 @@ class GeneratorTorqueMapConfig(StrictBaseModel):
             raise ValueError("generator torque-map file must not be empty")
         if self.load_resistance_ohm <= 0.0:
             raise ValueError("load_resistance_ohm must be > 0")
+        if self.skalierung_faktor <= 0.0:
+            raise ValueError("skalierung_faktor must be > 0")
         if self.angle_at_x_min_deg == self.angle_at_x_max_deg:
             raise ValueError("angle_at_x_min_deg and angle_at_x_max_deg must differ")
         if self.max_abs_torque_Nm is not None and self.max_abs_torque_Nm <= 0.0:

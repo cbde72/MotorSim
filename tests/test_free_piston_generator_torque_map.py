@@ -50,6 +50,7 @@ def _map_config(filename: str) -> SimpleNamespace:
     return SimpleNamespace(
         file=filename,
         load_resistance_ohm=1.0,
+        skalierung_faktor=1.0,
         angle_at_x_min_deg=9.0,
         angle_at_x_max_deg=-9.0,
         include_no_load_torque=True,
@@ -80,3 +81,18 @@ def test_generator_map_cache_is_reused_until_excel_content_changes(monkeypatch) 
     assert cache.stat().st_mtime_ns == first_timestamp
     np.testing.assert_allclose(first.resistances_ohm, second.resistances_ohm)
     assert _read_cache(cache, "changed-excel-content-hash") is None
+
+
+def test_generator_map_scaling_creates_separate_npz_and_scales_torque_and_power() -> None:
+    source = Path("Projekte/A16-002-28c_TorqueToWork_Spa_V01.xlsx").resolve()
+    run_config = Path("Projekte/variants/free_piston_GenSet_V57.yaml").resolve()
+    base = load_generator_torque_map(_map_config(str(source)), run_config)
+    scaled_config = _map_config(str(source))
+    scaled_config.skalierung_faktor = 0.5
+    scaled = load_generator_torque_map(scaled_config, run_config)
+
+    assert generator_map_cache_path(source, 0.5).exists()
+    assert generator_map_cache_path(source, 0.5) != generator_map_cache_path(source, 1.0)
+    np.testing.assert_allclose(scaled.operating_points[0].increasing.torque_Nm, base.operating_points[0].increasing.torque_Nm * 0.5)
+    np.testing.assert_allclose(scaled.operating_points[0].increasing.electrical_power_W, base.operating_points[0].increasing.electrical_power_W * 0.5)
+    np.testing.assert_allclose(scaled.operating_points[0].increasing.voltage_V, base.operating_points[0].increasing.voltage_V)

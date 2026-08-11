@@ -1,15 +1,14 @@
-name: Power cylinder 2
+name: Power cylinder 1
 style_sheet: ../../plot_style_sheet.yaml
 style:
   default_line_width: 1.6
-  axis_label_size: 11.0
-  tick_label_size: 9.0
+  legend_position: upper right
 figures:
 - title: energy
   rows: 1
   cols: 1
   subplots:
-  - title: Power cylinder 2
+  - title: Cylinder 2
     show_title: true
     plot_type: line
     x_signal: last_cycle_time_s
@@ -26,7 +25,7 @@ figures:
       y: 0.98
       ha: left
       va: top
-      font_size: 8.0
+      font_size: 4.0
       facecolor: '#ffffff'
       edgecolor: '#111111'
       alpha: 0.90
@@ -56,101 +55,97 @@ figures:
         digits: 5
         fixed: true
     y_axes:
-    - id: ax_x_2
-      title: Piston position [mm] (+54 = OT, -54 = UT)
+    - id: ax_x_1
+      title: Piston position [mm] (+45.6 = TDC, -45.6 = BDC)
       side: left
       color: '#111111'
       limit_mode: manual
-      y_min: -60.0
-      y_max: 60.0
-      min: -60.0
-      max: 60.0
-      axis_label_size: 8
+      y_min: -50.0
+      y_max: 50.0
+      tick_step: 10.0
+      minor_tick_step: 2.0
+      axis_label_size: 6
       tick_label_size: 6
-    - id: ax_a_open_2
+    - id: ax_a_open_1
       title: Opening area [mm²]
       side: right
       color: '#111111'
-      axis_label_size: 8
+      axis_label_size: 6
       tick_label_size: 6
-    - id: ax_mdot_2
-      title: Signed mass flow [kg/s] (+ from -> to, - to -> from)
+      label_pad: 2
+      tick_label_pad: 2
+
+    - id: ax_mdot_1
+      title: Mass flow [kg/s]
       side: right
       color: '#111111'
-      limit_mode: manual
-      y_min: -0.03
-      y_max: 0.30
-      tick_step: 0.05
-      minor_tick_step: 0.01
-      axis_label_size: 11
-      tick_label_size: 9
-    - id: ax_qzu_2
+      axis_label_size: 6
+      tick_label_size: 6
+      spine_offset: 0.08
+      label_pad: 2
+      tick_label_pad: 2
+
+    - id: ax_qzu_1
       title: Qzu [W]
       side: right
       color: '#111111'
-      axis_label_size: 8
+      axis_label_size: 6
       tick_label_size: 6
       limit_mode: manual
       y_min: 0.0
       y_max: 1000000.0
       min: 0.0
       max: 1000000.0
-    y_lines:
-    - y: 0.0
-      label: Zero mass flow
-      axis_id: ax_mdot_2
-      color: '#111111'
-      line_style: ':'
-      line_width: 0.9
-      alpha: 0.9
-      show_label: true
-      label_x: 0.99
-      label_font_size: 8.0
+      spine_offset: 0.18
+      label_pad: 2
+      tick_label_pad: 2
+
+
     series:
     - signal_key: cylinder_2_piston_distance_from_tdc_m
       label: Piston position
-      axis_id: ax_x_2
+      axis_id: ax_x_1
       color: '#111111'
       line_style: --
       line_width: 1.35
       scale_factor: -1000.0
       unit_preset: raw
-      offset: 54.04
+      offset: 45.553093
     - signal_key: transfer_slot_2_A_geom_m2
       label: Transfer Opening area
-      axis_id: ax_a_open_2
-      color: '#667085'
-      line_style: '-'
-      line_width: 1.6
+      axis_id: ax_a_open_1
+      color: '#0000FF'
+      line_style: '--'
+      line_width: 1.0
       scale_factor: 1000000.0
       unit_preset: raw
     - signal_key: exhaust_slot_2_A_geom_m2
       label: Exhaust Opening area
-      axis_id: ax_a_open_2
-      color: '#667085'
-      line_style: '-'
-      line_width: 1.6
+      axis_id: ax_a_open_1
+      color: '#B22222'
+      line_style: '--'
+      line_width: 1.0
       scale_factor: 1000000.0
       unit_preset: raw
     - signal_key: transfer_slot_2_mdot_kg_per_s
       label: Inflowing mass flow
-      axis_id: ax_mdot_2
+      axis_id: ax_mdot_1
       color: '#175CD3'
-      line_style: -.
+      line_style: '-'
       line_width: 1.45
       scale_factor: 1.0
       unit_preset: raw
     - signal_key: exhaust_slot_2_mdot_kg_per_s
       label: Outflowing mass flow
-      axis_id: ax_mdot_2
+      axis_id: ax_mdot_1
       color: '#D92D20'
-      line_style: -.
+      line_style: '-'
       line_width: 1.45
       scale_factor: 1.0
       unit_preset: raw
     - signal_key: cylinder_2_added_energy_W
       label: Added energy
-      axis_id: ax_qzu_2
+      axis_id: ax_qzu_1
       color: '#C2185B'
       line_style: '-'
       line_width: 1.9

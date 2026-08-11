@@ -4,7 +4,7 @@ figures:
   rows: 1
   cols: 1
   subplots:
-  - title: Temperatures over time
+  - title: Temperatures Cylinder 2
     plot_type: line
     x_signal: last_cycle_time_s
     x_title: Time in Last Working Cycle [s]
@@ -21,7 +21,7 @@ figures:
       y_min: 0.0
       y_max: 3000.0
     series:
-    - signal_key: cylinder_1_T_K
+    - signal_key: cylinder_2_T_K
       label: cylinder
       axis_id: ax_p
       color: '#FF8A80'
@@ -29,7 +29,7 @@ figures:
       scale_factor: 1
       unit_preset: raw
       line_width: 1.8
-    - signal_key: compressor_1_T_K
+    - signal_key: compressor_2_T_K
       label: bounce
       axis_id: ax_p
       color: '#667085'
@@ -37,7 +37,7 @@ figures:
       scale_factor: 1
       unit_preset: raw
       line_width: 1.8
-    - signal_key: receiver_1_T_K
+    - signal_key: receiver_2_T_K
       label: receiver
       axis_id: ax_p
       color: '#175CD3'
@@ -45,7 +45,7 @@ figures:
       scale_factor: 1
       unit_preset: raw
       line_width: 1.8
-    - signal_key: exhaust_plenum_1_T_K
+    - signal_key: exhaust_plenum_2_T_K
       label: exhaust
       axis_id: ax_p
       color: '#D92D20'

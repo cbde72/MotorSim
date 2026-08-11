@@ -10,7 +10,7 @@ import tempfile
 import numpy as np
 
 
-GENERATOR_MAP_CACHE_FORMAT_VERSION = 1
+GENERATOR_MAP_CACHE_FORMAT_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +34,7 @@ class GeneratorTorqueMap:
     operating_points: tuple[GeneratorMapOperatingPoint, ...]
     no_load: GeneratorMapOperatingPoint
     load_resistance_ohm: float
+    skalierung_faktor: float
     angle_at_x_min_deg: float
     angle_at_x_max_deg: float
     include_no_load_torque: bool
@@ -95,8 +96,13 @@ def _operating_point(ws) -> GeneratorMapOperatingPoint:
     return GeneratorMapOperatingPoint(increasing=_branch(rows, True), decreasing=_branch(rows, False))
 
 
-def generator_map_cache_path(source_path: str | Path) -> Path:
-    return Path(source_path).with_suffix(".generator_map.npz")
+def _scale_cache_token(skalierung_faktor: float) -> str:
+    return format(float(skalierung_faktor), ".12g").replace("-", "m").replace(".", "p").replace("+", "")
+
+
+def generator_map_cache_path(source_path: str | Path, skalierung_faktor: float = 1.0) -> Path:
+    source = Path(source_path)
+    return source.with_suffix(f".generator_map.scale_{_scale_cache_token(skalierung_faktor)}.npz")
 
 
 def _source_sha256(source: Path) -> str:
@@ -138,12 +144,13 @@ def _point_from_cache(data: np.lib.npyio.NpzFile, prefix: str) -> GeneratorMapOp
     )
 
 
-def _write_cache(cache_path: Path, source: Path, source_hash: str, resistances: np.ndarray, points: tuple[GeneratorMapOperatingPoint, ...], no_load: GeneratorMapOperatingPoint) -> None:
+def _write_cache(cache_path: Path, source: Path, source_hash: str, skalierung_faktor: float, resistances: np.ndarray, points: tuple[GeneratorMapOperatingPoint, ...], no_load: GeneratorMapOperatingPoint) -> None:
     values: dict[str, np.ndarray] = {
         "format_version": np.asarray(GENERATOR_MAP_CACHE_FORMAT_VERSION, dtype=np.int64),
         "source_filename": np.asarray(source.name),
         "source_sha256": np.asarray(source_hash),
         "source_mtime_ns": np.asarray(source.stat().st_mtime_ns, dtype=np.int64),
+        "skalierung_faktor": np.asarray(skalierung_faktor, dtype=np.float64),
         "resistances_ohm": np.asarray(resistances, dtype=np.float64),
     }
     values.update(_point_cache_values("no_load", no_load))
@@ -161,7 +168,7 @@ def _write_cache(cache_path: Path, source: Path, source_hash: str, resistances: 
             temp_path.unlink()
 
 
-def _read_cache(cache_path: Path, expected_hash: str | None) -> tuple[np.ndarray, tuple[GeneratorMapOperatingPoint, ...], GeneratorMapOperatingPoint] | None:
+def _read_cache(cache_path: Path, expected_hash: str | None, expected_scale: float = 1.0) -> tuple[np.ndarray, tuple[GeneratorMapOperatingPoint, ...], GeneratorMapOperatingPoint] | None:
     if not cache_path.exists():
         return None
     try:
@@ -171,6 +178,8 @@ def _read_cache(cache_path: Path, expected_hash: str | None) -> tuple[np.ndarray
             cached_hash = str(np.asarray(data["source_sha256"]).item())
             if expected_hash is not None and cached_hash != expected_hash:
                 return None
+            if not np.isclose(float(np.asarray(data["skalierung_faktor"]).item()), expected_scale, rtol=0.0, atol=1.0e-12):
+                return None
             resistances = np.asarray(data["resistances_ohm"], dtype=np.float64).copy()
             points = tuple(_point_from_cache(data, f"load_{index}") for index in range(int(resistances.size)))
             no_load = _point_from_cache(data, "no_load")
@@ -179,10 +188,26 @@ def _read_cache(cache_path: Path, expected_hash: str | None) -> tuple[np.ndarray
         return None
 
 
-def _load_or_create_cached_maps(source: Path) -> tuple[np.ndarray, tuple[GeneratorMapOperatingPoint, ...], GeneratorMapOperatingPoint]:
-    cache_path = generator_map_cache_path(source)
+def _scaled_branch(branch: GeneratorMapBranch, factor: float) -> GeneratorMapBranch:
+    return GeneratorMapBranch(
+        angle_deg=branch.angle_deg,
+        torque_Nm=branch.torque_Nm * factor,
+        voltage_V=branch.voltage_V,
+        electrical_power_W=branch.electrical_power_W * factor,
+    )
+
+
+def _scaled_point(point: GeneratorMapOperatingPoint, factor: float) -> GeneratorMapOperatingPoint:
+    return GeneratorMapOperatingPoint(
+        increasing=_scaled_branch(point.increasing, factor),
+        decreasing=_scaled_branch(point.decreasing, factor),
+    )
+
+
+def _load_or_create_cached_maps(source: Path, skalierung_faktor: float) -> tuple[np.ndarray, tuple[GeneratorMapOperatingPoint, ...], GeneratorMapOperatingPoint]:
+    cache_path = generator_map_cache_path(source, skalierung_faktor)
     source_hash = _source_sha256(source) if source.exists() else None
-    cached = _read_cache(cache_path, source_hash)
+    cached = _read_cache(cache_path, source_hash, skalierung_faktor)
     if cached is not None:
         return cached
     if not source.exists():
@@ -204,10 +229,10 @@ def _load_or_create_cached_maps(source: Path) -> tuple[np.ndarray, tuple[Generat
     if not resistance_points:
         raise ValueError(f"generator torque-map workbook {source} contains no '<value> Ohm' sheets")
     resistances = np.asarray([item[0] for item in resistance_points], dtype=np.float64)
-    points = tuple(item[1] for item in resistance_points)
-    no_load = _operating_point(workbook["No Load"])
+    points = tuple(_scaled_point(item[1], skalierung_faktor) for item in resistance_points)
+    no_load = _scaled_point(_operating_point(workbook["No Load"]), skalierung_faktor)
     workbook.close()
-    _write_cache(cache_path, source, str(source_hash), resistances, points, no_load)
+    _write_cache(cache_path, source, str(source_hash), skalierung_faktor, resistances, points, no_load)
     return resistances, points, no_load
 
 
@@ -216,13 +241,15 @@ def load_generator_torque_map(config, config_path: str | Path) -> GeneratorTorqu
     if not source.is_absolute():
         source = Path(config_path).resolve().parent / source
     source = source.resolve()
-    resistances, points, no_load = _load_or_create_cached_maps(source)
+    skalierung_faktor = float(getattr(config, "skalierung_faktor", 1.0))
+    resistances, points, no_load = _load_or_create_cached_maps(source, skalierung_faktor)
     return GeneratorTorqueMap(
         source_path=source,
         resistances_ohm=resistances,
         operating_points=points,
         no_load=no_load,
         load_resistance_ohm=float(config.load_resistance_ohm),
+        skalierung_faktor=skalierung_faktor,
         angle_at_x_min_deg=float(config.angle_at_x_min_deg),
         angle_at_x_max_deg=float(config.angle_at_x_max_deg),
         include_no_load_torque=bool(config.include_no_load_torque),

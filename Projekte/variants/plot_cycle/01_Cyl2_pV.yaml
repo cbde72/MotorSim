@@ -10,7 +10,7 @@ figures:
   rows: 1
   cols: 1
   subplots:
-  - title: Cyl.  1 Pressure-Volume - last BDC-TDC-BDC cycle
+  - title: Cyl.  2 Pressure-Volume - last BDC-TDC-BDC cycle
     plot_type: line
     x_signal: cylinder_2_V_m3
     x_title: Cylindervolumen [cm3]
@@ -37,4 +37,4 @@ figures:
       scale_factor: 1.0e-05
     show_title: true
 style:
-  default_line_width: 1.6
+  default_line_width: 1.0

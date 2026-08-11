@@ -2,12 +2,13 @@ name: Power cylinder 1
 style_sheet: ../../plot_style_sheet.yaml
 style:
   default_line_width: 1.6
+  legend_position: upper right
 figures:
 - title: energy
   rows: 1
   cols: 1
   subplots:
-  - title: Power cylinder 1
+  - title: Cylinder 1
     show_title: true
     plot_type: line
     x_signal: last_cycle_time_s
@@ -16,41 +17,90 @@ figures:
     x_limit_mode: auto
     x_start_at_zero: true
     x_axis_position: bottom
+    text_box:
+      enabled: true
+      source: data
+      title: Signed mass-flow check
+      x: 0.02
+      y: 0.98
+      ha: left
+      va: top
+      font_size: 4.0
+      facecolor: '#ffffff'
+      edgecolor: '#111111'
+      alpha: 0.90
+      metrics:
+      - label: Transfer minimum
+        signal_key: transfer_slot_1_mdot_kg_per_s
+        mode: min
+        unit: kg/s
+        digits: 5
+        fixed: true
+      - label: Transfer maximum
+        signal_key: transfer_slot_1_mdot_kg_per_s
+        mode: max
+        unit: kg/s
+        digits: 5
+        fixed: true
+      - label: Exhaust minimum
+        signal_key: exhaust_slot_1_mdot_kg_per_s
+        mode: min
+        unit: kg/s
+        digits: 5
+        fixed: true
+      - label: Exhaust maximum
+        signal_key: exhaust_slot_1_mdot_kg_per_s
+        mode: max
+        unit: kg/s
+        digits: 5
+        fixed: true
     y_axes:
     - id: ax_x_1
-      title: Piston position [mm] (+54 = OT, -54 = UT)
+      title: Piston position [mm] (+45.6 = TDC, -45.6 = BDC)
       side: left
       color: '#111111'
       limit_mode: manual
-      y_min: -60.0
-      y_max: 60.0
-      min: -60.0
-      max: 60.0
-      axis_label_size: 8
+      y_min: -50.0
+      y_max: 50.0
+      tick_step: 10.0
+      minor_tick_step: 2.0
+      axis_label_size: 6
       tick_label_size: 6
     - id: ax_a_open_1
       title: Opening area [mm²]
       side: right
       color: '#111111'
-      axis_label_size: 8
+      axis_label_size: 6
       tick_label_size: 6
+      label_pad: 2
+      tick_label_pad: 2
+
     - id: ax_mdot_1
       title: Mass flow [kg/s]
       side: right
       color: '#111111'
-      axis_label_size: 8
+      axis_label_size: 6
       tick_label_size: 6
+      spine_offset: 0.08
+      label_pad: 2
+      tick_label_pad: 2
+
     - id: ax_qzu_1
       title: Qzu [W]
       side: right
       color: '#111111'
-      axis_label_size: 8
+      axis_label_size: 6
       tick_label_size: 6
       limit_mode: manual
       y_min: 0.0
       y_max: 1000000.0
       min: 0.0
       max: 1000000.0
+      spine_offset: 0.16
+      label_pad: 2
+      tick_label_pad: 2
+
+
     series:
     - signal_key: cylinder_1_piston_distance_from_tdc_m
       label: Piston position
@@ -60,28 +110,28 @@ figures:
       line_width: 1.35
       scale_factor: -1000.0
       unit_preset: raw
-      offset: 54.04
+      offset: 45.553093
     - signal_key: transfer_slot_1_A_geom_m2
       label: Transfer Opening area
       axis_id: ax_a_open_1
-      color: '#667085'
-      line_style: '-'
-      line_width: 1.6
+      color: '#0000FF'
+      line_style: '--'
+      line_width: 1.0
       scale_factor: 1000000.0
       unit_preset: raw
     - signal_key: exhaust_slot_1_A_geom_m2
       label: Exhaust Opening area
       axis_id: ax_a_open_1
-      color: '#667085'
-      line_style: '-'
-      line_width: 1.6
+      color: '#B22222'
+      line_style: '--'
+      line_width: 1.0
       scale_factor: 1000000.0
       unit_preset: raw
     - signal_key: transfer_slot_1_mdot_kg_per_s
       label: Inflowing mass flow
       axis_id: ax_mdot_1
       color: '#175CD3'
-      line_style: -.
+      line_style: '-'
       line_width: 1.45
       scale_factor: 1.0
       unit_preset: raw
@@ -89,7 +139,7 @@ figures:
       label: Outflowing mass flow
       axis_id: ax_mdot_1
       color: '#D92D20'
-      line_style: -.
+      line_style: '-'
       line_width: 1.45
       scale_factor: 1.0
       unit_preset: raw

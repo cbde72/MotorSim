@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Einfluss der V57-Konfigurationsparameter auf die Freikolbenfrequenz</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f4f6f8; --card:#fff; --text:#17202a; --muted:#59636e; --line:#d8dee5; --accent:#175cd3; --up:#b42318; --down:#027a48; --warn:#9a6700; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#11151a; --card:#1b2128; --text:#e8edf2; --muted:#aab4bf; --line:#3a434d; --accent:#75a7ff; --up:#ff8d86; --down:#67d39d; --warn:#f2cc60; } }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { max-width:1220px; margin:auto; padding:28px 20px 64px; }
+    header,.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:22px; margin-bottom:18px; }
+    h1 { font-size:1.85rem; margin:0 0 8px; } h2 { margin-top:0; font-size:1.35rem; } h3 { font-size:1.08rem; }
+    p { max-width:92ch; } .muted { color:var(--muted); } .lead { font-size:1.08rem; }
+    code { background:color-mix(in srgb,var(--accent) 10%,transparent); padding:.1em .35em; border-radius:4px; }
+    pre { overflow:auto; padding:14px; border:1px solid var(--line); border-radius:8px; background:color-mix(in srgb,var(--card) 88%,var(--accent)); }
+    table { width:100%; border-collapse:collapse; font-size:.91rem; }
+    th,td { border:1px solid var(--line); padding:9px; text-align:left; vertical-align:top; }
+    th { background:color-mix(in srgb,var(--card) 86%,var(--accent)); position:sticky; top:0; }
+    tr:nth-child(even) td { background:color-mix(in srgb,var(--card) 97%,var(--accent)); }
+    .table-wrap { overflow:auto; max-height:72vh; }
+    .up { color:var(--up); font-weight:700; } .down { color:var(--down); font-weight:700; } .mixed,.warn { color:var(--warn); font-weight:700; }
+    .tag { display:inline-block; border:1px solid var(--line); border-radius:999px; padding:1px 8px; white-space:nowrap; }
+    .formula { overflow:auto; margin:12px 0; padding:14px; border-left:4px solid var(--accent); background:color-mix(in srgb,var(--card) 94%,var(--accent)); }
+    math { font-size:1.12rem; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:14px; }
+    .mini { border:1px solid var(--line); border-radius:9px; padding:14px; }
+    nav a { margin-right:14px; color:var(--accent); }
+  </style>
+</head>
+<body><main>
+<header>
+  <h1>Welche Konfigurationsparameter verändern die Freikolbenfrequenz?</h1>
+  <p class="lead">Modellbezogene Analyse der Konfiguration <code>free_piston_GenSet_V57.yaml</code>. Stand: 11. August 2026.</p>
+  <p class="muted">Die Pfeile beschreiben die typische lokale Tendenz, wenn nur ein Parameter verändert wird. Das System ist nichtlinear: Verbrennungszeitpunkt, Hub, gefangene Masse und Generatorlast reagieren gekoppelt. Deshalb ist kein Pfeil eine Garantie für große Änderungen.</p>
+  <nav><a href="#gleichungen">Gleichungen</a><a href="#parameter">Parameter</a><a href="#beispiele">Beispiele</a><a href="#vorgehen">Versuchsplan</a></nav>
+</header>
+
+<section class="card" id="gleichungen">
+  <h2>1. Die maßgebenden Gleichungen</h2>
+  <p>V57 nutzt <code>kinematics_type: oscillating_rotary</code>. Die verallgemeinerte Koordinate ist der Winkel φ und die lineare Kolbenposition wird mit dem wirksamen Radius abgebildet:</p>
+  <div class="formula"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+    <mrow><mi>x</mi><mo>=</mo><msub><mi>x</mi><mi>min</mi></msub><mo>+</mo><msub><mi>r</mi><mi>eff</mi></msub><mo>(</mo><mi>φ</mi><mo>−</mo><msub><mi>φ</mi><mi>min</mi></msub><mo>)</mo><mo>,</mo><mspace width="1em"/><mi>v</mi><mo>=</mo><msub><mi>r</mi><mi>eff</mi></msub><mover><mi>φ</mi><mo>˙</mo></mover></mrow>
+  </math></div>
+  <p>Die im Code gelöste Bewegungsgleichung lautet für das Generator-Kennfeldmodell:</p>
+  <div class="formula"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+    <mrow><msub><mi>J</mi><mi>rot</mi></msub><mover><mi>φ</mi><mo>¨</mo></mover><mo>=</mo><msub><mi>r</mi><mi>eff</mi></msub><mo>(</mo><msub><mi>F</mi><mi>Gas</mi></msub><mo>+</mo><msub><mi>F</mi><mi>Bounce</mi></msub><mo>+</mo><msub><mi>F</mi><mi>Reib</mi></msub><mo>+</mo><msub><mi>F</mi><mi>Sicherheit</mi></msub><mo>)</mo><mo>+</mo><msub><mi>M</mi><mi>Gen</mi></msub></mrow>
+  </math></div>
+  <p>Die Gas- und Bouncekräfte entstehen aus Druck und wirksamer Fläche:</p>
+  <div class="formula"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+    <mrow><msub><mi>F</mi><mi>Gas</mi></msub><mo>=</mo><munder><mo>∑</mo><mi>i</mi></munder><msub><mi>s</mi><mi>i</mi></msub><msub><mi>p</mi><mi>i</mi></msub><msub><mi>A</mi><mi>Kolben</mi></msub><mo>,</mo><mspace width="1em"/><msub><mi>F</mi><mi>Bounce</mi></msub><mo>=</mo><mo>−</mo><munder><mo>∑</mo><mi>j</mi></munder><msub><mi>s</mi><mi>j</mi></msub><msub><mi>p</mi><mi>j</mi></msub><msub><mi>A</mi><mi>Bounce</mi></msub></mrow>
+  </math></div>
+  <p>Die gemessene Frequenz ist keine Eingabe, sondern wird aus aufeinanderfolgenden gleichartigen Umkehrpunkten bestimmt:</p>
+  <div class="formula"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+    <mrow><mi>T</mi><mo>=</mo><msub><mi>t</mi><mrow><mi>UT</mi><mo>,</mo><mi>k</mi><mo>+</mo><mn>1</mn></mrow></msub><mo>−</mo><msub><mi>t</mi><mrow><mi>UT</mi><mo>,</mo><mi>k</mi></mrow></msub><mo>,</mo><mspace width="1em"/><mi>f</mi><mo>=</mo><mfrac><mn>1</mn><mi>T</mi></mfrac></mrow>
+  </math></div>
+  <p>Nur als lokale Orientierung kann man das nichtlineare System um einen Arbeitspunkt linearisieren:</p>
+  <div class="formula"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+    <mrow><msub><mi>f</mi><mi>d</mi></msub><mo>≈</mo><mfrac><mn>1</mn><mrow><mn>2</mn><mi>π</mi></mrow></mfrac><msqrt><mrow><mfrac><msub><mi>k</mi><mi>eff</mi></msub><msub><mi>J</mi><mi>rot</mi></msub></mfrac><mo>−</mo><msup><mrow><mo>(</mo><mfrac><msub><mi>c</mi><mi>eff</mi></msub><mrow><mn>2</mn><msub><mi>J</mi><mi>rot</mi></msub></mrow></mfrac><mo>)</mo></mrow><mn>2</mn></msup></mrow></msqrt></mrow>
+  </math></div>
+  <p>Damit gilt lokal: mehr wirksame Rückstellsteifigkeit erhöht die Frequenz, mehr Trägheit senkt sie. Dämpfung senkt die gedämpfte Eigenfrequenz nur begrenzt; im arbeitenden Motor verändert sie zusätzlich Hub, Ladungsmasse und Verbrennung und kann dadurch in beide Richtungen wirken.</p>
+  <div class="formula"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+    <mrow><msub><mi>E</mi><mi>Verbrennung</mi></msub><mo>+</mo><msub><mi>W</mi><mi>Gaswechsel</mi></msub><mo>=</mo><msub><mi>W</mi><mi>Generator</mi></msub><mo>+</mo><msub><mi>W</mi><mi>Reibung</mi></msub><mo>+</mo><msub><mi>Q</mi><mi>Wand</mi></msub><mo>+</mo><mi>Δ</mi><msub><mi>E</mi><mi>Zyklus</mi></msub></mrow>
+  </math></div>
+</section>
+
+<section class="card" id="parameter">
+  <h2>2. Parameterübersicht für V57</h2>
+  <p><span class="down">↓ f</span> bedeutet typischerweise niedrigere Frequenz, <span class="up">↑ f</span> höhere Frequenz und <span class="mixed">↕</span> eine stark arbeitspunktabhängige oder überwiegend indirekte Wirkung.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Konfigurationspfad</th><th>V57</th><th>Typische Änderung</th><th>Wirkung auf f</th><th>Warum / Grenze</th><th>Einfluss</th></tr></thead>
+    <tbody>
+      <tr><td><code>free_piston.mechanics.rotary_inertia_kg_m2</code></td><td>1.3</td><td>1.3 → 1.6</td><td class="down">deutlich ↓</td><td>Mehr Trägheit ergibt bei gleichem Moment weniger Winkelbeschleunigung. Direktester stabiler Hebel zur Frequenzsenkung; Startzustand muss eventuell neu synchronisiert werden.</td><td><span class="tag">sehr stark, direkt</span></td></tr>
+      <tr><td><code>moving_mass_kg</code></td><td>100.11</td><td>100 → 120 kg</td><td class="mixed">in V57 kaum / indirekt</td><td>Bei <code>oscillating_rotary</code> teilt der Code durch <code>rotary_inertia_kg_m2</code>, nicht durch die lineare Masse. Die Masse wird für andere Lastregler verwendet, ist beim V57-Kennfeld aber kein direkter Trägheitsterm.</td><td><span class="tag">schwach</span></td></tr>
+      <tr><td><code>effective_radius_m</code></td><td>0.290</td><td>0.290 → 0.320</td><td class="mixed">meist ↑ Kraftmoment, gekoppelt</td><td>Skaliert sowohl x(φ) als auch das Moment aller linearen Kräfte. Ändert Kinematik, Geschwindigkeit, Volumina und Generatorwinkelzuordnung gleichzeitig; nicht als isolierter Frequenzregler verwenden.</td><td><span class="tag">sehr stark</span></td></tr>
+      <tr><td><code>x_min_m</code>, <code>x_max_m</code></td><td>0; 0.0911</td><td>Hubgrenze vergrößern</td><td class="down">tendenziell ↓</td><td>Längerer Weg dauert meist länger, verändert aber Verdichtung, Portzeiten und die Kennfeldabbildung. Nur zusammen mit Geometrie und Winkelabbildung ändern.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>angle_min_deg</code>, <code>angle_max_deg</code></td><td>0; 18°</td><td>Winkelspanne ändern</td><td class="mixed">↕</td><td>Bestimmt die generalisierte Bewegungsstrecke und zusammen mit Radius die lineare Abbildung. Inkonsistente Werte verfälschen Hub und Kennfeld.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>piston_diameter_m</code></td><td>0.085</td><td>0.085 → 0.090</td><td class="mixed">oft ↑</td><td>Größere Kolbenfläche verstärkt Zylinderdruckkräfte. Sie verändert zugleich Hubvolumen und gefangene Masse; der Nettoeffekt hängt von Druckverlauf und Bounce-Seite ab.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>compression_ratio</code></td><td>50</td><td>50 → 55</td><td class="up">oft ↑</td><td>Höhere Verdichtung erhöht Druck-/Temperaturanstieg und kann früher zünden; stärkere Gasfeder und frühere Energiefreisetzung beschleunigen meist. Klopf-/Druckgrenzen beachten.</td><td><span class="tag">stark</span></td></tr>
+
+      <tr><td><code>friction.fc_N</code></td><td>80</td><td>80 → 120 N</td><td class="down">leicht ↓</td><td>Mehr Coulomb-Reibung entzieht Energie, reduziert Geschwindigkeit und Hub. Zu viel Reibung führt zum Hubkollaps.</td><td><span class="tag">mittel</span></td></tr>
+      <tr><td><code>friction.cv_Ns_per_m</code></td><td>0</td><td>0 → 100 Ns/m</td><td class="down">leicht ↓</td><td>Geschwindigkeitsproportionale Dämpfung. Wirkt über den ganzen Hub und ist deshalb berechenbarer als reine Endlagendämpfung.</td><td><span class="tag">mittel</span></td></tr>
+      <tr><td><code>load.torque_map.skalierung_faktor</code></td><td>1.5</td><td>1.5 → 1.7</td><td class="down">meist ↓</td><td>Skaliert Kennfeldmoment und elektrische Leistung. Mehr Gegenmoment senkt Geschwindigkeit/Hub; zu hoch kann den Grenzzyklus abwürgen.</td><td><span class="tag">stark, direkt</span></td></tr>
+      <tr><td><code>load.torque_map.load_resistance_ohm</code></td><td>0.5 Ω</td><td>0.5 → 0.3 Ω</td><td class="down">voraussichtlich ↓</td><td>Wählt/interpoliert ein anderes gemessenes Kennfeld. Kleinerer Lastwiderstand liefert üblicherweise mehr Strom und Gegenmoment; maßgebend sind aber die tatsächlichen Excel-Kennblätter.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>include_no_load_torque</code></td><td>true</td><td>true belassen</td><td class="down">leicht ↓</td><td>Magnetisches Leerlaufmoment wird zusätzlich berücksichtigt. <code>false</code> reduziert das Gegenmoment und kann f sowie Hub erhöhen.</td><td><span class="tag">mittel</span></td></tr>
+      <tr><td><code>max_abs_torque_Nm</code></td><td>1800</td><td>1800 → 2200</td><td class="down">nur bei aktiver Begrenzung ↓</td><td>Ist ausschließlich eine Kappung. Ohne Clipping keine Wirkung. Erst prüfen, ob <code>generator_torque_Nm</code> häufig ±1800 Nm erreicht.</td><td><span class="tag">bedingt</span></td></tr>
+      <tr><td><code>max_electrical_power_W</code></td><td>25000</td><td>25 → 30 kW</td><td>keine direkte Wirkung</td><td>Im aktuellen Kennfeldpfad wird die ausgegebene elektrische Leistung gekappt; das mechanisch angewandte Drehmoment wird separat durch <code>max_abs_torque_Nm</code> begrenzt.</td><td><span class="tag">Diagnose</span></td></tr>
+      <tr><td><code>angle_at_x_min_deg</code>, <code>angle_at_x_max_deg</code></td><td>+9; −9°</td><td>nicht zum Regeln ändern</td><td class="mixed">↕</td><td>Ordnet Kolbenpositionen den Kennfeldwinkeln zu. Eine Änderung wählt andere Kennfeldmomente und kann deren Richtung/Verlauf verfälschen.</td><td><span class="tag">stark, Kalibrierung</span></td></tr>
+      <tr><td><code>angle_out_of_range</code>, <code>resistance_out_of_range</code></td><td>clamp; error</td><td>Policy ändern</td><td>normalerweise keine</td><td>Numerische Randbehandlung bzw. Fehlerverhalten; nur bei Bereichsüberschreitung relevant.</td><td><span class="tag">bedingt</span></td></tr>
+      <tr><td><code>load.damping_Ns_per_m</code></td><td>0</td><td>0 → 200</td><td class="down">leicht ↓</td><td>Grunddämpfung der zusätzlichen Endlagensicherung. Beim V57-Kennfeld wirkt sie außerhalb der Regelzone als Basisterm.</td><td><span class="tag">mittel</span></td></tr>
+      <tr><td><code>load.max_damping_Ns_per_m</code></td><td>20000</td><td>20000 → 24000</td><td class="down">leicht / Hub ↓</td><td>Maximale Sicherheitsdämpfung nahe dem angefahrenen Totpunkt. Hauptwirkung ist Umkehrpunktbegrenzung, nicht gleichmäßige Frequenzregelung.</td><td><span class="tag">mittel, lokal</span></td></tr>
+      <tr><td><code>load.control_zone_m</code></td><td>0.016</td><td>0.016 → 0.020</td><td class="down">meist ↓</td><td>Größere Zone lässt die Sicherheitsdämpfung früher einsetzen. Reduziert Endgeschwindigkeit und Hub; kann Verbrennung verschlechtern.</td><td><span class="tag">mittel</span></td></tr>
+
+      <tr><td><code>compressor_bounce.chamber_diameter_m</code></td><td>0.075 Vorlage; Instanz 0.07</td><td>Durchmesser erhöhen</td><td class="up">meist ↑</td><td>Größere Bouncefläche und Volumenänderung verstärken das Gasfedermoment. Instanzwerte unter <code>volumes</code> überschreiben die Vorlage.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>compressor_bounce.chamber_length_m</code></td><td>0.0911 Vorlage; Instanz 0.10807</td><td>Länge erhöhen</td><td class="down">meist ↓</td><td>Größeres Grundvolumen macht die Gasfeder weicher. Gleichzeitig ändern sich Druckniveau und Förderarbeit.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>compressor_bounce.compression_ratio</code></td><td>16</td><td>16 → 14</td><td class="down">meist ↓</td><td>Niedrigere Bounce-Verdichtung reduziert Spitzendruck/Rückstellsteifigkeit. Gaswechsel kann den Effekt verändern.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>polytropic_exponent</code></td><td>1.3</td><td>1.3 → 1.2</td><td class="down">meist ↓</td><td>Kleinerer Exponent erzeugt bei Kompression einen flacheren Druckanstieg und damit eine weichere Gasfeder.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td>Bounce-<code>initial_pressure_Pa</code>, <code>initial_temperature_K</code></td><td>je Kammer verschieden</td><td>Druck erhöhen</td><td class="up">transient oft ↑</td><td>Bestimmt Vorspannung und Starttransient. Bei offenem Gaswechsel kann sich der Langzeitwert einregeln.</td><td><span class="tag">Start/mittel</span></td></tr>
+      <tr><td>Zylinder-<code>initial_pressure_Pa</code>, <code>initial_temperature_K</code></td><td>je Zylinder verschieden</td><td>T oder p erhöhen</td><td class="up">Start oft ↑</td><td>Beeinflusst erste Kompression, Zündverzug und Erreichen des Grenzzyklus. Bei langer Simulation meist weniger wichtig als periodischer Zustand.</td><td><span class="tag">Start</span></td></tr>
+      <tr><td><code>initial_conditions.x0_m</code>, <code>v0_m_per_s</code></td><td>0.0456; −6.91</td><td>|v₀| erhöhen</td><td class="up">anfangs ↑</td><td>Startenergie, nicht die gewünschte stationäre Frequenz. Falsch gewählte Zustände können einen anderen Grenzzyklus oder Abbruch erzeugen.</td><td><span class="tag">Start</span></td></tr>
+      <tr><td>initialer Burn-/Combustion-State</td><td>14.85 %, Flags false</td><td>nur synchronisiert ändern</td><td class="mixed">Start ↕</td><td>Beeinflusst Zusammensetzung, innere Energie und den ersten Zünd-/Verbrennungsablauf; kein stationärer Regler.</td><td><span class="tag">Start</span></td></tr>
+
+      <tr><td><code>combustion.duration_ms</code></td><td>10 ms</td><td>10 → 14 ms</td><td class="down">oft ↓</td><td>Längere Wärmefreisetzung verteilt den Druckimpuls; geringere Spitzenbeschleunigung. Zu spät freigesetzte Energie kann Hub und Stabilität reduzieren.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>combustion.hign_mm</code></td><td>4 mm</td><td>4 → 6 mm</td><td class="mixed">Timing ↕</td><td>Positionsabhängiger Verbrennungsstart. Früheres/späteres Freisetzen ändert Phasenlage und Arbeit; Richtung hängt von Hubrichtung und Modellkonvention ab.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>combustion.a</code>, <code>m</code></td><td>6.9; 2.0</td><td>Burn-Shape ändern</td><td class="mixed">↕</td><td>Form und Geschwindigkeit der Vibe-Wärmefreisetzung verändern Druckspitze und Phasenlage. Zusammen mit Dauer kalibrieren.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>lambda_target</code></td><td>1.0</td><td>1.0 → 1.2</td><td class="down">meist ↓</td><td>Magerer bedeutet bei gleicher gefangener Luft weniger Brennstoffenergie; außerdem verändert sich Zündverzug. Zu mager kann Aussetzer verursachen.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>lhv_J_per_kg</code>, <code>combustion_efficiency_0to1</code></td><td>43 MJ/kg; 1.0</td><td>η 1.0 → 0.9</td><td class="down">meist ↓</td><td>Weniger freigesetzte Energie reduziert Druckarbeit, Geschwindigkeit und meist Frequenz/Hub.</td><td><span class="tag">stark</span></td></tr>
+      <tr><td><code>afr_stoich_kg_air_per_kg_fuel</code></td><td>14.5</td><td>14.5 → höher</td><td class="down">meist ↓</td><td>Bei massenbasierter Lambda-Kraftstoffberechnung ergibt höheres stöchiometrisches Luftverhältnis weniger Kraftstoff für dieselbe Luftmasse.</td><td><span class="tag">mittel</span></td></tr>
+      <tr><td>Slot-close-/Geschwindigkeitsschwellen</td><td>1e−7, 1e−12 m²; 0.02 m/s</td><td>Schwellen ändern</td><td class="mixed">↕</td><td>Beeinflussen Latch-Zeitpunkt und gefangene Masse. Primär numerisch/ereignisbezogen; nur mit Diagnosesignalen ändern.</td><td><span class="tag">bedingt</span></td></tr>
+      <tr><td>Ignition: <code>beck_c1_s</code>, <code>beck_c2</code>, Restgasfaktor, Startschwellen</td><td>siehe YAML</td><td>Zündverzug verlängern</td><td class="mixed">meist ↓, eventuell Aussetzer</td><td>Spätere Zündung verschiebt Druckarbeit, kann Spitzenbeschleunigung senken, aber bei günstigerer Phasenlage auch Arbeit erhöhen. In V57 ist der HCCI-Pfad als Diagnose referenziert; tatsächliche Kopplung zum Vibe-Startmodus prüfen.</td><td><span class="tag">Timing</span></td></tr>
+
+      <tr><td><code>wall_heat.*.multiplier</code></td><td>Zylinder 5; Bounce 1</td><td>Zylinder 5 → 6</td><td class="down">meist ↓</td><td>Mehr Wandwärmeverlust senkt Gastemperatur/Druck und Verbrennungsarbeit. Bounce-Wärmeverlust macht die Gasfeder ebenfalls weicher.</td><td><span class="tag">mittel–stark</span></td></tr>
+      <tr><td><code>wall_temperature_K</code></td><td>450 / 350 K</td><td>Temperatur senken</td><td class="down">meist ↓</td><td>Kältere Wand erhöht Wärmeabgabe aus heißem Gas; beeinflusst auch Ladungstemperatur und Zündverzug.</td><td><span class="tag">mittel</span></td></tr>
+      <tr><td><code>wall_area_m2</code>, Woschni <code>c1,c2,c3,cucm,swirl_number</code></td><td>siehe YAML</td><td>Wärmeübergang erhöhen</td><td class="down">meist ↓</td><td>Alle wirksamen Wärmeübergangsparameter verändern Energieverlust und damit Druckverlauf. Parameter mit Nullwert oder im gewählten <code>promo</code>-Pfad ungenutzte Terme haben keine Wirkung.</td><td><span class="tag">mittel</span></td></tr>
+      <tr><td><code>gas_properties.cp</code>, <code>cv</code>, <code>R</code>, <code>thermo_model</code></td><td>1005; 718; 287; promo</td><td>nicht isoliert ändern</td><td class="mixed">↕</td><td>Bestimmen p(T,m,V), κ und Energie-Temperatur-Beziehung. Physikalische Stoffdaten, keine Stellgrößen; inkonsistente Änderungen verfälschen das gesamte Modell.</td><td><span class="tag">stark, physikalisch</span></td></tr>
+
+      <tr><td>Transfer-/Exhaust-Slot: Position, Breite, Höhe, Anzahl, Cd</td><td>siehe YAML</td><td>Transfer später/kleiner</td><td class="mixed">↕</td><td>Ändern Öffnungszeit, gefangene Luft, Restgas, Zylinderdruck und Pumpverluste. Größere Querschnitte senken Drosselverlust, können aber mehr Frischladung kurzschließen.</td><td><span class="tag">stark, indirekt</span></td></tr>
+      <tr><td>Check valves: <code>diameter_mm</code>, <code>discharge_coefficient</code>, <code>cracking_pressure_Pa</code></td><td>55/55.3 mm; 0.82; 0/10 kPa</td><td>Auslassventil restriktiver</td><td class="down">meist ↓</td><td>Mehr Förderarbeit belastet den Kolben und verändert Receiverdruck/Ladungsmasse. Zu restriktiv reduziert Spülung.</td><td><span class="tag">mittel–stark</span></td></tr>
+      <tr><td><code>exhaust_bleed.diameter_mm</code>, Cd</td><td>14 mm; 0.98</td><td>Bleed kleiner</td><td class="mixed">↕</td><td>Erhöht Abgasgegendruck, Pumpverlust und Restgas. Meist sinken Nettoarbeit und Frequenz, gleichzeitig kann die Gasfedersteifigkeit steigen.</td><td><span class="tag">mittel</span></td></tr>
+      <tr><td>Plenum-<code>fixed_volume_m3</code> und Initialzustände</td><td>je Plenum</td><td>Volumen erhöhen</td><td class="mixed">↕ / ruhiger</td><td>Größere Plena glätten Druckschwankungen und verändern Mittelwerte/Phasen. Initialwerte dominieren vor allem kurze Simulationen.</td><td><span class="tag">mittel</span></td></tr>
+      <tr><td><code>environment.pressure_Pa</code>, <code>temperature_K</code></td><td>101325 Pa; 300 K</td><td>Ansaugdruck erhöhen</td><td class="up">meist ↑</td><td>Mehr Luftmasse ermöglicht bei Lambda-Regelung mehr Brennstoff und Energie. Abgasdruck wirkt entgegengesetzt über Pumpverlust.</td><td><span class="tag">mittel–stark</span></td></tr>
+      <tr><td>Scavenging-Parameter</td><td>1.25; ηtrap 0.92; weitere</td><td>Trapping erhöhen / Kurzschluss senken</td><td class="up">meist ↑</td><td>Mehr gefangene Frischladung und weniger Kurzschluss erhöhen nutzbare Verbrennungsenergie; Restgas verändert Zündverzug und Wärmekapazität.</td><td><span class="tag">stark, indirekt</span></td></tr>
+
+      <tr><td><code>preprocessing.engine.speed_rpm</code></td><td>25 rpm</td><td>25 → 20</td><td><strong>setzt f nicht</strong></td><td>Die Freikolbenfrequenz entsteht dynamisch. Der Wert wird u. a. für nominelle Zyklus-/Wärmeübertragungsgrößen benutzt und kann daher indirekt über Wandwärme wirken, ist aber kein Sollwert.</td><td><span class="tag">indirekt</span></td></tr>
+      <tr><td><code>cycle_type: 2t</code></td><td>2t</td><td>nicht ändern</td><td class="mixed">Modellstruktur</td><td>Bestimmt Zyklusdefinition/Ereignisinterpretation. Kein Feinregler und physikalisch nicht unabhängig vom Motoraufbau.</td><td><span class="tag">strukturell</span></td></tr>
+      <tr><td><code>features.mass_flow/wall_heat/combustion/pv_work</code></td><td>true</td><td>Feature ausschalten</td><td class="mixed">fundamental</td><td>Schaltet ganze Physikanteile ab. Zum Debuggen geeignet, nicht zur Kalibrierung der realen Frequenz.</td><td><span class="tag">Modellschalter</span></td></tr>
+      <tr><td><code>simulation.dt_s</code>, Solver, Toleranzen</td><td>1e−5 s; RK4</td><td>dt halbieren</td><td>physikalisch keine</td><td>Ändert numerische Genauigkeit. Wenn f merklich wandert, war die vorherige Diskretisierung nicht konvergent.</td><td><span class="tag">numerisch</span></td></tr>
+      <tr><td><code>simulationtime</code>, <code>total_cycles</code></td><td>0.2 s; 3</td><td>0.2 → 0.5 s</td><td>keine Dynamikänderung</td><td>Mehr Laufzeit kann eine andere, besser konvergierte gemessene Endfrequenz zeigen; sie ändert nicht die Bewegungsgleichung.</td><td><span class="tag">Messfenster</span></td></tr>
+      <tr><td>Postprocessing, Sampling, CSV/Excel, Plotlayouts</td><td>verschieden</td><td>beliebig</td><td>keine</td><td>Ändert Export und Darstellung, nicht die simulierte Frequenz. Zu grobes Sampling kann die sichtbare/aus Export geschätzte Frequenz ungenauer machen.</td><td><span class="tag">Ausgabe</span></td></tr>
+      <tr><td>Versioning, Beschreibung, Dateipfade</td><td>verschieden</td><td>beliebig</td><td>keine</td><td>Metadaten. Ausnahme: Das Generator-Kennfeld unter <code>torque_map.file</code> enthält die physikalischen Momentkurven und ist daher hochwirksam.</td><td><span class="tag">Metadaten/Quelle</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card" id="beispiele">
+  <h2>3. Konkrete Variantenbeispiele</h2>
+  <div class="grid">
+    <div class="mini"><h3>A – Generator moderat stärker</h3><pre>load:
+  torque_map:
+    load_resistance_ohm: 0.5
+    skalierung_faktor: 1.7</pre><p>Erwartung: Geschwindigkeit, Hub und meist Frequenz sinken. Gegenüber 1.5 ist dies ein sinnvoller erster Schritt.</p></div>
+    <div class="mini"><h3>B – Trägheit erhöhen</h3><pre>mechanics:
+  rotary_inertia_kg_m2: 1.6</pre><p>Erwartung aus f ∝ 1/√J: rein linearisiert etwa √(1.3/1.6) = 0.901, also rund 10 % weniger. Im Vollmodell weicht das wegen Verbrennung und Gaswechsel ab.</p></div>
+    <div class="mini"><h3>C – Kombiniert, vorsichtig</h3><pre>mechanics:
+  rotary_inertia_kg_m2: 1.5
+load:
+  torque_map:
+    load_resistance_ohm: 0.5
+    skalierung_faktor: 1.7</pre><p>Verteilt die Frequenzsenkung auf Trägheit und Last. Stabiler als ein sehr großer Sprung nur beim Gegenmoment.</p></div>
+    <div class="mini"><h3>D – Verbrennung langsamer</h3><pre>combustion:
+  duration_ms: 12.0</pre><p>Kann Druckspitze und Frequenz senken, verändert aber Wirkungsgrad und Phasenlage. Nur mit p–V-, Druck- und Burnrate-Auswertung beurteilen.</p></div>
+  </div>
+  <h3>Beispielrechnung Trägheit</h3>
+  <div class="formula"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mfrac><msub><mi>f</mi><mi>neu</mi></msub><msub><mi>f</mi><mi>alt</mi></msub></mfrac><mo>≈</mo><msqrt><mfrac><msub><mi>J</mi><mi>alt</mi></msub><msub><mi>J</mi><mi>neu</mi></msub></mfrac></msqrt><mo>=</mo><msqrt><mfrac><mn>1.3</mn><mn>1.6</mn></mfrac></msqrt><mo>≈</mo><mn>0.901</mn></mrow></math></div>
+  <p>Beispiel: Bei 25 Hz wären linearisiert ungefähr 22.5 Hz zu erwarten. Das ist eine Startschätzung, keine Ersatzsimulation.</p>
+</section>
+
+<section class="card" id="vorgehen">
+  <h2>4. Empfohlener Versuchsplan</h2>
+  <ol>
+    <li>Eine Basisrechnung V57 lange genug bis zum stabilen Grenzzyklus ausführen; 0.2 s können für eine sichere Aussage knapp sein.</li>
+    <li>Immer nur einen Hauptparameter ändern: zuerst <code>rotary_inertia_kg_m2</code> oder <code>skalierung_faktor</code>.</li>
+    <li>Stufen verwenden: J = 1.3 / 1.4 / 1.5 / 1.6 kg·m² und Skalierung = 1.5 / 1.6 / 1.7 / 1.8.</li>
+    <li>Mit dem Vergleichsrenderer dieselben Signale übereinanderlegen.</li>
+    <li>Nicht nur <code>last_frequency_Hz</code>, sondern auch Hub, UT/OT, Spitzendruck, minimale Geschwindigkeit, Verbrennungsenergie, Generatorarbeit und Kennfeld-Clipping prüfen.</li>
+    <li>Erst danach Widerstand, Verbrennungsdauer oder Gaswechsel verändern, da diese stärker gekoppelte Nebenwirkungen haben.</li>
+  </ol>
+  <h3>Abbruch- und Warnkriterien</h3>
+  <ul>
+    <li>Hub kollabiert oder ein Totpunkt wird nicht mehr erreicht.</li>
+    <li>Verbrennung setzt aus beziehungsweise der Zündzeitpunkt driftet von Zyklus zu Zyklus.</li>
+    <li><code>max_abs_torque_Nm</code> oder Leistungsgrenze ist dauerhaft aktiv.</li>
+    <li>Frequenz und Hub sind nach mehreren vollständigen Perioden noch nicht stationär.</li>
+    <li>Eine Halbierung von <code>dt_s</code> ändert die Frequenz merklich: Dann liegt ein numerisches statt physikalisches Ergebnis vor.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2>5. Kurzfazit</h2>
+  <p>Für eine gezielte Frequenzsenkung in V57 ist <code>rotary_inertia_kg_m2</code> der sauberste direkte Parameter. <code>torque_map.skalierung_faktor</code> und <code>load_resistance_ohm</code> ändern die Generatorbelastung, wirken aber gleichzeitig stark auf Hub und Energiebilanz. Bounce-Geometrie und Verdichtung verändern die wirksame Gasfedersteifigkeit. Verbrennung, Wärmeübertragung, Ports, Ventile und Spülung beeinflussen die Frequenz indirekt über Druckverlauf und Zyklusarbeit. <code>engine.speed_rpm</code>, Simulationszeit und Postprocessing setzen die physikalische Freikolbenfrequenz nicht.</p>
+  <p class="muted">Technische Grundlage: V57-Konfiguration sowie die Implementierungen in <code>src/thermo0d/model/free_piston/rhs.py</code>, <code>forces.py</code>, <code>generator_map.py</code> und <code>cycle_metrics.py</code>.</p>
+</section>
+</main></body></html>

@@ -44,10 +44,10 @@ free_piston:
     torque_map:
       file: ../A16-002-28c_TorqueToWork_Spa_V01.xlsx
       load_resistance_ohm: 0.5  # Vorhandene Kennblaetter: 0.3, 0.5, 1, 2, 5 und 10 Ohm.
-      skalierung_faktor: 1.5    # Skaliert Drehmoment und elektrische Leistung; erzeugt eine eigene faktorabhaengige NPZ.
+      skalierung_faktor: 1.7    # Skaliert Drehmoment und elektrische Leistung; erzeugt eine eigene faktorabhaengige NPZ.
       angle_at_x_min_deg: 9.0   # Simulationswinkel 0 deg / x_min entspricht Rotor 1 bei +9 deg.
       angle_at_x_max_deg: -9.0  # Simulationswinkel 18 deg / x_max entspricht Rotor 1 bei -9 deg.
-      include_no_load_torque: true  # Magnetisches Leerlaufmoment aus Blatt "No Load" mitverwenden.
+      include_no_load_torque: false  # Magnetisches Leerlaufmoment aus Blatt "No Load" mitverwenden.
       angle_out_of_range: clamp     # Kleine numerische Ueberschreitungen an den Endpunkten begrenzen.
       resistance_out_of_range: error
       max_abs_torque_Nm: 1800.0
@@ -188,8 +188,8 @@ preprocessing:
         model: vibe
         start_mode: hign_position
         duration_mode: time
-        hign_mm: 4 #12.65
-        duration_ms: 10.0
+        hign_mm: 3.8 #12.65
+        duration_ms: 6.0
         a: 6.9
         m: 2.0
         energy_coupling: none

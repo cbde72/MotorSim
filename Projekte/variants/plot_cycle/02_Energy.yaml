@@ -6,7 +6,7 @@ style:
   legend_edgecolor: '#a0a0a0'
   legend_visible: true
   legend_position: upper left
-  
+
 figures:
 - title: energy
   rows: 1
@@ -38,40 +38,45 @@ figures:
       show_label: false
     y_axes:
     - id: ax_x
-      title: Piston position [mm] (+54 = TDC, -54 = BDC)
+      title: Piston Position [mm] (+46 = TDC, -46 = BDC)
       side: left
       color: '#111111'
       limit_mode: manual
-      y_min: -60.0
-      y_max: 60.0
-      min: -60.0
-      max: 60.0
-      axis_label_size: 8
+      y_min: -50.0
+      y_max: 50.0
+      min: -50.0
+      max: 50.0
+      axis_label_size: 6
       tick_label_size: 6
     - id: ax_mdot
       title: Mass flow [kg/s]
       side: right
       color: '#111111'
-      axis_label_size: 8
+      axis_label_size: 6
       tick_label_size: 6
       limit_mode: manual
       y_min: -0.5
       y_max: 0.5
       min: -0.5
-      max: 0.5
+      label_pad: 2
+      tick_label_pad: 2
+      #max: 0.5
     - id: ax_qzu
       title: Fuel Energie [kW]
       side: right
       color: '#111111'
       limit_mode: manual
       y_min: 0.0
-      y_max: 500.0
+      y_max: 350000.0
       min: 0.0
-      max: 500.0
-      axis_label_size: 8
+      max: 350000.0
+      axis_label_size: 6
       tick_label_size: 6
+      spine_offset: 0.08
+      label_pad: 2
+      tick_label_pad: 2
     y_lines:
-    - y: -54.0
+    - y: -45.553093
       axis_id: ax_x
       label: UT
       show_label: true
@@ -83,7 +88,7 @@ figures:
       line_style: --
       line_width: 0.5
       alpha: 0.95
-    - y: 54.0
+    - y: 45.553093
       axis_id: ax_x
       label: OT
       show_label: true
@@ -95,7 +100,7 @@ figures:
       line_style: --
       line_width: 0.5
       alpha: 0.95
-    - y: -38.0
+    - y: -35.43
       axis_id: ax_x
       label: Intake
       show_label: true
@@ -106,7 +111,7 @@ figures:
       line_style: dotted
       line_width: 0.5
       alpha: 0.9
-    - y: -36.0
+    - y: -27.84
       axis_id: ax_x
       label: Exhaust
       show_label: true
@@ -123,16 +128,16 @@ figures:
       axis_id: ax_x
       color: '#111111'
       line_style: --
-      line_width: 1.35
+      line_width: 1.0
       scale_factor: -1000.0
       unit_preset: raw
-      offset: 54.04
+      offset: 45.553093
     - signal_key: transfer_slot_1_mdot_kg_per_s
       label: Inflowing mass flow
       axis_id: ax_mdot
       color: '#175CD3'
       #line_style: -.
-      line_width: 1.0
+      line_width: 0.8
       scale_factor: 1.0
       unit_preset: raw
     - signal_key: exhaust_slot_1_mdot_kg_per_s
@@ -140,7 +145,7 @@ figures:
       axis_id: ax_mdot
       color: '#D92D20'
       #line_style: -.
-      line_width: 1.0
+      line_width: 0.8
       scale_factor: 1.0
       unit_preset: raw
     - signal_key: cylinder_1_added_energy_W
@@ -148,8 +153,8 @@ figures:
       axis_id: ax_qzu
       color: '#C2185B'
       line_style: '-'
-      line_width: 1.5
-      scale_factor: 1.0e-03
+      line_width: 0.8
+      scale_factor: 1.0
       unit_preset: raw
 style2:
   preset_name: Light Engineering

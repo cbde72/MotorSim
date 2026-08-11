@@ -32,11 +32,53 @@ DEFAULT_OUTDIR = ROOT / "Projekte" / "variants" / "results" / "free_piston_GenSe
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render plot_CFG YAML layouts from a pipeline csv/signals.csv file.")
     parser.add_argument("--csv", default=str(DEFAULT_CSV), help="Pipeline CSV, normally <result>/csv/signals.csv.")
+    parser.add_argument(
+        "--compare",
+        nargs="+",
+        metavar="LABEL=CSV",
+        help="Mehrere Pipeline-CSVs gemeinsam zeichnen, z. B. V55=.../signals.csv V56=.../signals.csv.",
+    )
+    parser.add_argument(
+        "--x-mode",
+        choices=("raw", "relative"),
+        default="raw",
+        help="raw: originale x-Werte; relative: jede Kurve beginnt bei x=0 (nur im Vergleichsmodus).",
+    )
     parser.add_argument("--plot-cfg", default=str(DEFAULT_PLOT_CFG), help="A plot YAML file or a directory with *.yaml layouts.")
     parser.add_argument("--outdir", default=str(DEFAULT_OUTDIR), help="Directory for rendered PNG files.")
     parser.add_argument("--prefix", default="pipeline", help="Filename prefix for rendered plots.")
     parser.add_argument("--run-config", default=None, help="Optional simulation config name shown in the plot footer.")
     return parser.parse_args(argv)
+
+
+COMPARE_COLORS = (
+    "#175cd3",
+    "#f79009",
+    "#027a48",
+    "#b42318",
+    "#7a5af8",
+    "#0891b2",
+    "#667085",
+)
+COMPARE_LINE_STYLES = ("-", "--", "-.", ":")
+
+
+def parse_compare_sources(values: list[str]) -> list[tuple[str, Path]]:
+    sources: list[tuple[str, Path]] = []
+    labels: set[str] = set()
+    for value in values:
+        label, separator, path_text = str(value).partition("=")
+        label = label.strip()
+        path_text = path_text.strip()
+        if not separator or not label or not path_text:
+            raise SystemExit(f"[ERROR] Ungueltige Vergleichsquelle {value!r}; erwartet wird LABEL=CSV.")
+        if label in labels:
+            raise SystemExit(f"[ERROR] Vergleichslabel mehrfach vergeben: {label}")
+        labels.add(label)
+        sources.append((label, Path(path_text).resolve()))
+    if len(sources) < 2:
+        raise SystemExit("[ERROR] --compare benoetigt mindestens zwei Quellen.")
+    return sources
 
 
 def _parse_float(value: str) -> float | str:
@@ -560,11 +602,132 @@ def render_plot_project_from_rows(rows: list[dict[str, Any]], plot_path: Path, o
     return rendered
 
 
+def _relative_values(values: list[float]) -> list[float]:
+    origin = next((value for value in values if math.isfinite(value)), 0.0)
+    return [value - origin if math.isfinite(value) else value for value in values]
+
+
+def render_comparison_plot(
+    datasets: list[tuple[str, list[dict[str, Any]], Path]],
+    plot_path: Path,
+    output_dir: Path,
+    prefix: str,
+    x_mode: str = "raw",
+) -> list[str]:
+    data = yaml.safe_load(plot_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(data, dict):
+        return []
+    style = _style(data, plot_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    rendered: list[str] = []
+    figures = data.get("figures") if isinstance(data.get("figures"), list) else []
+    for fig_index, fig_def in enumerate(figures, start=1):
+        if not isinstance(fig_def, dict):
+            continue
+        subplots = fig_def.get("subplots") if isinstance(fig_def.get("subplots"), list) else []
+        if not subplots:
+            continue
+        nrows = max(int(fig_def.get("rows", 1) or 1), 1)
+        ncols = max(int(fig_def.get("cols", 1) or 1), 1)
+        plt.rcParams["font.family"] = [str(style.get("font_family", "DejaVu Sans"))]
+        plt.rcParams["font.size"] = float(style.get("font_size", 8.0) or 8.0)
+        fig, axes = plt.subplots(nrows, ncols, figsize=(7.0 * ncols, 3.8 * nrows), dpi=150, squeeze=False)
+        figure_has_data = False
+        for subplot_index, subplot in enumerate(subplots):
+            if not isinstance(subplot, dict):
+                continue
+            row_idx, col_idx = divmod(subplot_index, ncols)
+            if row_idx >= nrows:
+                continue
+            base_axis = axes[row_idx][col_idx]
+            axis_specs = [item for item in (subplot.get("y_axes") or [{"id": "y0"}]) if isinstance(item, dict)]
+            axes_by_id: dict[str, Any] = {}
+            for axis_index, axis_spec in enumerate(axis_specs):
+                axis_id = str(axis_spec.get("id", f"y{axis_index}") or f"y{axis_index}")
+                _axis_for(base_axis, axes_by_id, axis_specs, axis_id)
+            labels: list[tuple[Any, str]] = []
+            x_key = str(subplot.get("x_signal", "t_s") or "t_s")
+            for dataset_index, (dataset_label, rows, _) in enumerate(datasets):
+                x_values = _series_values(
+                    rows,
+                    x_key,
+                    float(subplot.get("x_scale_factor", 1.0) or 1.0),
+                    float(subplot.get("x_offset", 0.0) or 0.0),
+                )
+                if not any(math.isfinite(value) for value in x_values):
+                    x_values = [float(index) for index in range(len(rows))]
+                if x_mode == "relative":
+                    x_values = _relative_values(x_values)
+                for series_index, series in enumerate(subplot.get("series", []) or []):
+                    if not isinstance(series, dict):
+                        continue
+                    signal_key = str(series.get("signal_key", "") or "")
+                    if not signal_key or (rows and signal_key not in rows[0]):
+                        continue
+                    axis_id = str(series.get("axis_id", axis_specs[0].get("id", "y0")) or "y0")
+                    axis = axes_by_id.get(axis_id) or base_axis
+                    y_values = _series_values(rows, signal_key, float(series.get("scale_factor", 1.0) or 1.0), float(series.get("offset", 0.0) or 0.0))
+                    y_values = _hide_values_before_positive_signal(rows, y_values, str(series.get("hide_before_positive_signal", "") or ""), _safe_float(series.get("hide_threshold", 0.0), 0.0))
+                    xs, ys = _finite_xy(x_values, y_values)
+                    if not xs:
+                        continue
+                    series_label = str(series.get("label") or signal_key)
+                    legend_label = f"{dataset_label} – {series_label}"
+                    line, = axis.plot(
+                        xs,
+                        ys,
+                        label=legend_label,
+                        color=COMPARE_COLORS[dataset_index % len(COMPARE_COLORS)],
+                        linestyle=str(series.get("compare_line_style") or COMPARE_LINE_STYLES[series_index % len(COMPARE_LINE_STYLES)]),
+                        linewidth=float(series.get("line_width", style.get("default_line_width", 1.8)) or style.get("default_line_width", 1.8)),
+                        markersize=float(series.get("marker_size", style.get("default_marker_size", 4.0)) or style.get("default_marker_size", 4.0)),
+                    )
+                    labels.append((line, legend_label))
+                    figure_has_data = True
+            first_rows = datasets[0][1]
+            if bool(style.get("subplot_title_visible", True)):
+                base_axis.set_title(str(subplot.get("title", "") or ""), fontsize=float(style.get("title_size", 9.0) or 9.0))
+            base_axis.set_xlabel(str(subplot.get("x_title", x_key) or x_key), fontsize=float(style.get("axis_label_size", 8.0) or 8.0))
+            if bool(style.get("grid_visible", True)):
+                base_axis.grid(True, alpha=float(style.get("grid_alpha", 0.3) or 0.3))
+            if labels and bool(style.get("legend_visible", True)):
+                base_axis.legend([line for line, _ in labels], [label for _, label in labels], loc=str(style.get("legend_position", "best") or "best"), fontsize=float(style.get("tick_label_size", 8.0) or 8.0))
+            _apply_x_axis_layout(base_axis, subplot, first_rows, style)
+            for axis_spec in axis_specs:
+                target_axis = axes_by_id.get(str(axis_spec.get("id", "")))
+                if target_axis is not None:
+                    _apply_y_axis_layout(target_axis, axis_spec)
+        for empty_index in range(len(subplots), nrows * ncols):
+            axes[empty_index // ncols][empty_index % ncols].axis("off")
+        title = str(fig_def.get("title", f"Figure {fig_index}") or f"Figure {fig_index}")
+        if bool(style.get("figure_title_visible", True)):
+            fig.suptitle(title, fontsize=float(style.get("figure_title_size", 10.0) or 10.0))
+        sources_text = ", ".join(label for label, _, _ in datasets)
+        fig.text(0.995, 0.006, f"Vergleich: {sources_text}\nPlot: {plot_path.name}", ha="right", va="bottom", fontsize=6, color="#666666", alpha=0.9)
+        if bool(style.get("tight_layout", True)):
+            fig.tight_layout(rect=(0.0, 0.02, 1.0, 1.0))
+        if figure_has_data:
+            out = output_dir / f"{prefix}__{fig_index:02d}__{_slug(title)}.png"
+            fig.savefig(out)
+            rendered.append(str(out))
+        plt.close(fig)
+    return rendered
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    csv_path = Path(args.csv).resolve()
     plot_cfg_path = Path(args.plot_cfg).resolve()
     outdir = Path(args.outdir).resolve()
+    if args.compare:
+        sources = parse_compare_sources(args.compare)
+        rendered = render_pipeline_csv_comparison(sources, plot_cfg_path, outdir, str(args.prefix), x_mode=args.x_mode)
+        print(f"[plots] compare={', '.join(label for label, _ in sources)}")
+        print(f"[plots] outdir={outdir}")
+        print(f"[plots] rendered={len(rendered)}")
+        for path in rendered:
+            print(f"[plot] {path}")
+        return 0
+    csv_path = Path(args.csv).resolve()
     run_config_path = Path(args.run_config).resolve() if args.run_config else None
     rendered = render_pipeline_csv_plots(csv_path, plot_cfg_path, outdir, str(args.prefix), run_config_path=run_config_path)
     print(f"[plots] csv={csv_path}")
@@ -602,6 +765,35 @@ def render_pipeline_csv_plots(csv_path: Path, plot_cfg_path: Path, outdir: Path,
     for plot_path in plot_paths:
         file_prefix = "__".join(part for part in (str(prefix).strip(), plot_path.stem.replace("-", "_")) if part)
         rendered.extend(render_plot_project_from_rows(rows, plot_path, outdir, file_prefix, run_config_path=run_config_path, source_csv_path=csv_path))
+    return rendered
+
+
+def render_pipeline_csv_comparison(
+    sources: list[tuple[str, Path]],
+    plot_cfg_path: Path,
+    outdir: Path,
+    prefix: str = "comparison",
+    x_mode: str = "raw",
+    clean: bool = True,
+) -> list[str]:
+    plot_cfg_path = Path(plot_cfg_path).resolve()
+    outdir = Path(outdir).resolve()
+    datasets: list[tuple[str, list[dict[str, Any]], Path]] = []
+    for label, source_path in sources:
+        csv_path = Path(source_path).resolve()
+        rows = read_pipeline_csv(csv_path)
+        if not rows:
+            raise SystemExit(f"[ERROR] CSV enthaelt keine Datenzeilen: {csv_path}")
+        datasets.append((str(label), rows, csv_path))
+    plot_paths = iter_plot_paths(plot_cfg_path)
+    if not plot_paths:
+        raise SystemExit(f"[ERROR] Keine Plot-Konfigurationen gefunden: {plot_cfg_path}")
+    if clean:
+        _clear_prefixed_pngs(outdir, str(prefix).strip())
+    rendered: list[str] = []
+    for plot_path in plot_paths:
+        file_prefix = "__".join(part for part in (str(prefix).strip(), plot_path.stem.replace("-", "_")) if part)
+        rendered.extend(render_comparison_plot(datasets, plot_path, outdir, file_prefix, x_mode=x_mode))
     return rendered
 
 

@@ -7,7 +7,7 @@ figures:
   rows: 1
   cols: 1
   subplots:
-  - title: Piston lift, Massflow, Added Energy
+  - title: Piston Position, Massflow, Added Energy
     show_title: true
     plot_type: line
     x_signal: t_s
@@ -33,7 +33,7 @@ figures:
       show_label: false
     y_axes:
     - id: ax_x
-      title: Piston lift [mm] (+46 = OT, -46 = UT)
+      title: Piston Position [mm] (+46 = OT, -46 = UT)
       side: left
       color: '#111111'
       limit_mode: manual
@@ -57,7 +57,7 @@ figures:
       tick_label_pad: 2
       # max: 0.5
     - id: ax_qzu
-      title: Added Energy [W]
+      title: Fuel Energy [W]
       side: right
       color: '#111111'
       limit_mode: manual

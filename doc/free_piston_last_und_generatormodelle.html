@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Free-Piston Last- und Generatormodelle</title>
+  <style>
+    :root { --ink:#17212b; --muted:#52606d; --line:#d8e0e7; --accent:#006b6b; --soft:#edf7f6; --code:#f5f7f9; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:#fff; font:16px/1.58 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    header { color:#fff; background:linear-gradient(120deg,#123447,#006b6b); padding:3.5rem max(1.5rem,calc((100% - 1120px)/2)); }
+    header p { max-width:52rem; margin:.5rem 0 0; opacity:.9; }
+    main { max-width:1120px; margin:auto; padding:2rem 1.5rem 5rem; display:grid; grid-template-columns:240px minmax(0,1fr); gap:2.5rem; }
+    nav { position:sticky; top:1rem; align-self:start; border:1px solid var(--line); border-radius:10px; padding:1rem; }
+    nav a { display:block; color:var(--accent); padding:.22rem 0; text-decoration:none; }
+    article { min-width:0; }
+    h1 { margin:0; font-size:clamp(2rem,5vw,3.4rem); line-height:1.05; }
+    h2 { margin-top:2.8rem; border-bottom:2px solid var(--line); padding-bottom:.35rem; }
+    h3 { margin-top:2rem; color:#16455a; }
+    h4 { margin-bottom:.35rem; }
+    code, pre { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+    code { background:var(--code); padding:.1rem .3rem; border-radius:4px; }
+    pre { overflow:auto; background:#18232d; color:#e8f1f5; padding:1rem; border-radius:8px; }
+    .card,.note { border:1px solid var(--line); border-radius:10px; padding:1rem 1.2rem; margin:1rem 0; }
+    .note { border-left:5px solid var(--accent); background:var(--soft); }
+    .eq { overflow-x:auto; text-align:center; margin:1.1rem 0; padding:.75rem; background:#fafcfd; border-radius:8px; }
+    math { font-size:1.16rem; }
+    table { width:100%; border-collapse:collapse; margin:1rem 0; font-size:.94rem; }
+    th,td { border:1px solid var(--line); padding:.55rem .65rem; text-align:left; vertical-align:top; }
+    th { background:#eef3f6; }
+    .tag { display:inline-block; padding:.08rem .45rem; border-radius:1rem; background:#d9eeee; color:#064f4f; font-size:.82rem; }
+    .src { color:var(--muted); font-size:.9rem; }
+    @media (max-width:800px) { main { grid-template-columns:1fr; } nav { position:static; } }
+    @media print { header { background:#fff; color:#000; padding:1rem 0; } main { display:block; padding:0; } nav { display:none; } h2 { break-before:page; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Free-Piston Last- und Generatormodelle</h1>
+  <p>Technische Dokumentation aller im Projekt implementierten Modelle, ihrer Gleichungen, Parameter, Grenzen und Ausgabesignale. Stand: 7. August 2026.</p>
+</header>
+<main>
+<nav aria-label="Inhalt">
+  <strong>Inhalt</strong>
+  <a href="#konventionen">1. Konventionen</a>
+  <a href="#uebersicht">2. Übersicht</a>
+  <a href="#none">3. Keine Last</a>
+  <a href="#linear">4. Lineare Modelle</a>
+  <a href="#controlled">5. Generatorregelung</a>
+  <a href="#regulated">6. Leistungsregelung</a>
+  <a href="#map">7. Drehmomentkennfeld</a>
+  <a href="#parameter">8. Parameter</a>
+  <a href="#signale">9. Ausgaben</a>
+  <a href="#quellen">10. Codequellen</a>
+</nav>
+<article>
+  <section id="konventionen">
+    <h2>1. Modellkonventionen</h2>
+    <p>Die Funktion <code>compute_load_info</code> liefert eine <em>vorzeichenbehaftete Lastgröße</em> in Bewegungsrichtung. In der Bewegungsgleichung wird sie negiert. Für die lineare Kinematik gilt daher:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>m</mi><mover><mi>x</mi><mo>¨</mo></mover><mo>=</mo><msub><mi>F</mi><mi>Gas</mi></msub><mo>+</mo><msub><mi>F</mi><mi>Feder</mi></msub><mo>+</mo><msub><mi>F</mi><mi>Reib</mi></msub><mo>−</mo><msub><mi>F</mi><mi>Last,signed</mi></msub></mrow></math></div>
+    <p>Damit wirkt eine positive Dämpferkraft bei positiver Geschwindigkeit im System stets bremsend. Die mechanische Generatorleistung wird nichtnegativ ausgegeben:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>P</mi><mi>mech</mi></msub><mo>=</mo><mi>max</mi><mo>(</mo><msub><mi>F</mi><mi>Last,signed</mi></msub><mover><mi>x</mi><mo>˙</mo></mover><mo>,</mo><mn>0</mn><mo>)</mo></mrow></math></div>
+    <div class="note"><strong>Wichtig:</strong> <code>electromagnetic_linear</code> und <code>viscous</code> sind derzeit mathematisch identisch. Der unterschiedliche Modellname beschreibt die physikalische Interpretation, nicht eine andere Gleichung.</div>
+  </section>
+
+  <section id="uebersicht">
+    <h2>2. Übersicht</h2>
+    <table><thead><tr><th>Konfigurationswert</th><th>Prinzip</th><th>Positionsabhängig</th><th>Elektrische Leistung</th></tr></thead><tbody>
+      <tr><td><code>none</code></td><td>keine externe Last</td><td>nein</td><td>0</td></tr>
+      <tr><td><code>viscous</code></td><td>linear-viskose Dämpfung</td><td>nein</td><td>gleich mechanischer Leistung</td></tr>
+      <tr><td><code>electromagnetic_linear</code></td><td>linearer elektromagnetischer Generator</td><td>nein</td><td>gleich mechanischer Leistung</td></tr>
+      <tr><td><code>generator_controlled</code></td><td>positionsabhängige Dämpfung plus optionale Motorhilfe</td><td>ja</td><td>gleich nichtnegativer Nettoleistung</td></tr>
+      <tr><td><code>linear_generator_regulated</code></td><td>Leistungsziel, Mittellagenfenster und Endanschlagregelung</td><td>ja</td><td>Wirkungsgradmodell</td></tr>
+      <tr><td><code>generator_torque_map</code></td><td>richtungs- und widerstandsabhängiges Excel-Kennfeld</td><td>ja</td><td>aus Kennfeld</td></tr>
+    </tbody></table>
+  </section>
+
+  <section id="none">
+    <h2>3. <code>none</code> – keine Last</h2>
+    <p>Das Modell deaktiviert Last und Generator vollständig.</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>F</mi><mi>Last</mi></msub><mo>=</mo><msub><mi>P</mi><mi>mech</mi></msub><mo>=</mo><msub><mi>P</mi><mi>el</mi></msub><mo>=</mo><mn>0</mn></mrow></math></div>
+    <pre>load:
+  model: none
+  damping_Ns_per_m: 0.0</pre>
+  </section>
+
+  <section id="linear">
+    <h2>4. <code>viscous</code> und <code>electromagnetic_linear</code></h2>
+    <p>Beide Modelle verwenden den Dämpfungskoeffizienten <span class="tag">damping_Ns_per_m</span> und berechnen dieselbe Kraft:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>F</mi><mi>Last,signed</mi></msub><mo>=</mo><mi>c</mi><mover><mi>x</mi><mo>˙</mo></mover><mo>,</mo><mspace width="1em"/><msub><mi>P</mi><mi>mech</mi></msub><mo>=</mo><mi>c</mi><msup><mover><mi>x</mi><mo>˙</mo></mover><mn>2</mn></msup></mrow></math></div>
+    <p>Im aktuellen Modell wird kein separater Generatorwirkungsgrad angewendet:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>P</mi><mi>el</mi></msub><mo>=</mo><msub><mi>P</mi><mi>mech</mi></msub></mrow></math></div>
+    <pre>load:
+  model: electromagnetic_linear  # alternativ: viscous
+  damping_Ns_per_m: 12.0</pre>
+  </section>
+
+  <section id="controlled">
+    <h2>5. <code>generator_controlled</code></h2>
+    <p>Die Grunddämpfung wird nur in Bewegungsrichtung zum jeweils nahen Hubende erhöht. Sei <i>z</i> die Breite der Regelzone und <i>d</i> der Abstand zum angefahrenen Ende:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>d</mi><mo>=</mo><mfenced open="{" close=""><mtable><mtr><mtd><mi>max</mi><mo>(</mo><mi>x</mi><mo>−</mo><msub><mi>x</mi><mi>min</mi></msub><mo>,</mo><mn>0</mn><mo>)</mo></mtd><mtd><mtext>für </mtext><mover><mi>x</mi><mo>˙</mo></mover><mo>&lt;</mo><mn>0</mn></mtd></mtr><mtr><mtd><mi>max</mi><mo>(</mo><msub><mi>x</mi><mi>max</mi></msub><mo>−</mo><mi>x</mi><mo>,</mo><mn>0</mn><mo>)</mo></mtd><mtd><mtext>für </mtext><mover><mi>x</mi><mo>˙</mo></mover><mo>&gt;</mo><mn>0</mn></mtd></mtr></mtable></mfenced></mrow></math></div>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>p</mi><mo>=</mo><mi>clamp</mi><mo>(</mo><mn>1</mn><mo>−</mo><mfrac><mi>d</mi><mi>z</mi></mfrac><mo>,</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>)</mo><mo>,</mo><mspace width="1em"/><msub><mi>c</mi><mi>eff</mi></msub><mo>=</mo><msub><mi>c</mi><mi>base</mi></msub><mo>+</mo><mo>(</mo><msub><mi>c</mi><mi>max</mi></msub><mo>−</mo><msub><mi>c</mi><mi>base</mi></msub><mo>)</mo><mi>p</mi></mrow></math></div>
+    <h3>Optionale Motorhilfe bei kleiner Geschwindigkeit</h3>
+    <p>Ist die Motorhilfe in der Konfiguration aktiviert, wird unterhalb der Schwelle <i>v</i><sub>a</sub> eine linear abfallende Kraft entgegen dem Vorzeichen der normalen Generatorlast addiert:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>F</mi><mi>assist</mi></msub><mo>=</mo><mfenced open="{" close=""><mtable><mtr><mtd><mo>−</mo><mi>sgn</mi><mo>(</mo><mover><mi>x</mi><mo>˙</mo></mover><mo>)</mo><msub><mi>F</mi><mi>a,max</mi></msub><mo>(</mo><mn>1</mn><mo>−</mo><mfrac><mrow><mo>|</mo><mover><mi>x</mi><mo>˙</mo></mover><mo>|</mo></mrow><msub><mi>v</mi><mi>a</mi></msub></mfrac><mo>)</mo></mtd><mtd><mtext>für </mtext><mn>0</mn><mo>&lt;</mo><mo>|</mo><mover><mi>x</mi><mo>˙</mo></mover><mo>|</mo><mo>&lt;</mo><msub><mi>v</mi><mi>a</mi></msub></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mtext>sonst</mtext></mtd></mtr></mtable></mfenced></mrow></math></div>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>F</mi><mi>Last,signed</mi></msub><mo>=</mo><msub><mi>c</mi><mi>eff</mi></msub><mover><mi>x</mi><mo>˙</mo></mover><mo>+</mo><msub><mi>F</mi><mi>assist</mi></msub></mrow></math></div>
+    <p>Bei <code>motor_assist_until_soc: true</code> wird die Hilfe nach erkannter Selbstzündung (SOC) abgeschaltet.</p>
+    <h3>Rechenbeispiel 1: Dämpfung in Hubmitte und nahe der Endlage</h3>
+    <p>Angenommen werden <i>x</i><sub>min</sub> = 0 m, <i>x</i><sub>max</sub> = 0,08 m, <i>c</i><sub>base</sub> = 10 N·s/m, <i>c</i><sub>max</sub> = 100 N·s/m, <i>z</i> = 0,01 m und ẋ = +2 m/s. Der Kolben bewegt sich also zum oberen Positionslimit.</p>
+    <div class="card">
+      <h4>Fall A – Hubmitte bei x = 0,04 m</h4>
+      <p>Der Abstand zum angefahrenen Ende ist <i>d</i> = 0,08 − 0,04 = 0,04 m. Weil <i>d</i> ≥ <i>z</i>, ist die Regelzone nicht aktiv: <i>p</i> = 0 und <i>c</i><sub>eff</sub> = 10 N·s/m.</p>
+      <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>F</mi><mi>Last,signed</mi></msub><mo>=</mo><mn>10</mn><mo>·</mo><mn>2</mn><mo>=</mo><mn>20</mn><mtext> N</mtext><mo>,</mo><mspace width="1em"/><mi>P</mi><mo>=</mo><mn>20</mn><mo>·</mo><mn>2</mn><mo>=</mo><mn>40</mn><mtext> W</mtext></mrow></math></div>
+      <p>In die Kraftbilanz geht −20 N ein; die Last bremst die positive Bewegung.</p>
+      <h4>Fall B – x = 0,075 m, fünf Millimeter vor dem Ende</h4>
+      <p>Nun ist <i>d</i> = 0,005 m. Daraus folgen <i>p</i> = 1 − 0,005/0,01 = 0,5 und <i>c</i><sub>eff</sub> = 10 + (100 − 10)·0,5 = 55 N·s/m.</p>
+      <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>F</mi><mi>Last,signed</mi></msub><mo>=</mo><mn>55</mn><mo>·</mo><mn>2</mn><mo>=</mo><mn>110</mn><mtext> N</mtext><mo>,</mo><mspace width="1em"/><mi>P</mi><mo>=</mo><mn>110</mn><mo>·</mo><mn>2</mn><mo>=</mo><mn>220</mn><mtext> W</mtext></mrow></math></div>
+      <p>Die Bremskraft ist damit 5,5-mal so groß wie in der Hubmitte. Direkt am Ende gilt <i>p</i> = 1 und somit <i>c</i><sub>eff</sub> = <i>c</i><sub>max</sub>.</p>
+    </div>
+    <h3>Rechenbeispiel 2: Motorhilfe</h3>
+    <p>In der Hubmitte seien ẋ = +0,5 m/s, <i>v</i><sub>a</sub> = 1,5 m/s und <i>F</i><sub>a,max</sub> = 350 N. Die normale Dämpferkraft beträgt nur 10·0,5 = 5 N. Die Motorhilfe ergibt:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>F</mi><mi>assist</mi></msub><mo>=</mo><mo>−</mo><mn>350</mn><mo>(</mo><mn>1</mn><mo>−</mo><mfrac><mn>0.5</mn><mn>1.5</mn></mfrac><mo>)</mo><mo>=</mo><mo>−</mo><mn>233.33</mn><mtext> N</mtext></mrow></math></div>
+    <p>Somit ist <i>F</i><sub>Last,signed</sub> = 5 − 233,33 = −228,33 N. Nach der Negation in der Bewegungsgleichung wirkt +228,33 N in Bewegungsrichtung: Der Generator arbeitet motorisch und führt Energie zu. Weil das Leistungs-Ausgabefeld mit <code>max(F·v, 0)</code> gebildet wird, meldet es in diesem Fall 0 W Generatorleistung; die zugeführte Motorleistung wird über die separaten Assist-Signale ausgewiesen. Bei |ẋ| ≥ 1,5 m/s oder ẋ = 0 ist die Hilfe exakt null.</p>
+    <div class="note"><strong>Regelcharakter:</strong> Dieses Modell regelt keine konstante elektrische Leistung. Es ist ein positionsabhängiger Dämpfer mit optionaler Anschleppfunktion. Der Übergang in der Endzone ist linear und deshalb am Zonenrand zwar stetig, aber nicht glatt differenzierbar.</div>
+  </section>
+
+  <section id="regulated">
+    <h2>6. <code>linear_generator_regulated</code></h2>
+    <p>Dieses Modell addiert Grundlast, eine auf elektrische Sollleistung geregelte Kraft und eine Endanschlag-Schutzkraft. Mit normierter Position <i>s</i> und Mittellagengewicht <i>w</i>:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>s</mi><mo>=</mo><mi>clamp</mi><mo>(</mo><mfrac><mrow><mi>x</mi><mo>−</mo><msub><mi>x</mi><mi>min</mi></msub></mrow><mrow><msub><mi>x</mi><mi>max</mi></msub><mo>−</mo><msub><mi>x</mi><mi>min</mi></msub></mrow></mfrac><mo>,</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>)</mo><mo>,</mo><mspace width="1em"/><mi>w</mi><mo>=</mo><mn>4</mn><mi>s</mi><mo>(</mo><mn>1</mn><mo>−</mo><mi>s</mi><mo>)</mo></mrow></math></div>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>F</mi><mi>base</mi></msub><mo>=</mo><msub><mi>c</mi><mi>base</mi></msub><mo>|</mo><mover><mi>x</mi><mo>˙</mo></mover><mo>|</mo><mo>,</mo><mspace width="1em"/><msub><mi>F</mi><mi>power</mi></msub><mo>=</mo><mfrac><mrow><mi>w</mi><msub><mi>P</mi><mi>el,target</mi></msub></mrow><mrow><mi>η</mi><mi>max</mi><mo>(</mo><mo>|</mo><mover><mi>x</mi><mo>˙</mo></mover><mo>|</mo><mo>,</mo><msub><mi>v</mi><mi>min</mi></msub><mo>)</mo></mrow></mfrac></mrow></math></div>
+    <p>Innerhalb der Regelzone wird die zum Abbremsen benötigte Kraft aus dem Energieansatz bestimmt. <i>S</i>(u)=u²(3−2u) ist die Smoothstep-Funktion:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>F</mi><mi>stop</mi></msub><mo>=</mo><msub><mi>k</mi><mi>stop</mi></msub><mi>S</mi><mo>(</mo><mfrac><mrow><mi>z</mi><mo>−</mo><mi>d</mi></mrow><mi>z</mi></mfrac><mo>)</mo><mfrac><mrow><mi>m</mi><msup><mrow><mo>|</mo><mover><mi>x</mi><mo>˙</mo></mover><mo>|</mo></mrow><mn>2</mn></msup></mrow><mrow><mn>2</mn><mi>max</mi><mo>(</mo><mi>d</mi><mo>−</mo><msub><mi>d</mi><mi>target</mi></msub><mo>,</mo><msub><mi>d</mi><mi>hard</mi></msub><mo>,</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>9</mn></mrow></msup><mo>)</mo></mrow></mfrac></mrow></math></div>
+    <p>Die Summe wird durch <code>max_force_N</code> und durch <i>c</i><sub>max</sub>|ẋ| begrenzt. Innerhalb der harten Marge wird direkt die Grenzkraft angesetzt.</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>F</mi><mo>=</mo><mi>clip</mi><mo>(</mo><msub><mi>F</mi><mi>base</mi></msub><mo>+</mo><msub><mi>F</mi><mi>power</mi></msub><mo>+</mo><msub><mi>F</mi><mi>stop</mi></msub><mo>,</mo><mn>0</mn><mo>,</mo><mi>min</mi><mo>(</mo><msub><mi>F</mi><mi>max</mi></msub><mo>,</mo><msub><mi>c</mi><mi>max</mi></msub><mo>|</mo><mover><mi>x</mi><mo>˙</mo></mover><mo>|</mo><mo>)</mo><mo>)</mo></mrow></math></div>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>P</mi><mi>mech</mi></msub><mo>=</mo><mi>F</mi><mo>|</mo><mover><mi>x</mi><mo>˙</mo></mover><mo>|</mo><mo>,</mo><mspace width="1em"/><msub><mi>P</mi><mi>el</mi></msub><mo>=</mo><mi>η</mi><msub><mi>P</mi><mi>mech</mi></msub></mrow></math></div>
+  </section>
+
+  <section id="map">
+    <h2>7. <code>generator_torque_map</code></h2>
+    <p>Das Kennfeldmodell liest eine Excel-Datei mit einem Blatt <code>No Load</code> und Blättern namens <code>&lt;Wert&gt; Ohm</code>. Jedes Lastblatt liefert mechanischen Winkel, Drehmoment, Spannung und elektrische Leistung. Für steigende und fallende Winkel werden getrennte Zweige gebildet.</p>
+    <h3>Abbildung des Simulationswinkels</h3>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>α</mi><mi>map</mi></msub><mo>=</mo><msub><mi>α</mi><mi>x,min</mi></msub><mo>+</mo><mfrac><mrow><mi>q</mi><mo>−</mo><msub><mi>q</mi><mi>min</mi></msub></mrow><mrow><msub><mi>q</mi><mi>max</mi></msub><mo>−</mo><msub><mi>q</mi><mi>min</mi></msub></mrow></mfrac><mo>(</mo><msub><mi>α</mi><mi>x,max</mi></msub><mo>−</mo><msub><mi>α</mi><mi>x,min</mi></msub><mo>)</mo></mrow></math></div>
+    <p>Innerhalb eines Zweigs wird linear über den Kennfeldwinkel interpoliert. Anschließend wird linear zwischen den zwei benachbarten Lastwiderständen interpoliert:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>y</mi><mo>(</mo><mi>R</mi><mo>)</mo><mo>=</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>λ</mi><mo>)</mo><msub><mi>y</mi><mn>0</mn></msub><mo>+</mo><mi>λ</mi><msub><mi>y</mi><mn>1</mn></msub><mo>,</mo><mspace width="1em"/><mi>λ</mi><mo>=</mo><mfrac><mrow><mi>R</mi><mo>−</mo><msub><mi>R</mi><mn>0</mn></msub></mrow><mrow><msub><mi>R</mi><mn>1</mn></msub><mo>−</mo><msub><mi>R</mi><mn>0</mn></msub></mrow></mfrac></mrow></math></div>
+    <p>Bei Stillstand wird der Mittelwert aus steigendem und fallendem Zweig verwendet. Je nach <code>include_no_load_torque</code> gilt:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>τ</mi><mi>applied</mi></msub><mo>=</mo><mfenced open="{" close=""><mtable><mtr><mtd><msub><mi>τ</mi><mi>total</mi></msub></mtd><mtd><mtext>wenn Leerlaufmoment enthalten</mtext></mtd></mtr><mtr><mtd><msub><mi>τ</mi><mi>total</mi></msub><mo>−</mo><msub><mi>τ</mi><mi>no-load</mi></msub></mtd><mtd><mtext>sonst</mtext></mtd></mtr></mtable></mfenced></mrow></math></div>
+    <p>Drehmoment und elektrische Leistung werden optional durch <code>max_abs_torque_Nm</code> bzw. <code>max_electrical_power_W</code> begrenzt. Winkel und Widerstand können außerhalb des Kennfelds geklemmt werden oder einen Fehler auslösen.</p>
+    <div class="note"><strong>Kopplung in der Bewegungsgleichung:</strong> Das Kennfelddrehmoment wird direkt zur generalisierten Dynamik addiert. Zusätzlich wird <code>generator_controlled</code> als Sicherheitsdämpfung berechnet. Das Vorzeichen des in der Excel-Datei gespeicherten Drehmoments muss daher zur Konvention des generalisierten Koordinatensystems passen.</div>
+    <h3>Rechenbeispiel 1: Winkelabbildung der vorhandenen V57-Konfiguration</h3>
+    <p>V57 verwendet <i>q</i><sub>min</sub> = 0°, <i>q</i><sub>max</sub> = 18°, <i>α</i><sub>x,min</sub> = +9° und <i>α</i><sub>x,max</sub> = −9°. Bei einem Simulationswinkel von <i>q</i> = 4,5° ist der normierte Anteil 4,5/18 = 0,25:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msub><mi>α</mi><mi>map</mi></msub><mo>=</mo><mn>9</mn><mo>°</mo><mo>+</mo><mn>0.25</mn><mo>(</mo><mo>−</mo><mn>9</mn><mo>°</mo><mo>−</mo><mn>9</mn><mo>°</mo><mo>)</mo><mo>=</mo><mn>4.5</mn><mo>°</mo></mrow></math></div>
+    <p>Entsprechend werden <i>q</i> = 0°, 9° und 18° auf +9°, 0° und −9° abgebildet. Das umgekehrte Vorzeichen ist beabsichtigt und entspricht der Rotor-1-Konvention der V57-Datei.</p>
+    <h3>Rechenbeispiel 2: zweistufige Interpolation</h3>
+    <p>Das folgende einfache Zahlenbeispiel erklärt den Algorithmus. Angenommen, bei <i>α</i> = 0° liefern zwei benachbarte Blätter 1 Ω und 2 Ω die Drehmomente 100 Nm und 60 Nm. Für <i>R</i> = 1,25 Ω ist λ = (1,25 − 1)/(2 − 1) = 0,25:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>τ</mi><mo>=</mo><mo>(</mo><mn>1</mn><mo>−</mo><mn>0.25</mn><mo>)</mo><mn>100</mn><mo>+</mo><mn>0.25</mn><mo>·</mo><mn>60</mn><mo>=</mo><mn>90</mn><mtext> Nm</mtext></mrow></math></div>
+    <p>Liegt der gewünschte Winkel zwischen zwei Messpunkten, wird zuerst auf jedem Widerstandsblatt linear über den Winkel interpoliert und danach mit obiger Rechnung über den Widerstand. Spannung und elektrische Leistung werden auf dieselbe Weise interpoliert. Es wird also <em>nicht</em> nachträglich <i>P</i> = <i>U</i>²/<i>R</i> berechnet.</p>
+    <h3>Rechenbeispiel 3: reale Werte aus V57 bei 0,5 Ω</h3>
+    <p>Die folgenden Werte wurden mit der implementierten Lookup-Funktion direkt aus dem vorhandenen V57-Kennfeld gelesen. Bei <i>q</i> = 9° gilt <i>α</i><sub>map</sub> = 0°. Die Richtungszweige unterscheiden sich deutlich:</p>
+    <table><thead><tr><th>Bewegungsrichtung</th><th>Gesamtmoment</th><th>Leerlaufmoment</th><th>Lastmoment</th><th>Spannung</th><th>elektrische Leistung</th></tr></thead><tbody>
+      <tr><td><i>q̇</i> &gt; 0</td><td>+1389,244 Nm</td><td>−5,625 Nm</td><td>+1394,868 Nm</td><td>+76,440 V</td><td>10 079,275 W</td></tr>
+      <tr><td><i>q̇</i> &lt; 0</td><td>−1235,527 Nm</td><td>−5,686 Nm</td><td>−1229,841 Nm</td><td>−67,417 V</td><td>7 564,110 W</td></tr>
+    </tbody></table>
+    <p>Da V57 <code>include_no_load_torque: true</code> setzt, wird jeweils das Gesamtmoment angewendet. Wäre die Option <code>false</code>, würden stattdessen +1394,868 Nm bzw. −1229,841 Nm verwendet. Die elektrische Leistung bleibt ein eigener Kennfeldkanal und wird nicht aus dem angewendeten Moment rekonstruiert.</p>
+    <h3>Rechenbeispiel 4: Bewegungsgleichung und Sicherheitsdämpfung</h3>
+    <p>V57 nutzt zusätzlich <i>c</i><sub>base</sub> = 200 N·s/m, <i>c</i><sub>max</sub> = 10 000 N·s/m und <i>z</i> = 0,018 m. Beispielhaft seien die aus Gas, Gasfeder und Reibung resultierende lineare Kraft 500 N, die Sicherheitsdämpfung 300 N, der Umrechnungsfaktor von linearer Kraft auf generalisiertes Moment 0,29 m, das Kennfelddrehmoment −100 Nm und die Trägheit 1,3 kg·m². Dann gilt:</p>
+    <div class="eq"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mover><mi>q</mi><mo>¨</mo></mover><mo>=</mo><mfrac><mrow><mo>(</mo><mn>500</mn><mo>−</mo><mn>300</mn><mo>)</mo><mo>·</mo><mn>0.29</mn><mo>+</mo><mo>(</mo><mo>−</mo><mn>100</mn><mo>)</mo></mrow><mn>1.3</mn></mfrac><mo>=</mo><mfrac><mrow><mo>−</mo><mn>42</mn></mrow><mn>1.3</mn></mfrac><mo>=</mo><mo>−</mo><mn>32.31</mn><mtext> rad/s²</mtext></mrow></math></div>
+    <p>Das Beispiel zeigt die zwei parallelen Lastpfade: Die Sicherheitslast entsteht als lineare Kraft und wird skaliert; das Kennfeldmoment wird unmittelbar als generalisiertes Drehmoment addiert.</p>
+    <pre>load:
+  model: generator_torque_map
+  damping_Ns_per_m: 10.0
+  max_damping_Ns_per_m: 100.0
+  control_zone_m: 0.01
+  torque_map:
+    file: generator_map.xlsx
+    load_resistance_ohm: 1.0
+    angle_at_x_min_deg: 9.0
+    angle_at_x_max_deg: -9.0
+    include_no_load_torque: true
+    angle_out_of_range: clamp
+    resistance_out_of_range: error</pre>
+  </section>
+
+  <section id="parameter">
+    <h2>8. Konfigurationsparameter</h2>
+    <table><thead><tr><th>Parameter</th><th>Einheit / Bereich</th><th>Verwendung</th></tr></thead><tbody>
+      <tr><td><code>damping_Ns_per_m</code></td><td>N·s/m, ≥ 0</td><td>Grunddämpfung; für alle Modelle Pflichtfeld</td></tr>
+      <tr><td><code>max_damping_Ns_per_m</code></td><td>N·s/m, ≥ Grunddämpfung</td><td>Generatorregelung, Leistungsregelung, Kennfeld-Sicherheit</td></tr>
+      <tr><td><code>control_zone_m</code></td><td>m, &gt; 0</td><td>Breite der Endlagen-Regelzone</td></tr>
+      <tr><td><code>power_target_W</code></td><td>W, ≥ 0</td><td>elektrisches Leistungsziel</td></tr>
+      <tr><td><code>efficiency_0to1</code></td><td>0 &lt; η ≤ 1</td><td>mechanisch-elektrischer Wirkungsgrad</td></tr>
+      <tr><td><code>min_velocity_m_per_s</code></td><td>m/s, &gt; 0</td><td>Regularisierung der Kraft bei kleiner Geschwindigkeit</td></tr>
+      <tr><td><code>motor_assist_enabled</code></td><td>bool</td><td>aktiviert die Anschlepphilfe</td></tr>
+      <tr><td><code>motor_assist_until_soc</code></td><td>bool</td><td>schaltet Anschlepphilfe nach SOC ab</td></tr>
+      <tr><td><code>assist_velocity_threshold_m_per_s</code></td><td>m/s, &gt; 0</td><td>Geschwindigkeitsschwelle der Motorhilfe</td></tr>
+      <tr><td><code>assist_force_N</code></td><td>N, &gt; 0 bei aktiver Hilfe</td><td>maximale Anschleppkraft</td></tr>
+      <tr><td><code>target_margin_m</code></td><td>m, ≥ harte Marge</td><td>Zielabstand zum Hubende</td></tr>
+      <tr><td><code>hard_margin_m</code></td><td>m, ≥ 0</td><td>harte Schutzmarge</td></tr>
+      <tr><td><code>stop_kp</code></td><td>dimensionslos, &gt; 0</td><td>Verstärkung der Stoppkraft</td></tr>
+      <tr><td><code>max_force_N</code></td><td>N, &gt; 0</td><td>optionale absolute Kraftgrenze</td></tr>
+    </tbody></table>
+  </section>
+
+  <section id="signale">
+    <h2>9. Relevante Ausgabesignale</h2>
+    <table><thead><tr><th>Signal</th><th>Bedeutung</th></tr></thead><tbody>
+      <tr><td><code>free_piston_F_load_N</code></td><td>Lastkraft in der rekonstruierten Kraftbilanz</td></tr>
+      <tr><td><code>free_piston_generator_power_W</code></td><td>mechanische, nichtnegative Generatorleistung</td></tr>
+      <tr><td><code>free_piston_generator_electrical_power_W</code></td><td>elektrische Leistung des geregelten bzw. Kennfeldmodells</td></tr>
+      <tr><td><code>free_piston_generator_assist_force_N</code></td><td>Anschleppkraft</td></tr>
+      <tr><td><code>free_piston_generator_assist_torque_Nm</code></td><td>generalisiertes Anschleppmoment</td></tr>
+      <tr><td><code>free_piston_generator_map_angle_deg</code></td><td>abgebildeter Kennfeldwinkel</td></tr>
+      <tr><td><code>free_piston_generator_map_torque_Nm</code></td><td>angewendetes Kennfelddrehmoment</td></tr>
+      <tr><td><code>free_piston_generator_map_no_load_torque_Nm</code></td><td>interpoliertes Leerlaufmoment</td></tr>
+      <tr><td><code>free_piston_generator_map_load_torque_Nm</code></td><td>Gesamt- minus Leerlaufmoment</td></tr>
+      <tr><td><code>free_piston_generator_map_voltage_V</code></td><td>interpolierte Spannung</td></tr>
+      <tr><td><code>free_piston_generator_map_out_of_range_0to1</code></td><td>Kennzeichen für Bereichsüberschreitung</td></tr>
+    </tbody></table>
+  </section>
+
+  <section id="quellen">
+    <h2>10. Implementierungsquellen</h2>
+    <p class="src">Abgeleitet aus <code>src/thermo0d/model/free_piston/forces.py</code>, <code>generator_map.py</code>, <code>rhs.py</code>, <code>postprocessing.py</code>, <code>output/reconstruction.py</code> sowie dem Konfigurationsschema in <code>src/thermo0d/config/models.py</code>. Die erlaubten Modellnamen stammen direkt aus <code>FreePistonLoadConfig</code>.</p>
+    <p class="src">Die Dokumentation beschreibt den tatsächlichen Softwarestand, einschließlich Grenzwertbehandlung und Vorzeichenkonventionen; sie ist keine allgemeine physikalische Beschreibung eines beliebigen Lineargenerators.</p>
+  </section>
+</article>
+</main>
+</body>
+</html>
